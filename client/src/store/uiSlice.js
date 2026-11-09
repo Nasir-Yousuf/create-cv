@@ -1,0 +1,112 @@
+import { createSlice } from '@reduxjs/toolkit';
+
+const initialState = {
+  mobileViewMode: 'edit', // 'edit' | 'preview' | 'design'
+  desktopTab: 'content', // 'content' | 'design' | 'templates' | 'ai'
+  activeSection: 'personalInfo',
+  previewScale: 0.95,
+  isDarkMode: false,
+  aiModal: {
+    isOpen: false,
+    mode: 'generate', // 'generate' | 'summary' | 'experience' | 'skills' | 'matcher' | 'review' | 'design'
+    contextData: null,
+  },
+  exportModal: {
+    isOpen: false,
+    format: 'pdf', // 'pdf' | 'docx'
+    isGenerating: false,
+    progress: 0,
+    downloadUrl: null,
+    error: null,
+  },
+  toast: {
+    show: false,
+    message: '',
+    type: 'info', // 'success' | 'error' | 'info' | 'warning'
+  },
+};
+
+export const uiSlice = createSlice({
+  name: 'ui',
+  initialState,
+  reducers: {
+    setMobileViewMode: (state, action) => {
+      state.mobileViewMode = action.payload;
+    },
+    setDesktopTab: (state, action) => {
+      state.desktopTab = action.payload;
+    },
+    setActiveSection: (state, action) => {
+      state.activeSection = action.payload;
+    },
+    setPreviewScale: (state, action) => {
+      state.previewScale = Math.max(0.5, Math.min(1.5, action.payload));
+    },
+    toggleDarkMode: (state) => {
+      state.isDarkMode = !state.isDarkMode;
+      if (state.isDarkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    },
+    openAIModal: (state, action) => {
+      state.aiModal = {
+        isOpen: true,
+        mode: action.payload.mode || 'generate',
+        contextData: action.payload.contextData || null,
+      };
+    },
+    closeAIModal: (state) => {
+      state.aiModal.isOpen = false;
+      state.aiModal.contextData = null;
+    },
+    openExportModal: (state, action) => {
+      state.exportModal = {
+        isOpen: true,
+        format: action.payload?.format || 'pdf',
+        isGenerating: false,
+        progress: 0,
+        downloadUrl: null,
+        error: null,
+      };
+    },
+    updateExportState: (state, action) => {
+      state.exportModal = {
+        ...state.exportModal,
+        ...action.payload,
+      };
+    },
+    closeExportModal: (state) => {
+      state.exportModal.isOpen = false;
+    },
+    showToast: (state, action) => {
+      state.toast = {
+        show: true,
+        message: action.payload.message,
+        type: action.payload.type || 'info',
+      };
+    },
+    hideToast: (state) => {
+      state.toast.show = false;
+    },
+  },
+});
+
+export const {
+  setMobileViewMode,
+  setDesktopTab,
+  setActiveSection,
+  setPreviewScale,
+  toggleDarkMode,
+  openAIModal,
+  closeAIModal,
+  openExportModal,
+  updateExportState,
+  closeExportModal,
+  showToast,
+  hideToast,
+} = uiSlice.actions;
+
+export default uiSlice.reducer;
+
