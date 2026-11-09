@@ -76,7 +76,7 @@ export const TEMPLATE_COMPONENTS = {
   ),
 };
 
-export const RenderCVTemplate = ({ cvData, scale = 1 }) => {
+export const RenderCVTemplate = ({ cvData, scale = 1, onOpenPhotoModal }) => {
   const templateId = cvData?.templateId || 'modern-minimal';
   const Component = TEMPLATE_COMPONENTS[templateId] || ModernMinimal;
 
@@ -94,7 +94,7 @@ export const RenderCVTemplate = ({ cvData, scale = 1 }) => {
         } bg-white shadow-2xl rounded-sm overflow-hidden`}
         id="cv-export-sheet"
       >
-        <Component cvData={cvData} />
+        <Component cvData={cvData} onOpenPhotoModal={onOpenPhotoModal} />
       </div>
     </div>
   );

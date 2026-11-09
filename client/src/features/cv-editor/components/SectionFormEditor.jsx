@@ -646,3 +646,4 @@ export const SectionFormEditor = ({ onOpenPhotoModal }) => {
 };
 
 export default SectionFormEditor;
+

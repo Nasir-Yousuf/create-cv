@@ -7,6 +7,7 @@ import morgan from 'morgan';
 import authRoutes from './routes/authRoutes.js';
 import cvRoutes from './routes/cvRoutes.js';
 import templateRoutes from './routes/templateRoutes.js';
+import exportRoutes from './routes/exportRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
 
 const app = express();
@@ -61,6 +62,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/cvs', cvRoutes);
 app.use('/api/templates', templateRoutes);
+app.use('/api/export', exportRoutes);
 
 // 404 Handler for undefined routes
 app.use('/api/*', (req, res) => {

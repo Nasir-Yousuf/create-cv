@@ -4,6 +4,7 @@ const initialState = {
   mobileViewMode: 'edit', // 'edit' | 'preview' | 'design'
   desktopTab: 'content', // 'content' | 'design' | 'templates' | 'ai'
   activeSection: 'personalInfo',
+  activeField: null, // e.g. 'fullName', 'jobTitle', 'summary'
   previewScale: 0.95,
   isDarkMode: false,
   aiModal: {
@@ -39,8 +40,11 @@ export const uiSlice = createSlice({
     setActiveSection: (state, action) => {
       state.activeSection = action.payload;
     },
+    setActiveField: (state, action) => {
+      state.activeField = action.payload;
+    },
     setPreviewScale: (state, action) => {
-      state.previewScale = Math.max(0.5, Math.min(1.5, action.payload));
+      state.previewScale = Math.max(0.4, Math.min(1.8, action.payload));
     },
     toggleDarkMode: (state) => {
       state.isDarkMode = !state.isDarkMode;
@@ -97,6 +101,7 @@ export const {
   setMobileViewMode,
   setDesktopTab,
   setActiveSection,
+  setActiveField,
   setPreviewScale,
   toggleDarkMode,
   openAIModal,
@@ -109,4 +114,3 @@ export const {
 } = uiSlice.actions;
 
 export default uiSlice.reducer;
-

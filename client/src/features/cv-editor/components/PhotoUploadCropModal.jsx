@@ -336,3 +336,4 @@ export const PhotoUploadCropModal = ({ isOpen, onClose }) => {
 };
 
 export default PhotoUploadCropModal;
+
