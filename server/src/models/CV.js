@@ -145,3 +145,4 @@ const cvSchema = new mongoose.Schema(
 
 export const CV = mongoose.model('CV', cvSchema);
 export default CV;
+

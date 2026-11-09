@@ -367,3 +367,4 @@ export const DashboardPage = ({ onOpenAuth }) => {
 };
 
 export default DashboardPage;
+

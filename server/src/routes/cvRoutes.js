@@ -26,3 +26,4 @@ router.route('/:id')
 router.post('/:id/duplicate', duplicateCV);
 
 export default router;
+

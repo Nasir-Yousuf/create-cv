@@ -31,6 +31,11 @@ export const INITIAL_CV_DATA = {
     margins: "normal", // compact | normal | wide
     pageSize: "A4", // A4 | Letter
     showPhoto: true,
+    photoSize: "md", // sm (72px) | md (96px) | lg (120px) | xl (144px)
+    photoPosition: "right", // left | center | right
+    columnRatio: "33/67", // 25/75 | 33/67 | 40/60 | 50/50
+    textAlignment: "left", // left | justify
+    headerStyle: "minimal", // minimal | banner | centered
     sectionOrder: [
       "summary",
       "experience",

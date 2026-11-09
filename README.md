@@ -146,3 +146,4 @@ npm run dev
 
 ## 📄 License
 This project is proprietary and built for personal and commercial SaaS portfolio deployment.
+

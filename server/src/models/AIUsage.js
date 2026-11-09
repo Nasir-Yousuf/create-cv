@@ -28,3 +28,4 @@ const aiUsageSchema = new mongoose.Schema(
 
 export const AIUsage = mongoose.model('AIUsage', aiUsageSchema);
 export default AIUsage;
+
