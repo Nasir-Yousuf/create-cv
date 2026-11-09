@@ -311,3 +311,4 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
 };
 
 export default EditorInspector;
+

@@ -1,7 +1,19 @@
 import React from 'react';
 
 export const ATSClassic = ({ cvData }) => {
-  const { personalInfo, experience, education, skills, projects, certifications, languages, design } = cvData;
+  const {
+    personalInfo = {},
+    personalDetails = {},
+    experience = [],
+    education = [],
+    skills = [],
+    projects = [],
+    certifications = [],
+    languages = [],
+    references = [],
+    declaration = {},
+    design = {},
+  } = cvData;
   const fontFamily = design?.fontFamily || 'Merriweather';
 
   return (
@@ -150,9 +162,54 @@ export const ATSClassic = ({ cvData }) => {
           </div>
         )}
       </div>
+
+      {/* Personal Details */}
+      {personalDetails?.fatherName && (
+        <div className="mt-5">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-black border-b border-black pb-0.5 mb-1.5">
+            PERSONAL DETAILS
+          </h2>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-800">
+            <p><strong>Father's Name:</strong> {personalDetails.fatherName}</p>
+            <p><strong>Mother's Name:</strong> {personalDetails.motherName}</p>
+            <p><strong>Date of Birth:</strong> {personalDetails.dob}</p>
+            <p><strong>Nationality:</strong> {personalDetails.nationality || 'Bangladeshi'}</p>
+            {personalDetails.nid && <p><strong>National ID:</strong> {personalDetails.nid}</p>}
+            {personalDetails.bloodGroup && <p><strong>Blood Group:</strong> {personalDetails.bloodGroup}</p>}
+          </div>
+        </div>
+      )}
+
+      {/* References */}
+      {references && references.length > 0 && (
+        <div className="mt-5">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-black border-b border-black pb-0.5 mb-1.5">
+            REFERENCES
+          </h2>
+          <div className="grid grid-cols-2 gap-4 text-slate-800">
+            {references.map((r, i) => (
+              <div key={r.id || i}>
+                <p className="font-bold">{r.name}</p>
+                <p>{r.designation}, {r.company}</p>
+                {r.phone && <p>Phone: {r.phone}</p>}
+                {r.email && <p>Email: {r.email}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Declaration */}
+      {declaration?.signedBy && (
+        <div className="mt-6 pt-4 border-t border-black text-[11px] flex justify-between items-end">
+          <p className="italic text-slate-700">{declaration.text || 'I hereby declare that all information above is true.'}</p>
+          <div className="text-right">
+            <p className="font-bold">{declaration.signedBy || personalInfo.fullName}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default ATSClassic;
-

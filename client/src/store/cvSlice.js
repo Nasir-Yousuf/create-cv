@@ -46,6 +46,20 @@ export const cvSlice = createSlice({
         ...action.payload,
       };
     },
+    updatePersonalDetails: (state, action) => {
+      pushHistory(state);
+      state.currentCV.personalDetails = {
+        ...state.currentCV.personalDetails,
+        ...action.payload,
+      };
+    },
+    updateDeclaration: (state, action) => {
+      pushHistory(state);
+      state.currentCV.declaration = {
+        ...state.currentCV.declaration,
+        ...action.payload,
+      };
+    },
     updateDesign: (state, action) => {
       pushHistory(state);
       state.currentCV.design = {
@@ -345,6 +359,8 @@ export const {
   setCVId,
   updateTitle,
   updatePersonalInfo,
+  updatePersonalDetails,
+  updateDeclaration,
   updateDesign,
   setTemplateId,
   undo,

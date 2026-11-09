@@ -38,14 +38,10 @@ export const ModernMinimal = ({ cvData, onOpenPhotoModal }) => {
     'languages',
   ];
 
-  const photoSizeClass =
-    design?.photoSize === 'sm'
-      ? 'w-16 h-16'
-      : design?.photoSize === 'lg'
-      ? 'w-28 h-28'
-      : design?.photoSize === 'xl'
-      ? 'w-36 h-36'
-      : 'w-24 h-24';
+  const isPortrait = personalInfo?.photoStyle === 'portrait' || design?.photoFormat === 'portrait' || true;
+  const photoSizeClass = isPortrait
+    ? (design?.photoSize === 'sm' ? 'w-20 h-28' : design?.photoSize === 'lg' ? 'w-32 h-44' : design?.photoSize === 'xl' ? 'w-36 h-48' : 'w-24 h-32')
+    : (design?.photoSize === 'sm' ? 'w-16 h-16' : design?.photoSize === 'lg' ? 'w-28 h-28' : design?.photoSize === 'xl' ? 'w-36 h-36' : 'w-24 h-24');
 
   const renderSection = (sectionId) => {
     switch (sectionId) {
@@ -373,6 +369,71 @@ export const ModernMinimal = ({ cvData, onOpenPhotoModal }) => {
           </section>
         );
 
+      case 'personalDetails':
+        if (!personalDetails?.fatherName && !personalDetails?.nid) return null;
+        return (
+          <section key="personalDetails" className="mb-6">
+            <h2
+              className="text-xs font-bold uppercase tracking-widest pb-1 mb-2 border-b-2"
+              style={{ color: primary, borderColor: primary }}
+            >
+              Personal Details
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-slate-700">
+              {personalDetails.fatherName && <p><strong className="text-slate-900">Father's Name:</strong> {personalDetails.fatherName}</p>}
+              {personalDetails.motherName && <p><strong className="text-slate-900">Mother's Name:</strong> {personalDetails.motherName}</p>}
+              {personalDetails.dob && <p><strong className="text-slate-900">Date of Birth:</strong> {personalDetails.dob}</p>}
+              {personalDetails.gender && <p><strong className="text-slate-900">Gender:</strong> {personalDetails.gender}</p>}
+              {personalDetails.nationality && <p><strong className="text-slate-900">Nationality:</strong> {personalDetails.nationality}</p>}
+              {personalDetails.nid && <p><strong className="text-slate-900">National ID (NID):</strong> {personalDetails.nid}</p>}
+              {personalDetails.bloodGroup && <p><strong className="text-slate-900">Blood Group:</strong> {personalDetails.bloodGroup}</p>}
+              {personalDetails.permanentAddress && (
+                <p className="sm:col-span-2"><strong className="text-slate-900">Permanent Address:</strong> {personalDetails.permanentAddress}</p>
+              )}
+            </div>
+          </section>
+        );
+
+      case 'references':
+        if (!references || references.length === 0) return null;
+        return (
+          <section key="references" className="mb-6">
+            <h2
+              className="text-xs font-bold uppercase tracking-widest pb-1 mb-2 border-b-2"
+              style={{ color: primary, borderColor: primary }}
+            >
+              References
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-700">
+              {references.map((r, i) => (
+                <div key={r.id || i} className="p-2.5 bg-slate-50 border border-slate-200 rounded">
+                  <p className="font-bold text-slate-900">{r.name}</p>
+                  <p className="text-slate-600">{r.designation}, {r.company}</p>
+                  {r.phone && <p className="text-slate-500">Phone: {r.phone}</p>}
+                  {r.email && <p className="text-slate-500">Email: {r.email}</p>}
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+
+      case 'declaration':
+        if (!declaration?.signedBy && !declaration?.text) return null;
+        return (
+          <section key="declaration" className="pt-4 border-t border-slate-200 text-[10px] text-slate-600">
+            <p className="italic">
+              {declaration.text || 'I hereby declare that all the information provided above is true and correct.'}
+            </p>
+            <div className="flex justify-between items-end pt-4 text-xs">
+              <p className="text-slate-500">Date: {declaration.date || new Date().toLocaleDateString('en-GB')}</p>
+              <div className="text-right">
+                <div className="w-32 border-b border-slate-400 mb-1" />
+                <p className="font-bold text-slate-900">{declaration.signedBy || personalInfo.fullName}</p>
+              </div>
+            </div>
+          </section>
+        );
+
       default:
         return null;
     }
@@ -425,9 +486,11 @@ export const ModernMinimal = ({ cvData, onOpenPhotoModal }) => {
                 className={`${photoSizeClass} object-cover border-2 shadow-sm transition-transform group-hover/photo:scale-105 ${
                   personalInfo.photoStyle === 'square'
                     ? 'rounded-none'
+                    : personalInfo.photoStyle === 'circle'
+                    ? 'rounded-full'
                     : personalInfo.photoStyle === 'rounded'
                     ? 'rounded-2xl'
-                    : 'rounded-full'
+                    : 'rounded-md'
                 }`}
                 style={{ borderColor: primary }}
               />

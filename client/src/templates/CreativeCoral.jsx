@@ -1,24 +1,58 @@
 import React from 'react';
-import { Mail, Phone, MapPin, Globe, Sparkles } from 'lucide-react';
+import { Mail, Phone, MapPin, Globe, Sparkles, Camera } from 'lucide-react';
 
-export const CreativeCoral = ({ cvData }) => {
-  const { personalInfo, experience, education, skills, projects, certifications, languages, design } = cvData;
+export const CreativeCoral = ({ cvData, onOpenPhotoModal }) => {
+  const {
+    personalInfo = {},
+    personalDetails = {},
+    experience = [],
+    education = [],
+    skills = [],
+    projects = [],
+    certifications = [],
+    languages = [],
+    references = [],
+    declaration = {},
+    design = {},
+  } = cvData;
   const primary = design?.primaryColor || '#f43f5e'; // Coral
   const fontFamily = design?.fontFamily || 'Outfit';
 
+  const photoSizeClass =
+    design?.photoSize === 'sm'
+      ? 'w-20 h-28'
+      : design?.photoSize === 'lg'
+      ? 'w-32 h-44'
+      : design?.photoSize === 'xl'
+      ? 'w-36 h-48'
+      : 'w-24 h-32';
+
   return (
     <div className="bg-white text-slate-800 text-xs min-h-full" style={{ fontFamily }}>
-      {/* Top Banner with organic wave & avatar */}
+      {/* Top Banner with organic wave & portrait/circle avatar */}
       <div className="bg-gradient-to-r from-rose-500 via-rose-400 to-amber-300 p-8 sm:p-10 text-white relative">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-          {personalInfo.photo && design?.showPhoto && (
-            <img
-              src={personalInfo.photo}
-              alt={personalInfo.fullName}
-              className="w-24 h-24 object-cover rounded-full border-4 border-white shadow-xl"
-            />
+          {design?.showPhoto && (
+            <div
+              onClick={() => onOpenPhotoModal && onOpenPhotoModal()}
+              className="cursor-pointer group relative shrink-0"
+              title="Click to edit photo"
+            >
+              {personalInfo.photo ? (
+                <img
+                  src={personalInfo.photo}
+                  alt={personalInfo.fullName}
+                  className={`${photoSizeClass} object-cover rounded-xl border-4 border-white shadow-xl`}
+                />
+              ) : (
+                <div className={`${photoSizeClass} border-2 border-dashed border-white/80 rounded-xl flex flex-col items-center justify-center text-white p-2 text-center`}>
+                  <Camera className="w-5 h-5 mb-1" />
+                  <span className="text-[9px]">Portrait</span>
+                </div>
+              )}
+            </div>
           )}
-          <div className="space-y-1 text-center sm:text-left">
+          <div className="space-y-1 text-center sm:text-left flex-1">
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
               {personalInfo.fullName || 'Creative Name'}
             </h1>
@@ -58,12 +92,14 @@ export const CreativeCoral = ({ cvData }) => {
                     <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-rose-500" />
                     <div className="flex justify-between font-bold text-slate-900">
                       <span>{exp.jobTitle}</span>
-                      <span className="text-rose-600 font-normal">{exp.startDate} – {exp.current ? 'Present' : exp.endDate}</span>
+                      <span className="text-[11px] text-slate-500 font-normal">
+                        {exp.startDate} - {exp.current ? 'Present' : exp.endDate}
+                      </span>
                     </div>
-                    <p className="text-slate-600 font-medium">{exp.company} {exp.location && `• ${exp.location}`}</p>
+                    <div className="text-rose-600 font-semibold">{exp.company}</div>
                     {exp.description && <p className="text-slate-700">{exp.description}</p>}
                     {exp.highlights && exp.highlights.length > 0 && (
-                      <ul className="list-disc pl-4 space-y-1 text-slate-700 mt-1">
+                      <ul className="list-disc pl-4 space-y-0.5 text-slate-700 mt-1">
                         {exp.highlights.map((h, i) => h && <li key={i}>{h}</li>)}
                       </ul>
                     )}
@@ -73,20 +109,25 @@ export const CreativeCoral = ({ cvData }) => {
             </section>
           )}
 
+          {/* Projects */}
           {projects && projects.length > 0 && (
             <section className="space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-rose-500 border-b border-rose-200 pb-1">
-                Featured Work
+                Featured Projects
               </h3>
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {projects.map((proj) => (
                   <div key={proj.id || proj.title} className="p-3 bg-rose-50/50 rounded-xl border border-rose-100">
                     <p className="font-bold text-slate-900">{proj.title}</p>
-                    <p className="text-slate-700 mt-0.5">{proj.description}</p>
+                    <p className="text-slate-600 mt-1">{proj.description}</p>
                     {proj.technologies && (
-                      <p className="text-rose-600 font-semibold text-[10px] mt-1">
-                        {proj.technologies.join(' • ')}
-                      </p>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {proj.technologies.map((t, idx) => (
+                          <span key={idx} className="px-1.5 py-0.5 bg-white text-rose-600 rounded text-[10px] font-medium border border-rose-200">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -95,58 +136,63 @@ export const CreativeCoral = ({ cvData }) => {
           )}
         </div>
 
-        {/* Right Column: Skills, Education, Languages */}
+        {/* Right Sidebar: Skills, Education, References */}
         <div className="space-y-6">
           {skills && skills.length > 0 && (
-            <section>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-rose-500 border-b border-rose-200 pb-1 mb-3">
-                Creative Skills
+            <section className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-rose-500 border-b border-rose-200 pb-1">
+                Expertise
               </h3>
-              <div className="space-y-2">
-                {skills.map((skill) => (
-                  <div key={skill.id || skill.name} className="space-y-1">
-                    <div className="flex justify-between text-[11px]">
-                      <span className="font-medium text-slate-800">{skill.name}</span>
-                      <span className="text-rose-500 font-semibold">{skill.level || 'Expert'}</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-rose-400 to-amber-400 rounded-full w-4/5" />
-                    </div>
-                  </div>
+              <div className="flex flex-wrap gap-1.5">
+                {skills.map((s) => (
+                  <span key={s.id || s.name} className="px-2.5 py-1 bg-amber-50 text-amber-900 rounded-lg text-xs font-medium border border-amber-200">
+                    {s.name}
+                  </span>
                 ))}
               </div>
             </section>
           )}
 
           {education && education.length > 0 && (
-            <section>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-rose-500 border-b border-rose-200 pb-1 mb-2">
+            <section className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-rose-500 border-b border-rose-200 pb-1">
                 Education
               </h3>
               <div className="space-y-2">
                 {education.map((edu) => (
-                  <div key={edu.id || edu.institution}>
-                    <p className="font-bold text-slate-900">{edu.degree} in {edu.fieldOfStudy}</p>
-                    <p className="text-slate-600 text-[11px]">{edu.institution} ({edu.startDate} - {edu.endDate})</p>
+                  <div key={edu.id || edu.institution} className="space-y-0.5">
+                    <p className="font-bold text-slate-900">{edu.degree}</p>
+                    <p className="text-slate-600 text-[11px]">{edu.institution} {edu.grade && `(${edu.grade})`}</p>
+                    <p className="text-slate-400 text-[10px]">{edu.startDate} - {edu.endDate}</p>
                   </div>
                 ))}
               </div>
             </section>
           )}
 
-          {languages && languages.length > 0 && (
-            <section>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-rose-500 border-b border-rose-200 pb-1 mb-2">
-                Languages
+          {personalDetails?.fatherName && (
+            <section className="space-y-1.5 pt-2 border-t border-rose-100">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-rose-500 pb-1">
+                Personal
               </h3>
-              <div className="space-y-1">
-                {languages.map((l) => (
-                  <div key={l.id || l.language} className="flex justify-between text-[11px]">
-                    <span className="text-slate-800">{l.language}</span>
-                    <span className="text-rose-500 font-medium">{l.proficiency}</span>
-                  </div>
-                ))}
-              </div>
+              <p><strong>DOB:</strong> {personalDetails.dob}</p>
+              <p><strong>NID:</strong> {personalDetails.nid}</p>
+              <p><strong>Blood:</strong> {personalDetails.bloodGroup}</p>
+            </section>
+          )}
+
+          {references && references.length > 0 && (
+            <section className="space-y-2 pt-2 border-t border-rose-100">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-rose-500 pb-1">
+                References
+              </h3>
+              {references.map((r, i) => (
+                <div key={r.id || i} className="p-2 bg-slate-50 rounded text-[11px]">
+                  <p className="font-bold text-slate-900">{r.name}</p>
+                  <p className="text-slate-600">{r.designation}, {r.company}</p>
+                  {r.phone && <p className="text-slate-500">Phone: {r.phone}</p>}
+                </div>
+              ))}
             </section>
           )}
         </div>
@@ -156,4 +202,3 @@ export const CreativeCoral = ({ cvData }) => {
 };
 
 export default CreativeCoral;
-

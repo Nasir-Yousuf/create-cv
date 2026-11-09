@@ -384,6 +384,104 @@ export const generateDOCX = async (cvData) => {
     );
   }
 
+  // 8. Personal Details (Bangladesh Recruiter standard)
+  const { personalDetails = {}, references = [], declaration = {} } = cvData;
+  if (personalDetails && (personalDetails.fatherName || personalDetails.nid)) {
+    sections.push(createSectionHeading('Personal Details'));
+    const details = [
+      personalDetails.fatherName ? `Father's Name: ${personalDetails.fatherName}` : null,
+      personalDetails.motherName ? `Mother's Name: ${personalDetails.motherName}` : null,
+      personalDetails.dob ? `Date of Birth: ${personalDetails.dob}` : null,
+      personalDetails.nationality ? `Nationality: ${personalDetails.nationality}` : null,
+      personalDetails.nid ? `National ID (NID): ${personalDetails.nid}` : null,
+      personalDetails.bloodGroup ? `Blood Group: ${personalDetails.bloodGroup}` : null,
+      personalDetails.permanentAddress ? `Permanent Address: ${personalDetails.permanentAddress}` : null,
+    ].filter(Boolean);
+
+    details.forEach((d) => {
+      sections.push(
+        new Paragraph({
+          spacing: { after: 40 },
+          children: [
+            new TextRun({
+              text: d,
+              size: 20,
+              font: 'Calibri',
+            }),
+          ],
+        })
+      );
+    });
+  }
+
+  // 9. References
+  if (references && references.length > 0) {
+    sections.push(createSectionHeading('References'));
+    references.forEach((ref) => {
+      sections.push(
+        new Paragraph({
+          spacing: { after: 20 },
+          children: [
+            new TextRun({
+              text: ref.name,
+              bold: true,
+              size: 20,
+              font: 'Calibri',
+            }),
+            new TextRun({
+              text: ` — ${ref.designation}, ${ref.company}`,
+              size: 20,
+              font: 'Calibri',
+            }),
+            ...(ref.phone
+              ? [
+                  new TextRun({
+                    text: ` (Phone: ${ref.phone})`,
+                    size: 18,
+                    color: grayColorHex,
+                    font: 'Calibri',
+                  }),
+                ]
+              : []),
+          ],
+        })
+      );
+    });
+  }
+
+  // 10. Declaration
+  if (declaration && (declaration.signedBy || declaration.text)) {
+    sections.push(createSectionHeading('Declaration'));
+    sections.push(
+      new Paragraph({
+        spacing: { before: 80, after: 120 },
+        children: [
+          new TextRun({
+            text: declaration.text || 'I hereby declare that all the information provided above is true and correct.',
+            italics: true,
+            size: 18,
+            color: grayColorHex,
+            font: 'Calibri',
+          }),
+        ],
+      })
+    );
+    sections.push(
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        spacing: { before: 100 },
+        children: [
+          new TextRun({
+            text: `Signed by: ${declaration.signedBy || personalInfo.fullName || 'Applicant'}`,
+            bold: true,
+            size: 20,
+            font: 'Calibri',
+          }),
+        ],
+      })
+    );
+  }
+
   const doc = new Document({
     sections: [
       {
@@ -406,3 +504,4 @@ export const generateDOCX = async (cvData) => {
 };
 
 export default generateDOCX;
+

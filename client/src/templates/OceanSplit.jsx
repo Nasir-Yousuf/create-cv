@@ -1,26 +1,63 @@
 import React from 'react';
-import { Mail, Phone, MapPin, Globe, Linkedin, Github } from 'lucide-react';
+import { Mail, Phone, MapPin, Globe, Linkedin, Github, Camera } from 'lucide-react';
 
-export const OceanSplit = ({ cvData }) => {
-  const { personalInfo, experience, education, skills, projects, certifications, languages, design } = cvData;
+export const OceanSplit = ({ cvData, onOpenPhotoModal }) => {
+  const {
+    personalInfo = {},
+    personalDetails = {},
+    experience = [],
+    education = [],
+    skills = [],
+    projects = [],
+    certifications = [],
+    languages = [],
+    references = [],
+    declaration = {},
+    design = {},
+  } = cvData;
+
   const primary = design?.primaryColor || '#0284c7'; // Sky/Ocean blue
   const accent = design?.accentColor || '#38bdf8';
   const fontFamily = design?.fontFamily || 'Inter';
 
+  const photoSizeClass =
+    design?.photoSize === 'sm'
+      ? 'w-20 h-28'
+      : design?.photoSize === 'lg'
+      ? 'w-32 h-44'
+      : design?.photoSize === 'xl'
+      ? 'w-36 h-48'
+      : 'w-24 h-32';
+
   return (
-    <div className="flex flex-col sm:flex-row min-h-full bg-white text-slate-800" style={{ fontFamily }}>
+    <div className="flex flex-col sm:flex-row min-h-full bg-white text-slate-800 text-xs" style={{ fontFamily }}>
       {/* Left Sidebar */}
       <div className="w-full sm:w-1/3 bg-slate-900 text-white p-6 sm:p-8 space-y-6 shrink-0">
         {/* Photo */}
-        {personalInfo.photo && design?.showPhoto && (
-          <div className="flex justify-center">
-            <img
-              src={personalInfo.photo}
-              alt={personalInfo.fullName}
-              className={`w-28 h-28 object-cover border-4 border-sky-400 shadow-lg ${
-                personalInfo.photoStyle === 'square' ? 'rounded-none' : 'rounded-full'
-              }`}
-            />
+        {design?.showPhoto && (
+          <div
+            onClick={() => onOpenPhotoModal && onOpenPhotoModal()}
+            className="flex justify-center cursor-pointer group relative"
+            title="Click to edit photo"
+          >
+            {personalInfo.photo ? (
+              <img
+                src={personalInfo.photo}
+                alt={personalInfo.fullName}
+                className={`${photoSizeClass} object-cover border-4 border-sky-400 shadow-lg ${
+                  personalInfo.photoStyle === 'circle'
+                    ? 'rounded-full w-28 h-28'
+                    : personalInfo.photoStyle === 'square'
+                    ? 'rounded-none'
+                    : 'rounded-lg'
+                }`}
+              />
+            ) : (
+              <div className={`${photoSizeClass} border-2 border-dashed border-sky-400/60 rounded-lg flex flex-col items-center justify-center text-sky-300 p-2 text-center`}>
+                <Camera className="w-5 h-5 mb-1" />
+                <span className="text-[9px]">Passport Photo</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -60,21 +97,27 @@ export const OceanSplit = ({ cvData }) => {
                 <span className="truncate">{personalInfo.github.replace(/^https?:\/\/(www\.)?github\.com\//, '')}</span>
               </div>
             )}
+            {personalInfo.linkedin && (
+              <div className="flex items-center gap-2">
+                <Linkedin className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                <span className="truncate">{personalInfo.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '')}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Skills */}
+        {/* Skills in Sidebar */}
         {skills && skills.length > 0 && (
-          <div className="space-y-3 text-xs">
+          <div className="space-y-3">
             <h3 className="text-[11px] font-bold uppercase tracking-wider text-sky-400 border-b border-slate-700 pb-1">
-              Skills
+              Skills & Expertise
             </h3>
-            <div className="space-y-2">
+            <div className="space-y-2 text-xs">
               {skills.map((skill) => (
                 <div key={skill.id || skill.name} className="space-y-1">
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-200">{skill.name}</span>
-                    <span className="text-slate-400 text-[10px]">{skill.level || 'Proficient'}</span>
+                  <div className="flex justify-between text-slate-200">
+                    <span>{skill.name}</span>
+                    <span className="text-[10px] text-slate-400">{skill.level}</span>
                   </div>
                   <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
                     <div
@@ -87,7 +130,7 @@ export const OceanSplit = ({ cvData }) => {
                             ? '80%'
                             : skill.level === 'Intermediate'
                             ? '60%'
-                            : '45%',
+                            : '40%',
                       }}
                     />
                   </div>
@@ -97,43 +140,37 @@ export const OceanSplit = ({ cvData }) => {
           </div>
         )}
 
-        {/* Languages */}
-        {languages && languages.length > 0 && (
-          <div className="space-y-2 text-xs">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-sky-400 border-b border-slate-700 pb-1">
-              Languages
-            </h3>
-            <div className="space-y-1 text-slate-300">
-              {languages.map((l) => (
-                <div key={l.id || l.language} className="flex justify-between text-[11px]">
-                  <span>{l.language}</span>
-                  <span className="text-slate-400">{l.proficiency}</span>
-                </div>
-              ))}
-            </div>
+        {/* Personal Details in Sidebar (if available) */}
+        {personalDetails?.fatherName && (
+          <div className="space-y-2 text-[11px] text-slate-300 pt-2 border-t border-slate-800">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-sky-400">Personal Info</h3>
+            <p><strong>DOB:</strong> {personalDetails.dob}</p>
+            <p><strong>NID:</strong> {personalDetails.nid}</p>
+            <p><strong>Blood:</strong> {personalDetails.bloodGroup}</p>
+            <p><strong>Nationality:</strong> {personalDetails.nationality || 'Bangladeshi'}</p>
           </div>
         )}
       </div>
 
-      {/* Right Column */}
-      <div className="w-full sm:w-2/3 p-6 sm:p-8 space-y-6">
-        {/* Name Header */}
-        <div className="border-b-2 pb-4" style={{ borderColor: primary }}>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
+      {/* Right Content Area */}
+      <div className="w-full sm:w-2/3 p-6 sm:p-10 space-y-6">
+        {/* Header */}
+        <div className="border-b pb-4">
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900" style={{ color: primary }}>
             {personalInfo.fullName || 'Your Name'}
           </h1>
-          <p className="text-base font-semibold mt-1" style={{ color: primary }}>
-            {personalInfo.jobTitle || 'Your Job Title'}
+          <p className="text-base font-semibold text-slate-600 mt-1">
+            {personalInfo.jobTitle || 'Your Title'}
           </p>
         </div>
 
         {/* Summary */}
         {personalInfo.summary && (
           <section>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 mb-1.5">
-              Profile
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b pb-1 mb-2">
+              Professional Profile
             </h3>
-            <p className="text-xs leading-relaxed text-slate-700">{personalInfo.summary}</p>
+            <p className="text-slate-700 leading-relaxed">{personalInfo.summary}</p>
           </section>
         )}
 
@@ -206,10 +243,27 @@ export const OceanSplit = ({ cvData }) => {
             </div>
           </section>
         )}
+
+        {/* References */}
+        {references && references.length > 0 && (
+          <section className="space-y-2 pt-2 border-t">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1">
+              References
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              {references.map((r, i) => (
+                <div key={r.id || i} className="p-2 bg-slate-50 rounded border border-slate-200">
+                  <p className="font-bold text-slate-900">{r.name}</p>
+                  <p className="text-slate-600">{r.designation}, {r.company}</p>
+                  {r.phone && <p className="text-slate-500">Phone: {r.phone}</p>}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
 };
 
 export default OceanSplit;
-
