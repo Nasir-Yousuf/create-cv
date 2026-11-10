@@ -3,21 +3,116 @@
  * Supports international and Bangladeshi recruiter formats (BDJobs standard, Corporate, Banking)
  */
 
-export const INITIAL_CV_DATA = {
-  title: "Professional Resume",
-  templateId: "bd-corporate-standard",
+export const DANIEL_CARTER_CV = {
+  title: "Daniel Carter - Resume",
+  templateId: "modern-blue",
   personalInfo: {
-    fullName: "Tahmidur Rahman",
-    jobTitle: "Senior Software Engineer / Project Coordinator",
-    email: "tahmid.rahman@email.com",
-    phone: "+880 1712-345678",
-    location: "Gulshan-2, Dhaka, Bangladesh",
-    website: "https://tahmidrahman.dev",
-    linkedin: "linkedin.com/in/tahmidrahman",
-    github: "github.com/tahmidrahman",
-    photo: null,
-    photoStyle: "portrait", // 'portrait' (passport size 3:4/4:5) | 'circle' | 'rounded' | 'square'
-    summary: "Dedicated and analytical professional with 5+ years of experience delivering high-impact software solutions and cross-functional team leadership. Proven track record in streamlining operational workflows, managing client deliverables under pressure, and maintaining high standards of software quality."
+    fullName: "Daniel Carter",
+    jobTitle: "Senior Software Engineer",
+    email: "daniel.carter@example.com",
+    phone: "+1 (555) 123-4567",
+    location: "San Francisco, CA",
+    website: "https://danielcarter.dev",
+    linkedin: "linkedin.com/in/danielcarter",
+    github: "github.com/danielcarter",
+    photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80",
+    photoStyle: "circle",
+    summary: "Passionate Senior Software Engineer with 5+ years of experience in building scalable web applications. Skilled in modern technologies and delivering innovative solutions that make an impact."
+  },
+  design: {
+    primaryColor: "#2563eb",
+    accentColor: "#3b82f6",
+    textColor: "#0f172a",
+    backgroundColor: "#ffffff",
+    fontFamily: "Inter",
+    fontSize: "medium",
+    lineSpacing: "normal",
+    sectionSpacing: "normal",
+    margins: "normal",
+    pageSize: "A4",
+    showPhoto: true,
+    photoSize: "md",
+    photoPosition: "left",
+    sectionOrder: ["summary", "experience", "education", "skills", "languages", "interests"]
+  },
+  skills: [
+    { name: "React", level: 90 },
+    { name: "Next.js", level: 85 },
+    { name: "TypeScript", level: 85 },
+    { name: "Node.js", level: 80 },
+    { name: "Python", level: 75 },
+    { name: "AWS", level: 70 },
+    { name: "UI/UX Design", level: 80 },
+    { name: "Project Management", level: 75 }
+  ],
+  languages: [
+    { name: "English", proficiency: "Native" },
+    { name: "Spanish", proficiency: "Fluent" },
+    { name: "French", proficiency: "Intermediate" }
+  ],
+  interests: ["Travel", "Photography", "Technology", "Fitness"],
+  experience: [
+    {
+      id: "exp-1",
+      jobTitle: "Senior Software Engineer",
+      company: "TechCorp Inc.",
+      location: "San Francisco, CA",
+      startDate: "2021",
+      endDate: "Present",
+      current: true,
+      description: "Leading development of cloud-based applications and mentoring engineers.",
+      highlights: [
+        "Lead development of cloud-based applications",
+        "Mentor junior developers",
+        "Improve system performance by 40%"
+      ]
+    },
+    {
+      id: "exp-2",
+      jobTitle: "Software Engineer",
+      company: "InnovateLabs",
+      location: "New York, NY",
+      startDate: "2019",
+      endDate: "2021",
+      current: false,
+      description: "Built responsive client portals and implemented CI/CD pipelines.",
+      highlights: [
+        "Developed responsive web applications",
+        "Collaborated with cross-functional teams",
+        "Implemented CI/CD pipelines"
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-1",
+      degree: "Bachelor of Science in Computer Science",
+      institution: "University of California",
+      location: "Berkeley, CA",
+      startDate: "2015",
+      endDate: "2019",
+      grade: "3.85 GPA"
+    }
+  ],
+  projects: [],
+  certifications: []
+};
+
+export const INITIAL_CV_DATA = {
+  title: "Daniel Carter - Professional Resume",
+  templateId: "modern-blue",
+  personalInfo: {
+    fullName: "Daniel Carter",
+    jobTitle: "Senior Software Engineer",
+    email: "daniel.carter@example.com",
+    phone: "+1 (555) 123-4567",
+    location: "San Francisco, CA",
+    website: "https://danielcarter.dev",
+    linkedin: "linkedin.com/in/danielcarter",
+    github: "github.com/danielcarter",
+    photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80",
+    photoStyle: "circle",
+    summary: "Passionate Senior Software Engineer with 5+ years of experience in building scalable web applications. Skilled in modern technologies and delivering innovative solutions that make an impact."
   },
 
   // Personal details expected by Bangladesh corporate recruiters, banks, and BDJobs
@@ -69,30 +164,31 @@ export const INITIAL_CV_DATA = {
     {
       id: "exp-1",
       jobTitle: "Senior Software Engineer",
-      company: "Brain Station 23 Ltd.",
-      location: "Mohakhali DOHS, Dhaka",
-      startDate: "2022-03",
-      endDate: "",
+      company: "TechCorp Inc.",
+      location: "San Francisco, CA",
+      startDate: "2021",
+      endDate: "Present",
       current: true,
-      description: "Leading core fintech development squad building high-throughput payment gateways and cloud services.",
+      description: "Lead development of cloud-based applications and mentor engineers.",
       highlights: [
-        "Architected scalable microservices handling 2.5M daily transactions with 99.98% uptime.",
-        "Reduced database query latency by 45% using Redis caching and PostgreSQL query optimization.",
-        "Mentored a cross-functional team of 6 engineers across agile delivery sprints."
+        "Lead development of cloud-based applications",
+        "Mentor junior developers",
+        "Improve system performance by 40%"
       ]
     },
     {
       id: "exp-2",
-      jobTitle: "Software Developer",
-      company: "Kazi IT Center",
-      location: "Nikunja-2, Dhaka",
-      startDate: "2019-08",
-      endDate: "2022-02",
+      jobTitle: "Software Engineer",
+      company: "InnovateLabs",
+      location: "New York, NY",
+      startDate: "2019",
+      endDate: "2021",
       current: false,
-      description: "Developed enterprise web applications and RESTful APIs using React, Node.js, and MongoDB.",
+      description: "Developed responsive web applications and automated CI/CD pipelines.",
       highlights: [
-        "Built responsive client portals improving user engagement by 32%.",
-        "Automated CI/CD delivery pipelines with Docker and GitHub Actions."
+        "Developed responsive web applications",
+        "Collaborated with cross-functional teams",
+        "Implemented CI/CD pipelines"
       ]
     }
   ],
@@ -100,44 +196,26 @@ export const INITIAL_CV_DATA = {
   education: [
     {
       id: "edu-1",
-      institution: "University of Dhaka",
-      degree: "Bachelor of Science (B.Sc.)",
-      fieldOfStudy: "Computer Science & Engineering",
+      institution: "University of California",
+      degree: "Bachelor of Science in Computer Science",
+      fieldOfStudy: "Computer Science",
+      location: "Berkeley, CA",
       startDate: "2015",
       endDate: "2019",
-      grade: "CGPA 3.82 out of 4.00",
-      description: "Major in Software Engineering. Recipient of Dean's Merit Scholarship."
-    },
-    {
-      id: "edu-2",
-      institution: "Notre Dame College, Dhaka",
-      degree: "Higher Secondary Certificate (HSC)",
-      fieldOfStudy: "Science",
-      startDate: "2013",
-      endDate: "2015",
-      grade: "GPA 5.00 out of 5.00",
-      description: "Dhaka Board. Achieved Board General Scholarship."
-    },
-    {
-      id: "edu-3",
-      institution: "Government Laboratory High School, Dhaka",
-      degree: "Secondary School Certificate (SSC)",
-      fieldOfStudy: "Science",
-      startDate: "2011",
-      endDate: "2013",
-      grade: "GPA 5.00 out of 5.00",
-      description: "Dhaka Board. Golden GPA-5."
+      grade: "3.85 GPA",
+      description: "Graduated with Honors. Dean's Honor List."
     }
   ],
 
   skills: [
-    { id: "skill-1", name: "JavaScript / TypeScript", level: "Expert", category: "Technical" },
-    { id: "skill-2", name: "React / Next.js / Redux", level: "Expert", category: "Frontend" },
-    { id: "skill-3", name: "Node.js / Express.js", level: "Expert", category: "Backend" },
-    { id: "skill-4", name: "MongoDB & PostgreSQL", level: "Advanced", category: "Databases" },
-    { id: "skill-5", name: "MS Office (Word, Excel, PowerPoint)", level: "Expert", category: "Office" },
-    { id: "skill-6", name: "Project Management & Agile", level: "Advanced", category: "Leadership" },
-    { id: "skill-7", name: "Docker & AWS Cloud", level: "Intermediate", category: "DevOps" }
+    { id: "skill-1", name: "React" },
+    { id: "skill-2", name: "Next.js" },
+    { id: "skill-3", name: "TypeScript" },
+    { id: "skill-4", name: "Node.js" },
+    { id: "skill-5", name: "Python" },
+    { id: "skill-6", name: "AWS" },
+    { id: "skill-7", name: "UI/UX Design" },
+    { id: "skill-8", name: "Project Management" }
   ],
 
   projects: [
@@ -171,8 +249,9 @@ export const INITIAL_CV_DATA = {
   ],
 
   languages: [
-    { id: "lang-1", language: "Bengali", proficiency: "Native (Reading, Writing, Speaking)" },
-    { id: "lang-2", language: "English", proficiency: "Fluent / Professional Working" }
+    { id: "lang-1", name: "English", language: "English", proficiency: "Native" },
+    { id: "lang-2", name: "Spanish", language: "Spanish", proficiency: "Fluent" },
+    { id: "lang-3", name: "French", language: "French", proficiency: "Intermediate" }
   ],
 
   references: [
@@ -204,6 +283,107 @@ export const INITIAL_CV_DATA = {
 };
 
 export const TEMPLATES_REGISTRY = [
+  // --- MACOS REFERENCE & MODERN DESIGNS ---
+  {
+    id: "modern-blue",
+    name: "Modern Blue",
+    category: "Modern Minimal",
+    description: "Featured flagship design from ResumeCraft. Two-column layout with circular profile headshot, 2-column contact grid, skill pill badges, and clean chronological experience.",
+    badge: "Featured",
+    isPremium: false,
+    thumbnailColor: "#2563eb",
+    photoFormat: "circle",
+    features: ["Circular Headshot", "Two-Column Balance", "Skill Pills", "ATS Optimized"]
+  },
+  {
+    id: "elegant-minimal",
+    name: "Elegant Minimal",
+    category: "Modern Minimal",
+    description: "Refined dark slate accents, clean lines, and crisp typography for senior professionals and executives.",
+    badge: "Minimal",
+    isPremium: false,
+    thumbnailColor: "#334155",
+    photoFormat: "circle",
+    features: ["Slate Tones", "Executive Clarity", "Skill Badges"]
+  },
+  {
+    id: "professional",
+    name: "Professional",
+    category: "Classic Formal",
+    description: "Timeless corporate standard with midnight blue accents and structured career achievements.",
+    badge: "Formal",
+    isPremium: false,
+    thumbnailColor: "#0f172a",
+    photoFormat: "circle",
+    features: ["Formal Header", "High Readability", "Chronological"]
+  },
+  {
+    id: "creative-design",
+    name: "Creative Design",
+    category: "Creative & Design",
+    description: "Vibrant coral accents, asymmetric layouts, and standout typography for designers, marketers, and creators.",
+    badge: "Creative",
+    isPremium: false,
+    thumbnailColor: "#f97316",
+    photoFormat: "circle",
+    features: ["Coral Accent", "Portfolio Ready", "Dynamic"]
+  },
+  {
+    id: "clean-layout",
+    name: "Clean Layout",
+    category: "Modern Minimal",
+    description: "Apple-inspired pure whitespace, hairline dividers, and San Francisco style typography.",
+    badge: "Apple Style",
+    isPremium: false,
+    thumbnailColor: "#1e293b",
+    photoFormat: "circle",
+    features: ["Pure Whitespace", "Hairline Dividers", "Crisp Text"]
+  },
+  {
+    id: "bold-style",
+    name: "Bold Style",
+    category: "Classic Formal",
+    description: "Strong high-contrast headings and clear hierarchy for technical leadership.",
+    badge: "Bold",
+    isPremium: false,
+    thumbnailColor: "#0f172a",
+    photoFormat: "circle",
+    features: ["High Contrast", "Strong Headers", "Leadership"]
+  },
+  {
+    id: "simple-white",
+    name: "Simple White",
+    category: "Modern Minimal",
+    description: "Monochrome elegance with zero distractions and maximum ATS parser compatibility.",
+    badge: "Simple",
+    isPremium: false,
+    thumbnailColor: "#475569",
+    photoFormat: "circle",
+    features: ["Monochrome", "100% ATS Safe", "Clean"]
+  },
+  {
+    id: "dark-mode",
+    name: "Dark Mode",
+    category: "Tech & IT",
+    description: "Linear Obsidian dark mode theme for software engineers, product builders, and designers.",
+    badge: "Dark",
+    isPremium: false,
+    thumbnailColor: "#6366f1",
+    photoFormat: "circle",
+    features: ["Dark Theme", "Tech Stack Focus", "Modern"]
+  },
+  {
+    id: "minimal-blue",
+    name: "Minimal Blue",
+    category: "Modern Minimal",
+    description: "Electric cyan and sky blue accents with light and airy structure.",
+    badge: "Fresh",
+    isPremium: false,
+    thumbnailColor: "#0284c7",
+    photoFormat: "circle",
+    features: ["Sky Blue", "Modern Balance", "Compact"]
+  },
+
   // --- BANGLADESH & BDJOBS CORPORATE STANDARDS ---
   {
     id: "bd-corporate-standard",

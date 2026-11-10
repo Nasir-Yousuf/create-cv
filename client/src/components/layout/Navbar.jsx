@@ -44,21 +44,16 @@ export const Navbar = ({ onOpenAuth }) => {
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-18">
-          {/* Minimal Apple-Style Logo */}
+          {/* ResumeCraft Brand Logo */}
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-sky-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform duration-200">
-              <FileText className="w-5 h-5" />
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 via-purple-600 to-indigo-500 flex items-center justify-center text-white shadow-sm shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                <path d="M4 4h4.5l3.5 5 3.5-5H20v16h-4.5v-8.5L12 12l-3.5-4.5V20H4V4z" />
+              </svg>
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-                  Nova<span className="text-emerald-600 dark:text-emerald-400">CV</span>
-                </span>
-                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 rounded border border-emerald-200/60 dark:border-emerald-800/60 flex items-center gap-0.5">
-                  <Sparkles className="w-2.5 h-2.5 text-emerald-500" /> AI
-                </span>
-              </div>
-            </div>
+            <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+              ResumeCraft
+            </span>
           </Link>
 
           {/* Desktop Nav Links */}

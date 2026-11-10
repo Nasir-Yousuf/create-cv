@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import Toast from './components/common/Toast';
@@ -10,6 +10,8 @@ import DashboardPage from './pages/DashboardPage';
 import CVEditorPage from './features/cv-editor/CVEditorPage';
 
 export const App = () => {
+  const location = useLocation();
+  const isEditorPage = location.pathname === '/builder';
   const [authModal, setAuthModal] = useState({ isOpen: false, mode: 'login' });
 
   const handleOpenAuth = (mode = 'login') => {
@@ -21,9 +23,9 @@ export const App = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+    <div className={`flex flex-col min-h-screen ${isEditorPage ? 'macos-desktop-bg' : 'bg-slate-50 dark:bg-slate-950'} text-slate-900 dark:text-slate-100`}>
       <Toast />
-      <Navbar onOpenAuth={handleOpenAuth} />
+      {!isEditorPage && <Navbar onOpenAuth={handleOpenAuth} />}
 
       <main className="flex-1">
         <Routes>
@@ -35,7 +37,7 @@ export const App = () => {
         </Routes>
       </main>
 
-      <Footer />
+      {!isEditorPage && <Footer />}
 
       <AuthModal
         isOpen={authModal.isOpen}

@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
+  setCVData,
   updatePersonalInfo,
   updatePersonalDetails,
   setTemplateId,
@@ -14,7 +15,7 @@ import {
   addSkill,
   removeSkill,
 } from '../../store/cvSlice';
-import { TEMPLATES_REGISTRY, TEMPLATE_CATEGORIES } from '@shared/constants/cvDefaults.js';
+import { TEMPLATES_REGISTRY, TEMPLATE_CATEGORIES, INITIAL_CV_DATA } from '@shared/constants/cvDefaults.js';
 import { RenderCVTemplate } from '../../templates';
 import exportService from '../../services/exportService';
 import { generateSmartBio, enhanceBulletPoint, PRESET_ROLES } from '../../utils/aiGenerator';
@@ -38,6 +39,150 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import Button from '../../components/common/Button';
+
+const FRESHER_SAMPLE = {
+  ...INITIAL_CV_DATA,
+  title: "Management Trainee Resume",
+  templateId: "bd-fresher-graduate",
+  personalInfo: {
+    fullName: "Nusrat Jahan",
+    jobTitle: "Management Trainee / Business Analyst",
+    email: "nusrat.jahan@email.com",
+    phone: "+880 1819-234567",
+    location: "Dhanmondi, Dhaka, Bangladesh",
+    website: "https://nusratjahan.me",
+    linkedin: "linkedin.com/in/nusratjahan",
+    github: "",
+    photo: null,
+    photoStyle: "portrait",
+    summary: "High-achieving BBA graduate from IBA, University of Dhaka, with strong analytical acumen, team leadership experience in national business competitions, and excellent communication skills. Eager to contribute strategic problem-solving to corporate operations and marketing strategy.",
+  },
+  personalDetails: {
+    fatherName: "Kazi Anwar Hossain",
+    motherName: "Syeda Yasmin",
+    dob: "12/04/2001",
+    gender: "Female",
+    maritalStatus: "Single",
+    nationality: "Bangladeshi",
+    nid: "20012692518000456",
+    religion: "Islam",
+    bloodGroup: "O+",
+    permanentAddress: "House 18, Road 5, Sector 4, Uttara, Dhaka-1230, Bangladesh",
+    presentAddress: "House 45, Road 8/A, Dhanmondi, Dhaka-1209, Bangladesh",
+  },
+  education: [
+    {
+      id: "edu-f1",
+      institution: "Institute of Business Administration (IBA), University of Dhaka",
+      degree: "Bachelor of Business Administration (BBA)",
+      fieldOfStudy: "Finance & Marketing",
+      startDate: "2020",
+      endDate: "2024",
+      grade: "CGPA 3.86 out of 4.00",
+      description: "Dean's Honor List for 6 consecutive semesters. Champion at Battle of Minds 2023.",
+    },
+    {
+      id: "edu-f2",
+      institution: "Holy Cross College, Dhaka",
+      degree: "Higher Secondary Certificate (HSC)",
+      fieldOfStudy: "Business Studies",
+      startDate: "2018",
+      endDate: "2020",
+      grade: "GPA 5.00 out of 5.00",
+      description: "Dhaka Board. General Board Scholarship.",
+    },
+    {
+      id: "edu-f3",
+      institution: "Viqarunnisa Noon School & College, Dhaka",
+      degree: "Secondary School Certificate (SSC)",
+      fieldOfStudy: "Science",
+      startDate: "2016",
+      endDate: "2018",
+      grade: "GPA 5.00 out of 5.00",
+      description: "Dhaka Board. Golden GPA-5.",
+    },
+  ],
+  experience: [
+    {
+      id: "exp-f1",
+      jobTitle: "Business Strategy Intern",
+      company: "Unilever Bangladesh Ltd.",
+      location: "Gulshan, Dhaka",
+      startDate: "2023-06",
+      endDate: "2023-09",
+      current: false,
+      description: "Conducted retail channel market research across 12 distributor points in Dhaka metro.",
+      highlights: [
+        "Analyzed FMCG consumer purchasing patterns using SPSS and advanced Excel pivot models.",
+        "Delivered executive presentation on digital distributor restocking to brand director.",
+      ],
+    },
+  ],
+  skills: [
+    { id: "s-f1", name: "Financial Modeling & Valuation", level: "Advanced", category: "Finance" },
+    { id: "s-f2", name: "MS Excel (VLOOKUP, Macros, Pivots)", level: "Expert", category: "Office" },
+    { id: "s-f3", name: "PowerPoint & Executive Pitching", level: "Expert", category: "Communication" },
+    { id: "s-f4", name: "Market Research & SPSS", level: "Advanced", category: "Analytics" },
+    { id: "s-f5", name: "English (IELTS 8.0)", level: "Expert", category: "Language" },
+  ],
+};
+
+const BLANK_SAMPLE = {
+  ...INITIAL_CV_DATA,
+  title: "My Professional Resume",
+  personalInfo: {
+    fullName: "",
+    jobTitle: "",
+    email: "",
+    phone: "+880 ",
+    location: "Dhaka, Bangladesh",
+    website: "",
+    linkedin: "",
+    github: "",
+    photo: null,
+    photoStyle: "portrait",
+    summary: "",
+  },
+  personalDetails: {
+    fatherName: "",
+    motherName: "",
+    dob: "",
+    gender: "Male",
+    maritalStatus: "Single",
+    nationality: "Bangladeshi",
+    nid: "",
+    religion: "Islam",
+    bloodGroup: "B+",
+    permanentAddress: "",
+    presentAddress: "",
+  },
+  education: [
+    {
+      id: "edu-b1",
+      institution: "",
+      degree: "",
+      fieldOfStudy: "",
+      startDate: "",
+      endDate: "",
+      grade: "",
+      description: "",
+    },
+  ],
+  experience: [
+    {
+      id: "exp-b1",
+      jobTitle: "",
+      company: "",
+      location: "",
+      startDate: "",
+      endDate: "",
+      current: true,
+      description: "",
+      highlights: [],
+    },
+  ],
+  skills: [],
+};
 
 export const QuickCVWizard = () => {
   const dispatch = useDispatch();

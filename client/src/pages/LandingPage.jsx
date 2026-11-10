@@ -37,7 +37,7 @@ export const LandingPage = ({ onOpenAuth }) => {
               Frequently Asked Questions
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-              Everything you need to know about NovaCV templates, ATS scoring, and recruiter formats.
+              Everything you need to know about ResumeCraft templates, ATS scoring, and recruiter formats.
             </p>
           </div>
 

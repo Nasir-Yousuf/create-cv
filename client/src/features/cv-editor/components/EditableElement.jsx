@@ -45,6 +45,7 @@ export const EditableElement = ({
     e.stopPropagation();
     dispatch(setActiveSection(section));
     dispatch(setActiveField(fieldKey));
+    setIsEditing(true);
   };
 
   const handleDoubleClick = (e) => {
@@ -147,7 +148,7 @@ export const EditableElement = ({
           : 'hover:outline-dashed hover:outline-1 hover:outline-indigo-400/80 hover:bg-indigo-50/10 rounded-sm'
       } ${className}`}
       style={style}
-      title="Click to select, double-click to edit directly"
+      title="Click to edit directly"
     >
       {/* Corner pip indicators when selected (matches Canva / smallseotools screenshot 2) */}
       {isSelected && (

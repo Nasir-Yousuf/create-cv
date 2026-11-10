@@ -1,4 +1,5 @@
 import React from 'react';
+import ModernBlue from './ModernBlue';
 import ModernMinimal from './ModernMinimal';
 import BangladeshStandard from './BangladeshStandard';
 import AppleClean from './AppleClean';
@@ -25,6 +26,18 @@ const withCustomDesign = (Component, defaultDesign) => {
 };
 
 export const TEMPLATE_COMPONENTS = {
+  // 0. macOS Reference "Modern Blue" & Gallery Presets
+  'modern-blue': ModernBlue,
+  'daniel-carter': ModernBlue,
+  'elegant-minimal': withCustomDesign(ModernBlue, { primaryColor: '#334155' }),
+  'professional': withCustomDesign(ModernBlue, { primaryColor: '#0f172a' }),
+  'creative-design': CreativeCoral,
+  'clean-layout': AppleClean,
+  'bold-style': ExecutiveSlate,
+  'simple-white': withCustomDesign(ModernBlue, { primaryColor: '#475569' }),
+  'dark-mode': LinearDark,
+  'minimal-blue': withCustomDesign(ModernBlue, { primaryColor: '#0284c7' }),
+
   // 1. Bangladesh Recruiter Standards
   'bd-corporate-standard': BangladeshStandard,
   'bd-bank-officer': withCustomDesign(BangladeshStandard, { primaryColor: '#0369a1' }),

@@ -4,9 +4,37 @@
 
 @layer base {
   :root {
-    --color-primary: #4f46e5;
-    --color-accent: #0ea5e9;
+    --color-primary: #2563eb;
+    --color-accent: #3b82f6;
   }
+}
+
+/* macOS Sonoma/Ventura Silk Pastel Desktop Wallpaper */
+.macos-desktop-bg {
+  background: radial-gradient(circle at 10% 20%, rgba(216, 180, 254, 0.45) 0%, transparent 40%),
+              radial-gradient(circle at 90% 80%, rgba(244, 114, 182, 0.35) 0%, transparent 40%),
+              radial-gradient(circle at 50% 10%, rgba(147, 197, 253, 0.4) 0%, transparent 50%),
+              radial-gradient(circle at 80% 20%, rgba(192, 132, 252, 0.35) 0%, transparent 40%),
+              radial-gradient(circle at 20% 80%, rgba(165, 180, 252, 0.4) 0%, transparent 50%),
+              linear-gradient(135deg, #eef2ff 0%, #fdf4ff 50%, #eff6ff 100%);
+  background-attachment: fixed;
+}
+
+.dark .macos-desktop-bg {
+  background: radial-gradient(circle at 15% 25%, rgba(147, 51, 234, 0.25) 0%, transparent 45%),
+              radial-gradient(circle at 85% 75%, rgba(219, 39, 119, 0.2) 0%, transparent 40%),
+              radial-gradient(circle at 50% 20%, rgba(59, 130, 246, 0.2) 0%, transparent 50%),
+              linear-gradient(135deg, #090d16 0%, #0f172a 50%, #1e1b4b 100%);
+  background-attachment: fixed;
+}
+
+/* macOS Window Glass Shadows */
+.macos-window-shadow {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+
+.dark .macos-window-shadow {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
 /* Custom modern scrollbars */
