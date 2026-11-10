@@ -58,6 +58,20 @@ export const PaymentExportModal = ({
     }
   }, [isOpen, user]);
 
+  // Auto-poll approval status every 4 seconds when payment is pending
+  useEffect(() => {
+    let interval = null;
+    const currentTrx = transactionId || submittedPayment?.transactionId;
+    if (isOpen && currentTrx && statusMessage.type === 'info') {
+      interval = setInterval(() => {
+        checkStatus(currentTrx);
+      }, 4000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isOpen, transactionId, submittedPayment, statusMessage.type]);
+
   if (!isOpen) return null;
 
   const handleCopyNumber = () => {
@@ -506,3 +520,4 @@ export const PaymentExportModal = ({
 };
 
 export default PaymentExportModal;
+

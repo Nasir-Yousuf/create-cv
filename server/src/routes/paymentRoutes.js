@@ -25,3 +25,4 @@ router.patch('/admin/:id/reject', adminRejectPayment);
 router.delete('/admin/:id', adminDeletePayment);
 
 export default router;
+
