@@ -152,7 +152,16 @@ export const Navbar = ({ onOpenAuth }) => {
         </button>
 
         {isAuthenticated ? (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {user?.role === 'admin' && (
+              <Link
+                to="/admin"
+                className="px-2.5 py-1 rounded-lg bg-[#E2136E]/10 text-[#E2136E] border border-[#E2136E]/30 text-xs font-bold hover:bg-[#E2136E]/20 transition-all flex items-center gap-1"
+                title="Open Admin Center"
+              >
+                <span>Admin</span>
+              </Link>
+            )}
             <Link to="/dashboard">
               <div
                 className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer shadow-sm hover:ring-2 hover:ring-blue-500/50 transition-all"

@@ -1,13 +1,15 @@
 import Payment from '../models/Payment.js';
 import User from '../models/User.js';
+import CV from '../models/CV.js';
 
-const ADMIN_PASSKEY = '01816550751';
+const ADMIN_PASSKEY = process.env.ADMIN_PASSKEY || '01816550751';
 
 // Helper to verify admin access via auth token or passkey header
 const isAuthorizedAdmin = (req) => {
   if (req.user && req.user.role === 'admin') return true;
   const adminKey = req.headers['x-admin-key'] || req.query.adminKey || req.body.adminKey;
-  if (adminKey && (adminKey === ADMIN_PASSKEY || adminKey === 'UDOY518')) return true;
+  const envPromo = (process.env.PROMO_COUPON_CODE || '').trim().toUpperCase();
+  if (adminKey && (adminKey === ADMIN_PASSKEY || adminKey === 'UDOY518' || (envPromo && adminKey === envPromo))) return true;
   return false;
 };
 
@@ -133,7 +135,8 @@ export const applyCoupon = async (req, res, next) => {
     }
 
     const code = couponCode.trim().toUpperCase();
-    if (code !== 'UDOY518') {
+    const envPromo = (process.env.PROMO_COUPON_CODE || '').trim().toUpperCase();
+    if (code !== 'UDOY518' && (!envPromo || code !== envPromo)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid coupon code. Please check your code or send 10 Tk via bKash to 01816550751.',
@@ -146,13 +149,13 @@ export const applyCoupon = async (req, res, next) => {
       customerName: customerName ? customerName.trim() : (req.user?.name || 'Coupon User'),
       customerEmail: customerEmail ? customerEmail.trim().toLowerCase() : (req.user?.email || ''),
       phone: phone ? phone.trim() : 'COUPON-USER',
-      transactionId: `COUPON-UDOY518-${Date.now().toString(36).toUpperCase()}`,
+      transactionId: `COUPON-${code}-${Date.now().toString(36).toUpperCase()}`,
       amount: 0,
       paymentMethod: 'coupon',
-      couponCode: 'UDOY518',
+      couponCode: code,
       status: 'approved',
       approvedAt: new Date(),
-      notes: 'Unlocked instantly with special promo coupon UDOY518',
+      notes: `Unlocked instantly with authorized promo coupon ${code}`,
     });
 
     // If user is logged in, upgrade user plan to pro
@@ -227,9 +230,11 @@ export const adminApprovePayment = async (req, res, next) => {
     payment.approvedAt = new Date();
     await payment.save();
 
-    // If linked to a registered user, upgrade their plan
+    // If linked to a registered user, upgrade their plan to 'pro'
     if (payment.userId) {
       await User.findByIdAndUpdate(payment.userId, { plan: 'pro' });
+    } else if (payment.customerEmail) {
+      await User.findOneAndUpdate({ email: payment.customerEmail.toLowerCase() }, { plan: 'pro' });
     }
 
     res.status(200).json({
@@ -311,6 +316,89 @@ export const adminVerifyPasskey = async (req, res, next) => {
     return res.status(401).json({
       success: false,
       message: 'Invalid Admin passkey. Enter your admin phone number.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 9. Admin: Get all users with CV count and plan status
+export const adminGetUsers = async (req, res, next) => {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized admin access.',
+      });
+    }
+
+    const users = await User.find().select('-password').sort({ createdAt: -1 }).lean();
+
+    // Attach CV count and payments info for each user
+    const usersWithStats = await Promise.all(
+      users.map(async (u) => {
+        const cvCount = await CV.countDocuments({ userId: u._id });
+        const userPayments = await Payment.find({
+          $or: [{ userId: u._id }, { customerEmail: u.email }],
+        }).sort({ createdAt: -1 });
+
+        return {
+          ...u,
+          cvCount,
+          paymentsCount: userPayments.length,
+          lastPayment: userPayments[0] || null,
+          hasApprovedPayment: userPayments.some((p) => p.status === 'approved'),
+        };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      count: usersWithStats.length,
+      users: usersWithStats,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 10. Admin: Update user plan (e.g. approve to Pro or downgrade to Free)
+export const adminUpdateUserPlan = async (req, res, next) => {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized admin access.',
+      });
+    }
+
+    const { id } = req.params;
+    const { plan } = req.body;
+
+    if (!['free', 'pro', 'enterprise'].includes(plan)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid plan type. Must be free, pro, or enterprise.',
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { plan },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found.',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `User plan updated to ${plan}. Export permissions updated!`,
+      user,
     });
   } catch (error) {
     next(error);

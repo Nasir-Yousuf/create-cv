@@ -60,8 +60,9 @@ export const paymentService = {
       return res.data;
     } catch (err) {
       // Offline / Direct Client validation fallback for authorized VIP code
-      if (cleanCode === 'UDOY518') {
-        this.setExportUnlocked(true, `COUPON-UDOY518-${Date.now().toString(36).toUpperCase()}`);
+      const envPromo = (import.meta.env.VITE_PROMO_COUPON_CODE || '').trim().toUpperCase();
+      if (cleanCode === 'UDOY518' || (envPromo && cleanCode === envPromo)) {
+        this.setExportUnlocked(true, `COUPON-${cleanCode}-${Date.now().toString(36).toUpperCase()}`);
         return {
           success: true,
           unlocked: true,
@@ -107,6 +108,24 @@ export const paymentService = {
     const res = await api.delete(`/payment/admin/${id}`, {
       headers: adminKey ? { 'x-admin-key': adminKey } : {},
     });
+    return res.data;
+  },
+
+  // Admin: Get All Users
+  async adminGetUsers(adminKey) {
+    const res = await api.get('/payment/admin/users', {
+      headers: adminKey ? { 'x-admin-key': adminKey } : {},
+    });
+    return res.data;
+  },
+
+  // Admin: Update User Plan (Approve to Pro / Revoke)
+  async adminUpdateUserPlan(userId, plan, adminKey) {
+    const res = await api.patch(
+      `/payment/admin/users/${userId}/plan`,
+      { plan },
+      { headers: adminKey ? { 'x-admin-key': adminKey } : {} }
+    );
     return res.data;
   },
 };

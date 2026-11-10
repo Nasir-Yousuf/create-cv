@@ -8,6 +8,8 @@ import {
   adminRejectPayment,
   adminDeletePayment,
   adminVerifyPasskey,
+  adminGetUsers,
+  adminUpdateUserPlan,
 } from '../controllers/paymentController.js';
 
 const router = express.Router();
@@ -23,6 +25,8 @@ router.get('/admin/all', adminGetPayments);
 router.patch('/admin/:id/approve', adminApprovePayment);
 router.patch('/admin/:id/reject', adminRejectPayment);
 router.delete('/admin/:id', adminDeletePayment);
+router.get('/admin/users', adminGetUsers);
+router.patch('/admin/users/:id/plan', adminUpdateUserPlan);
 
 export default router;
 

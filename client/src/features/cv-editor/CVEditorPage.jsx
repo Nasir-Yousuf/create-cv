@@ -164,6 +164,45 @@ export const CVEditorPage = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [dispatch]);
 
+  // Cloud Document Auto-Sync on Mount / Login across devices
+  useEffect(() => {
+    const syncCloudCV = async () => {
+      if (!isAuthenticated) return;
+      if (cvId && !cvId.startsWith('sample-')) return; // Already editing a specific cloud CV
+
+      try {
+        const res = await cvService.getCVs();
+        if (res.data && res.data.length > 0) {
+          // User already has saved CVs in their cloud account!
+          const latestCVMeta = res.data[0];
+          const fullCVRes = await cvService.getCVById(latestCVMeta._id);
+          if (fullCVRes.data) {
+            dispatch(setCVData(fullCVRes.data));
+            dispatch(setCVId(fullCVRes.data._id));
+            dispatch(
+              showToast({
+                message: `Loaded your cloud document: ${fullCVRes.data.title || 'My Professional Resume'}`,
+                type: 'info',
+              })
+            );
+          }
+        } else {
+          // User has no CV in cloud yet -> create first cloud CV from current draft
+          const draftStr = localStorage.getItem('resumecraft_draft');
+          const draftToSave = draftStr ? JSON.parse(draftStr) : currentCV;
+          const created = await cvService.createCV(draftToSave);
+          if (created.data?._id) {
+            dispatch(setCVId(created.data._id));
+          }
+        }
+      } catch (err) {
+        console.warn('Cloud sync error:', err.message);
+      }
+    };
+
+    syncCloudCV();
+  }, [isAuthenticated]);
+
   // Debounced Autosave
   useEffect(() => {
     if (!isDirty) return;
@@ -171,14 +210,21 @@ export const CVEditorPage = () => {
     const timer = setTimeout(async () => {
       dispatch(setSavingState(true));
       try {
-        if (isAuthenticated && cvId && !cvId.startsWith('sample-')) {
-          await cvService.updateCV(cvId, currentCV);
-        } else {
-          localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
+        if (isAuthenticated) {
+          if (cvId && !cvId.startsWith('sample-')) {
+            await cvService.updateCV(cvId, currentCV);
+          } else {
+            const res = await cvService.createCV(currentCV);
+            if (res.data?._id) {
+              dispatch(setCVId(res.data._id));
+            }
+          }
         }
+        localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
         dispatch(setSavingState(false));
       } catch (err) {
         console.warn('Autosave status:', err.message);
+        localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
         dispatch(setSavingState(false));
       }
     }, 1500);
@@ -189,18 +235,27 @@ export const CVEditorPage = () => {
   const handleManualSave = async () => {
     dispatch(setSavingState(true));
     try {
-      if (isAuthenticated && cvId && !cvId.startsWith('sample-')) {
-        await cvService.updateCV(cvId, currentCV);
-      } else {
-        localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
+      if (isAuthenticated) {
+        if (cvId && !cvId.startsWith('sample-')) {
+          await cvService.updateCV(cvId, currentCV);
+        } else {
+          const res = await cvService.createCV(currentCV);
+          if (res.data?._id) {
+            dispatch(setCVId(res.data._id));
+          }
+        }
       }
+      localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
       dispatch(
         showToast({
-          message: 'Changes saved successfully to your cloud document!',
+          message: isAuthenticated
+            ? 'Changes saved successfully to your cloud document!'
+            : 'Saved locally in browser cache. Sign in to sync across devices!',
           type: 'success',
         })
       );
     } catch (err) {
+      localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
       dispatch(showToast({ message: 'Saved locally in browser cache.', type: 'info' }));
     } finally {
       dispatch(setSavingState(false));

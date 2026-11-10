@@ -74,8 +74,33 @@ export const login = async (req, res, next) => {
       });
     }
 
+    const cleanEmail = email.trim().toLowerCase();
+    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@resumecraft.com').trim().toLowerCase();
+    const adminPassword = process.env.ADMIN_PASSWORD || 'AdminPass01816550751!';
+
+    // Check if this is the environment-configured Admin logging in
+    if (cleanEmail === adminEmail && password === adminPassword) {
+      let adminUser = await User.findOne({ email: adminEmail }).select('+password');
+      if (!adminUser) {
+        adminUser = await User.create({
+          name: 'Super Admin',
+          email: adminEmail,
+          password: adminPassword,
+          role: 'admin',
+          plan: 'enterprise',
+        });
+      } else {
+        if (adminUser.role !== 'admin' || adminUser.plan !== 'enterprise') {
+          adminUser.role = 'admin';
+          adminUser.plan = 'enterprise';
+          await adminUser.save();
+        }
+      }
+      return sendTokenResponse(adminUser, 200, res);
+    }
+
     // Find user and include password hash
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+    const user = await User.findOne({ email: cleanEmail }).select('+password');
     if (!user) {
       return res.status(401).json({
         success: false,
