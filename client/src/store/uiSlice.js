@@ -44,7 +44,7 @@ export const uiSlice = createSlice({
       state.activeField = action.payload;
     },
     setPreviewScale: (state, action) => {
-      state.previewScale = Math.max(0.4, Math.min(1.8, action.payload));
+      state.previewScale = Math.max(0.25, Math.min(2.0, action.payload));
     },
     toggleDarkMode: (state) => {
       state.isDarkMode = !state.isDarkMode;

@@ -113,9 +113,9 @@ export const CVEditorPage = () => {
   const handleFitZoom = () => {
     const isMobileScreen = typeof window !== 'undefined' && window.innerWidth < 768;
     if (isMobileScreen) {
-      const availableWidth = Math.max(300, window.innerWidth - 24);
+      const availableWidth = Math.max(280, window.innerWidth - 12);
       const targetPaperWidth = devicePreview === 'mobile' ? 400 : 794;
-      const optimalScale = Math.min(1.0, Math.max(0.35, Math.floor((availableWidth / targetPaperWidth) * 100) / 100));
+      const optimalScale = Math.min(1.0, Math.max(0.30, Math.floor((availableWidth / targetPaperWidth) * 100) / 100));
       dispatch(setPreviewScale(optimalScale));
       return;
     }
@@ -136,9 +136,13 @@ export const CVEditorPage = () => {
 
   useEffect(() => {
     handleFitZoom();
+    const timer = setTimeout(() => handleFitZoom(), 150);
     const handleResize = () => handleFitZoom();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+    };
   }, [isSidebarOpen, isRightDockOpen, devicePreview]);
 
   // Keyboard shortcuts (Ctrl/Cmd+Z, Ctrl/Cmd+Y, Ctrl/Cmd+S)
@@ -484,18 +488,8 @@ export const CVEditorPage = () => {
             </button>
           </nav>
 
-          {/* Right Group: Mobile Export, Theme Toggle & User Avatar */}
+          {/* Right Group: Theme Toggle & User Avatar */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Quick Export on Mobile */}
-            <button
-              type="button"
-              onClick={handleExportPDF}
-              className="flex sm:hidden items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm active:scale-95 transition-all cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export</span>
-            </button>
-
             {/* Theme Toggle (Moon/Sun) */}
             <button
               type="button"
@@ -1226,9 +1220,9 @@ export const CVEditorPage = () => {
             ------------------------------------------------------------------ */}
             <div
               ref={canvasScrollContainerRef}
-              className="flex-1 overflow-auto p-4 sm:p-6 md:p-8 relative select-text"
+              className="flex-1 overflow-auto p-1.5 sm:p-6 md:p-8 relative select-text"
             >
-              <div className="w-fit min-w-full flex justify-center py-4 px-2">
+              <div className="w-fit min-w-full flex justify-center py-2 sm:py-4 px-0.5 sm:px-2">
                 <div
                   className="shrink-0 transition-all duration-150"
                   style={{

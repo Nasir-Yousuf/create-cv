@@ -188,10 +188,10 @@ export const PaymentExportModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in select-none">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in select-none">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[90vh]">
         {/* 1. macOS Window Titlebar */}
-        <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80">
+        <div className="px-4 sm:px-5 py-3 sm:py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -200,7 +200,7 @@ export const PaymentExportModal = ({
             />
             <div className="w-3.5 h-3.5 rounded-full bg-[#ffbd2e] border border-[#dea123] opacity-60" />
             <div className="w-3.5 h-3.5 rounded-full bg-[#27c93f] border border-[#1aab29] opacity-60" />
-            <span className="ml-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+            <span className="ml-2 text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">
               ResumeCraft • Export Authorization
             </span>
           </div>
@@ -215,7 +215,7 @@ export const PaymentExportModal = ({
         </div>
 
         {/* 2. Scrollable Body */}
-        <div className="p-6 overflow-y-auto space-y-5">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-5">
           {/* Hero Banner: 10 Taka bKash */}
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#E2136E] to-[#b80c54] p-5 text-white shadow-lg shadow-[#e2136e]/20">
             {/* Background Decorative Rings */}

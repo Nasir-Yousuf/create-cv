@@ -259,7 +259,7 @@ export const QuickCVWizard = () => {
 
   const previewScaleFactor = Math.min(
     0.85,
-    Math.max(0.35, (windowWidth - 36) / 794),
+    Math.max(0.25, (windowWidth - 48) / 794),
   );
 
   // Default sample strings that should NOT force user to backspace or delete from form inputs
@@ -665,11 +665,11 @@ export const QuickCVWizard = () => {
           Bangladesh BDJobs standards and modern dual-column layouts.
         </p>
 
-        <div className="flex items-center justify-center gap-3 pt-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-3 pt-2">
           <button
             type="button"
             onClick={() => navigate("/builder")}
-            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
           >
             <Edit3 className="w-4 h-4" />
             <span>Launch Full macOS Editor</span>
@@ -680,7 +680,7 @@ export const QuickCVWizard = () => {
               const el = document.getElementById("quick-creator-card");
               el?.scrollIntoView({ behavior: "smooth" });
             }}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-500 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-semibold text-xs shadow-sm transition-all cursor-pointer"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-500 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-semibold text-xs shadow-sm transition-all cursor-pointer flex items-center justify-center"
           >
             ⚡ Quick Form Creator
           </button>
@@ -690,7 +690,7 @@ export const QuickCVWizard = () => {
       {/* 2. Primary Feature: Quick Input Form (Apple Native Style) */}
       <div
         id="quick-creator-card"
-        className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800 shadow-xl rounded-2xl p-6 sm:p-8 mb-16"
+        className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800 shadow-xl rounded-2xl p-4 sm:p-8 mb-10 sm:mb-16"
       >
         <div className="space-y-8">
           {/* Section A: Photo & Key Personal Details */}

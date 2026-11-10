@@ -47,9 +47,9 @@ export const Navbar = ({ onOpenAuth }) => {
   return (
     <header className="sticky top-0 z-40 w-full h-14 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between shrink-0 select-none transition-colors">
       {/* Left: Traffic Lights 🔴🟡🟢, Chevrons & Brand Logo */}
-      <div className="flex items-center gap-4">
-        {/* 3 macOS Window Controls */}
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 sm:gap-4">
+        {/* 3 macOS Window Controls (Desktop Only) */}
+        <div className="hidden sm:flex items-center gap-2">
           <button
             type="button"
             onClick={() => navigate('/')}
@@ -177,14 +177,14 @@ export const Navbar = ({ onOpenAuth }) => {
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               onClick={() => onOpenAuth && onOpenAuth('login')}
-              className="px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+              className="px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
             >
               Sign In
             </button>
-            <Link to="/builder">
+            <Link to="/builder" className="hidden sm:inline-flex">
               <button className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow hover:shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5">
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>Open Editor</span>
