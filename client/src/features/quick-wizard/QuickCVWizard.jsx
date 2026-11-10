@@ -369,30 +369,51 @@ export const QuickCVWizard = () => {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-      {/* 1. Header: Apple-style Minimalism */}
-      <div className="text-center max-w-3xl mx-auto mb-10 space-y-3">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold text-emerald-700 dark:text-emerald-300 shadow-sm">
-          <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-          <span>Instant CV Creator • So simple anyone can build in 2 minutes</span>
+      {/* 1. Header: Sleek ResumeCraft Desktop Aesthetic */}
+      <div className="text-center max-w-3xl mx-auto mb-10 space-y-4">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/80 dark:border-blue-800/80 text-xs font-semibold text-blue-700 dark:text-blue-300 shadow-sm">
+          <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+          <span>Effortless Professional CV Builder • Instant Preview & 1-Click Export</span>
         </div>
         <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-          Type Your Info. Get{' '}
-          <span className="bg-gradient-to-r from-emerald-600 via-teal-500 to-sky-500 bg-clip-text text-transparent">
-            30+ Styled CVs Instantly.
+          Enter Your Details Once. Get{' '}
+          <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            50+ Styled CVs Instantly.
           </span>
         </h1>
         <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
-          Fill in your basic information below. Your CV automatically renders across 30+ recruiter-approved styles—including Bangladesh BDJobs standards and Apple clean templates.
+          Fill in your details below or launch our full desktop editor. Your CV automatically renders across 50+ recruiter-approved styles—including Bangladesh BDJobs standards and modern dual-column layouts.
         </p>
+
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => navigate('/builder')}
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
+          >
+            <Edit3 className="w-4 h-4" />
+            <span>Launch Full macOS Editor</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById('quick-creator-card');
+              el?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-500 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-semibold text-xs shadow-sm transition-all cursor-pointer"
+          >
+            ⚡ Quick Form Creator
+          </button>
+        </div>
       </div>
 
       {/* 2. Primary Feature: Quick Input Form (Apple Native Style) */}
-      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800 shadow-xl rounded-2xl p-6 sm:p-8 mb-16">
+      <div id="quick-creator-card" className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800 shadow-xl rounded-2xl p-6 sm:p-8 mb-16">
         <div className="space-y-8">
           {/* Section A: Photo & Key Personal Details */}
           <div>
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-4 flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-xs">
+              <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 flex items-center justify-center text-xs">
                 1
               </span>
               Personal Information & Portrait Photo

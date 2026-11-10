@@ -283,87 +283,87 @@ export const CVEditorPage = () => {
     { label: 'Sunset Coral', hex: '#ea580c' },
   ];
 
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      setIsFullScreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+      setIsFullScreen(false);
+    }
+  };
+
   return (
-    <div
-      className={`min-h-screen macos-desktop-bg flex items-center justify-center p-2 sm:p-4 md:p-6 lg:p-8 transition-colors select-none ${
-        isFullScreen ? '!p-0' : ''
-      }`}
-    >
-      {/* =========================================================================
-          MACOS APPLICATION WINDOW CONTAINER
-      ========================================================================== */}
-      <div
-        className={`w-full max-w-[1580px] bg-white dark:bg-slate-900 border border-white/60 dark:border-slate-800 macos-window-shadow flex flex-col overflow-hidden transition-all duration-300 ${
-          isFullScreen ? 'h-screen !rounded-none !max-w-none' : 'h-[94vh] max-h-[960px] min-h-[700px] rounded-2xl'
-        }`}
-      >
-        {/* -----------------------------------------------------------------------
-            1. MACOS TOP TITLEBAR & UNIFIED NAVIGATION (Matching Reference Photo)
-        ------------------------------------------------------------------------ */}
-        <header className="h-14 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-4 flex items-center justify-between shrink-0 z-30 select-none">
-          {/* Left Group: Traffic Lights 🔴🟡🟢, Chevrons & Brand Logo */}
-          <div className="flex items-center gap-4">
-            {/* 3 macOS Window Controls */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => navigate('/')}
-                title="Close / Return Home"
-                className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e] hover:opacity-80 active:scale-95 transition-all shadow-sm"
-              />
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                title="Minimize / Toggle Sidebar"
-                className="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dea123] hover:opacity-80 active:scale-95 transition-all shadow-sm"
-              />
-              <button
-                type="button"
-                onClick={() => setIsFullScreen(!isFullScreen)}
-                title="Toggle Fullscreen"
-                className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29] hover:opacity-80 active:scale-95 transition-all shadow-sm"
-              />
-            </div>
-
-            {/* Back / Forward History Chevrons */}
-            <div className="flex items-center text-slate-400 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 rounded-md border border-slate-200/60 dark:border-slate-700/60">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="p-0.5 hover:text-slate-700 dark:hover:text-white transition-colors"
-                title="Go back"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate(1)}
-                className="p-0.5 hover:text-slate-700 dark:hover:text-white transition-colors"
-                title="Go forward"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* ResumeCraft Brand Logo */}
-            <div
+    <div className="w-screen h-screen flex flex-col bg-slate-100 dark:bg-slate-950 overflow-hidden select-none">
+      {/* -----------------------------------------------------------------------
+          1. FULL-WIDTH APPLICATION TOP BAR (100% Window Width)
+      ------------------------------------------------------------------------ */}
+      <header className="h-14 w-full bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between shrink-0 z-30 select-none">
+        {/* Left Group: Traffic Lights 🔴🟡🟢, Chevrons & Brand Logo */}
+        <div className="flex items-center gap-4">
+          {/* 3 macOS Window Controls */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
               onClick={() => navigate('/')}
-              className="flex items-center gap-2 cursor-pointer group"
-            >
-              {/* Purple squircle icon with folded ribbon/origami 'M' */}
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-600 via-purple-600 to-indigo-500 flex items-center justify-center text-white shadow-sm shadow-indigo-500/20 group-hover:scale-105 transition-transform">
-                <svg
-                  className="w-4 h-4 fill-current"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M4 4h4.5l3.5 5 3.5-5H20v16h-4.5v-8.5L12 12l-3.5-4.5V20H4V4z" />
-                </svg>
-              </div>
-              <span className="font-bold text-base tracking-tight text-slate-800 dark:text-white">
-                ResumeCraft
-              </span>
-            </div>
+              title="Return to Home"
+              className="w-3.5 h-3.5 rounded-full bg-[#ff5f56] border border-[#e0443e] hover:opacity-80 active:scale-95 transition-all shadow-sm cursor-pointer"
+            />
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              title="Toggle Sidebar Panel"
+              className="w-3.5 h-3.5 rounded-full bg-[#ffbd2e] border border-[#dea123] hover:opacity-80 active:scale-95 transition-all shadow-sm cursor-pointer"
+            />
+            <button
+              type="button"
+              onClick={toggleFullScreen}
+              title="Toggle Fullscreen"
+              className="w-3.5 h-3.5 rounded-full bg-[#27c93f] border border-[#1aab29] hover:opacity-80 active:scale-95 transition-all shadow-sm cursor-pointer"
+            />
           </div>
+
+          {/* Back / Forward History Chevrons */}
+          <div className="flex items-center text-slate-400 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 rounded-md border border-slate-200/60 dark:border-slate-700/60">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="p-0.5 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
+              title="Go back"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(1)}
+              className="p-0.5 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
+              title="Go forward"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* ResumeCraft Brand Logo */}
+          <div
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 cursor-pointer group"
+          >
+            {/* Purple squircle icon with folded ribbon/origami 'M' */}
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-600 via-purple-600 to-indigo-500 flex items-center justify-center text-white shadow-sm shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+              <svg
+                className="w-4 h-4 fill-current"
+                viewBox="0 0 24 24"
+              >
+                <path d="M4 4h4.5l3.5 5 3.5-5H20v16h-4.5v-8.5L12 12l-3.5-4.5V20H4V4z" />
+              </svg>
+            </div>
+            <span className="font-bold text-base tracking-tight text-slate-800 dark:text-white">
+              ResumeCraft
+            </span>
+          </div>
+        </div>
 
           {/* Center Group: Segmented Navigation Pills */}
           <nav className="hidden md:flex items-center gap-1.5">
@@ -1246,7 +1246,6 @@ export const CVEditorPage = () => {
             </div>
           </main>
         </div>
-      </div>
 
       {/* Profile Photo Upload & Crop Modal */}
       <PhotoUploadCropModal
