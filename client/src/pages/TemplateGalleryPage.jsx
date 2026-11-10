@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { setTemplateId, setCVData } from '../store/cvSlice';
@@ -43,6 +43,20 @@ export const TemplateGalleryPage = () => {
   const [favorites, setFavorites] = useState(['modern-blue', 'bd-corporate-standard']);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [pendingExportTemplate, setPendingExportTemplate] = useState(null);
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1024
+  );
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const previewScaleFactor = Math.min(
+    0.85,
+    Math.max(0.35, (windowWidth - 36) / 794)
+  );
 
   const toggleFavorite = (id) => {
     setFavorites((prev) =>
@@ -378,15 +392,15 @@ export const TemplateGalleryPage = () => {
               <div
                 className="shrink-0 origin-top shadow-2xl rounded bg-white my-2"
                 style={{
-                  width: `${Math.round(794 * Math.min(0.85, Math.max(0.38, ((typeof window !== 'undefined' ? window.innerWidth : 400) - 32) / 794)))}px`,
-                  minHeight: `${Math.round(1123 * Math.min(0.85, Math.max(0.38, ((typeof window !== 'undefined' ? window.innerWidth : 400) - 32) / 794)))}px`,
+                  width: `${Math.round(794 * previewScaleFactor)}px`,
+                  minHeight: `${Math.round(1123 * previewScaleFactor)}px`,
                 }}
               >
                 <div
                   style={{
                     width: '794px',
                     minHeight: '1123px',
-                    transform: `scale(${Math.min(0.85, Math.max(0.38, ((typeof window !== 'undefined' ? window.innerWidth : 400) - 32) / 794))})`,
+                    transform: `scale(${previewScaleFactor})`,
                     transformOrigin: 'top left',
                   }}
                 >

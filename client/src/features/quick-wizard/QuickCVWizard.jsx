@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   setCVData,
   updatePersonalInfo,
@@ -14,13 +14,23 @@ import {
   removeExperience,
   addSkill,
   removeSkill,
-} from '../../store/cvSlice';
-import { TEMPLATES_REGISTRY, TEMPLATE_CATEGORIES, INITIAL_CV_DATA, TAHMIDUR_RAHMAN_CV } from '@shared/constants/cvDefaults.js';
-import { RenderCVTemplate } from '../../templates';
-import exportService from '../../services/exportService';
-import paymentService from '../../services/paymentService';
-import PaymentExportModal from '../../components/common/PaymentExportModal';
-import { generateSmartBio, enhanceBulletPoint, PRESET_ROLES } from '../../utils/aiGenerator';
+} from "../../store/cvSlice";
+import {
+  TEMPLATES_REGISTRY,
+  TEMPLATE_CATEGORIES,
+  INITIAL_CV_DATA,
+  TAHMIDUR_RAHMAN_CV,
+  DANIEL_CARTER_CV,
+} from "@shared/constants/cvDefaults.js";
+import { RenderCVTemplate } from "../../templates";
+import exportService from "../../services/exportService";
+import paymentService from "../../services/paymentService";
+import PaymentExportModal from "../../components/common/PaymentExportModal";
+import {
+  generateSmartBio,
+  enhanceBulletPoint,
+  PRESET_ROLES,
+} from "../../utils/aiGenerator";
 import {
   Sparkles,
   Camera,
@@ -40,8 +50,8 @@ import {
   Layers,
   ArrowRight,
   Edit3,
-} from 'lucide-react';
-import Button from '../../components/common/Button';
+} from "lucide-react";
+import Button from "../../components/common/Button";
 
 const FRESHER_SAMPLE = {
   ...INITIAL_CV_DATA,
@@ -58,7 +68,8 @@ const FRESHER_SAMPLE = {
     github: "",
     photo: null,
     photoStyle: "portrait",
-    summary: "High-achieving BBA graduate from IBA, University of Dhaka, with strong analytical acumen, team leadership experience in national business competitions, and excellent communication skills. Eager to contribute strategic problem-solving to corporate operations and marketing strategy.",
+    summary:
+      "High-achieving BBA graduate from IBA, University of Dhaka, with strong analytical acumen, team leadership experience in national business competitions, and excellent communication skills. Eager to contribute strategic problem-solving to corporate operations and marketing strategy.",
   },
   personalDetails: {
     fatherName: "Kazi Anwar Hossain",
@@ -70,19 +81,22 @@ const FRESHER_SAMPLE = {
     nid: "20012692518000456",
     religion: "Islam",
     bloodGroup: "O+",
-    permanentAddress: "House 18, Road 5, Sector 4, Uttara, Dhaka-1230, Bangladesh",
+    permanentAddress:
+      "House 18, Road 5, Sector 4, Uttara, Dhaka-1230, Bangladesh",
     presentAddress: "House 45, Road 8/A, Dhanmondi, Dhaka-1209, Bangladesh",
   },
   education: [
     {
       id: "edu-f1",
-      institution: "Institute of Business Administration (IBA), University of Dhaka",
+      institution:
+        "Institute of Business Administration (IBA), University of Dhaka",
       degree: "Bachelor of Business Administration (BBA)",
       fieldOfStudy: "Finance & Marketing",
       startDate: "2020",
       endDate: "2024",
       grade: "CGPA 3.86 out of 4.00",
-      description: "Dean's Honor List for 6 consecutive semesters. Champion at Battle of Minds 2023.",
+      description:
+        "Dean's Honor List for 6 consecutive semesters. Champion at Battle of Minds 2023.",
     },
     {
       id: "edu-f2",
@@ -114,7 +128,8 @@ const FRESHER_SAMPLE = {
       startDate: "2023-06",
       endDate: "2023-09",
       current: false,
-      description: "Conducted retail channel market research across 12 distributor points in Dhaka metro.",
+      description:
+        "Conducted retail channel market research across 12 distributor points in Dhaka metro.",
       highlights: [
         "Analyzed FMCG consumer purchasing patterns using SPSS and advanced Excel pivot models.",
         "Delivered executive presentation on digital distributor restocking to brand director.",
@@ -122,11 +137,36 @@ const FRESHER_SAMPLE = {
     },
   ],
   skills: [
-    { id: "s-f1", name: "Financial Modeling & Valuation", level: "Advanced", category: "Finance" },
-    { id: "s-f2", name: "MS Excel (VLOOKUP, Macros, Pivots)", level: "Expert", category: "Office" },
-    { id: "s-f3", name: "PowerPoint & Executive Pitching", level: "Expert", category: "Communication" },
-    { id: "s-f4", name: "Market Research & SPSS", level: "Advanced", category: "Analytics" },
-    { id: "s-f5", name: "English (IELTS 8.0)", level: "Expert", category: "Language" },
+    {
+      id: "s-f1",
+      name: "Financial Modeling & Valuation",
+      level: "Advanced",
+      category: "Finance",
+    },
+    {
+      id: "s-f2",
+      name: "MS Excel (VLOOKUP, Macros, Pivots)",
+      level: "Expert",
+      category: "Office",
+    },
+    {
+      id: "s-f3",
+      name: "PowerPoint & Executive Pitching",
+      level: "Expert",
+      category: "Communication",
+    },
+    {
+      id: "s-f4",
+      name: "Market Research & SPSS",
+      level: "Advanced",
+      category: "Analytics",
+    },
+    {
+      id: "s-f5",
+      name: "English (IELTS 8.0)",
+      level: "Expert",
+      category: "Language",
+    },
   ],
 };
 
@@ -190,20 +230,214 @@ const BLANK_SAMPLE = {
 export const QuickCVWizard = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const cvData = useSelector((state) => state.cv.currentCV || state.cv.present || {});
+  const cvData = useSelector(
+    (state) => state.cv.currentCV || state.cv.present || {},
+  );
   const { user } = useSelector((state) => state.auth);
 
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [activeCategory, setActiveCategory] = useState("All");
   const [downloadingTemplateId, setDownloadingTemplateId] = useState(null);
   const [downloadType, setDownloadType] = useState(null); // 'pdf' | 'docx'
   const [isGeneratingBio, setIsGeneratingBio] = useState(false);
   const [showBDDetails, setShowBDDetails] = useState(true);
   const [fullscreenPreview, setFullscreenPreview] = useState(null);
-  const [newSkillInput, setNewSkillInput] = useState('');
+  const [newSkillInput, setNewSkillInput] = useState("");
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [pendingExportType, setPendingExportType] = useState('pdf');
+  const [pendingExportType, setPendingExportType] = useState("pdf");
   const [pendingExportTemplate, setPendingExportTemplate] = useState(null);
+  const [showSampleInInputs, setShowSampleInInputs] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1024,
+  );
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const previewScaleFactor = Math.min(
+    0.85,
+    Math.max(0.35, (windowWidth - 36) / 794),
+  );
+
+  // Default sample strings that should NOT force user to backspace or delete from form inputs
+  const SAMPLE_DUMMY_STRINGS = new Set([
+    "Tahmidur Rahman Dipto",
+    "Tahmidur Rahman",
+    "Daniel Carter",
+    "Senior Software Engineer / Project Coordinator",
+    "Senior Software Engineer",
+    "tahmid.rahman@email.com",
+    "daniel.carter@example.com",
+    "+880 1712-345678",
+    "+1 (555) 123-4567",
+    "Gulshan-2, Dhaka, Bangladesh",
+    "San Francisco, CA",
+    "linkedin.com/in/tahmidrahman",
+    "linkedin.com/in/danielcarter",
+    "https://linkedin.com/in/tahmidrahman",
+    "Md. Abdur Rahman",
+    "Begum Rokeya Sultana",
+    "19962692518000123",
+    "15/10/1996",
+    "Vill: Shantinagar, P.O: Shantinagar, Upazila: Mirpur, Dist: Kushtia, Bangladesh",
+    "House 42, Road 11, Block D, Banani, Dhaka-1213, Bangladesh",
+    "Detail-oriented IT Professional with strong problem-solving skills and a solid academic background in Computer Science & Engineering. Experienced in architecting RESTful APIs, cloud containerization, and modern CI/CD delivery pipelines.",
+    "Passionate Senior Software Engineer with 5+ years of experience in building scalable web applications. Skilled in modern technologies and delivering innovative solutions that make an impact.",
+    "University of Dhaka",
+    "University of California",
+    "Bachelor of Science in CSE",
+    "Bachelor of Science in Computer Science",
+    "Computer Science & Engineering",
+    "Computer Science",
+    "CGPA 3.85 out of 4.00",
+    "3.85 GPA",
+    "Graduated with Honors. Dean's Honor List.",
+    "TechCorp Bangladesh Ltd.",
+    "TechCorp Inc.",
+    "InnovateLabs Ltd.",
+    "InnovateLabs",
+  ]);
+
+  // Clean empty input value for user if it's currently holding a dummy template string
+  const getInputValue = (val) => {
+    if (showSampleInInputs) return val || "";
+    if (!val || SAMPLE_DUMMY_STRINGS.has(val)) return "";
+    return val;
+  };
+
+  // Get complete, rich CV Data for template preview card or export
+  const getTemplateCVData = (template) => {
+    if (!template) return cvData;
+    const isBD =
+      template.category === "Bangladesh Standard" ||
+      template.id?.startsWith("bd-");
+    const fallback = isBD ? TAHMIDUR_RAHMAN_CV : DANIEL_CARTER_CV;
+
+    const userPersonalInfo = { ...cvData.personalInfo };
+    const userPersonalDetails = { ...cvData.personalDetails };
+
+    return {
+      ...fallback,
+      ...cvData,
+      templateId: template.id,
+      personalInfo: {
+        ...fallback.personalInfo,
+        ...userPersonalInfo,
+        fullName:
+          userPersonalInfo.fullName && !SAMPLE_DUMMY_STRINGS.has(userPersonalInfo.fullName)
+            ? userPersonalInfo.fullName
+            : fallback.personalInfo.fullName,
+        jobTitle:
+          userPersonalInfo.jobTitle && !SAMPLE_DUMMY_STRINGS.has(userPersonalInfo.jobTitle)
+            ? userPersonalInfo.jobTitle
+            : fallback.personalInfo.jobTitle,
+        email:
+          userPersonalInfo.email && !SAMPLE_DUMMY_STRINGS.has(userPersonalInfo.email)
+            ? userPersonalInfo.email
+            : fallback.personalInfo.email,
+        phone:
+          userPersonalInfo.phone && !SAMPLE_DUMMY_STRINGS.has(userPersonalInfo.phone)
+            ? userPersonalInfo.phone
+            : fallback.personalInfo.phone,
+        location:
+          userPersonalInfo.location && !SAMPLE_DUMMY_STRINGS.has(userPersonalInfo.location)
+            ? userPersonalInfo.location
+            : fallback.personalInfo.location,
+        summary:
+          userPersonalInfo.summary && !SAMPLE_DUMMY_STRINGS.has(userPersonalInfo.summary)
+            ? userPersonalInfo.summary
+            : fallback.personalInfo.summary,
+        photo: userPersonalInfo.photo || fallback.personalInfo.photo,
+        linkedin:
+          userPersonalInfo.linkedin && !SAMPLE_DUMMY_STRINGS.has(userPersonalInfo.linkedin)
+            ? userPersonalInfo.linkedin
+            : fallback.personalInfo.linkedin,
+      },
+      personalDetails: {
+        ...fallback.personalDetails,
+        ...userPersonalDetails,
+        fatherName:
+          userPersonalDetails.fatherName && !SAMPLE_DUMMY_STRINGS.has(userPersonalDetails.fatherName)
+            ? userPersonalDetails.fatherName
+            : fallback.personalDetails?.fatherName,
+        motherName:
+          userPersonalDetails.motherName && !SAMPLE_DUMMY_STRINGS.has(userPersonalDetails.motherName)
+            ? userPersonalDetails.motherName
+            : fallback.personalDetails?.motherName,
+        nid:
+          userPersonalDetails.nid && !SAMPLE_DUMMY_STRINGS.has(userPersonalDetails.nid)
+            ? userPersonalDetails.nid
+            : fallback.personalDetails?.nid,
+        dob:
+          userPersonalDetails.dob && !SAMPLE_DUMMY_STRINGS.has(userPersonalDetails.dob)
+            ? userPersonalDetails.dob
+            : fallback.personalDetails?.dob,
+        permanentAddress:
+          userPersonalDetails.permanentAddress && !SAMPLE_DUMMY_STRINGS.has(userPersonalDetails.permanentAddress)
+            ? userPersonalDetails.permanentAddress
+            : fallback.personalDetails?.permanentAddress,
+        presentAddress:
+          userPersonalDetails.presentAddress && !SAMPLE_DUMMY_STRINGS.has(userPersonalDetails.presentAddress)
+            ? userPersonalDetails.presentAddress
+            : fallback.personalDetails?.presentAddress,
+      },
+      experience:
+        cvData.experience &&
+        cvData.experience.length > 0 &&
+        cvData.experience.some(
+          (e) =>
+            (e.jobTitle && !SAMPLE_DUMMY_STRINGS.has(e.jobTitle)) ||
+            (e.company && !SAMPLE_DUMMY_STRINGS.has(e.company)),
+        )
+          ? cvData.experience
+          : fallback.experience,
+      education:
+        cvData.education &&
+        cvData.education.length > 0 &&
+        cvData.education.some(
+          (e) =>
+            (e.degree && !SAMPLE_DUMMY_STRINGS.has(e.degree)) ||
+            (e.institution && !SAMPLE_DUMMY_STRINGS.has(e.institution)),
+        )
+          ? cvData.education
+          : fallback.education,
+      skills:
+        cvData.skills && cvData.skills.length > 0
+          ? cvData.skills
+          : fallback.skills,
+      projects:
+        cvData.projects && cvData.projects.length > 0
+          ? cvData.projects
+          : fallback.projects,
+      certifications:
+        cvData.certifications && cvData.certifications.length > 0
+          ? cvData.certifications
+          : fallback.certifications,
+      languages:
+        cvData.languages && cvData.languages.length > 0
+          ? cvData.languages
+          : fallback.languages,
+      references:
+        cvData.references && cvData.references.length > 0
+          ? cvData.references
+          : fallback.references,
+      declaration:
+        cvData.declaration?.signedBy && !SAMPLE_DUMMY_STRINGS.has(cvData.declaration.signedBy)
+          ? cvData.declaration
+          : fallback.declaration,
+      design: {
+        ...fallback.design,
+        ...cvData.design,
+        primaryColor:
+          template.thumbnailColor ||
+          cvData.design?.primaryColor ||
+          fallback.design?.primaryColor,
+      },
+    };
+  };
 
   const personalInfo = cvData.personalInfo || {};
   const personalDetails = cvData.personalDetails || {};
@@ -213,7 +447,7 @@ export const QuickCVWizard = () => {
 
   // Filter templates
   const filteredTemplates = TEMPLATES_REGISTRY.filter((t) => {
-    if (activeCategory === 'All') return true;
+    if (activeCategory === "All") return true;
     return t.category === activeCategory;
   });
 
@@ -222,7 +456,7 @@ export const QuickCVWizard = () => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('Please choose an image under 5MB.');
+        alert("Please choose an image under 5MB.");
         return;
       }
       const reader = new FileReader();
@@ -243,7 +477,7 @@ export const QuickCVWizard = () => {
           personalInfo.jobTitle,
           education,
           experience,
-          preset
+          preset,
         );
         dispatch(updatePersonalInfo({ summary: generated }));
         setIsGeneratingBio(false);
@@ -257,38 +491,40 @@ export const QuickCVWizard = () => {
   const executeDownloadPDF = async (template) => {
     try {
       setDownloadingTemplateId(template.id);
-      setDownloadType('pdf');
-      const targetCVData = {
-        ...cvData,
-        templateId: template.id,
-        design: {
-          ...cvData.design,
-          primaryColor: template.thumbnailColor || cvData.design?.primaryColor,
-        },
-      };
+      setDownloadType("pdf");
+      const targetCVData = getTemplateCVData(template);
 
       // Query template container element if mounted on screen
       const cardEl = document.getElementById(`preview-sheet-${template.id}`);
-      const sheetEl = cardEl ? cardEl.querySelector('#cv-export-sheet') || cardEl : null;
-      const html = sheetEl ? sheetEl.outerHTML : '';
+      const sheetEl = cardEl
+        ? cardEl.querySelector("#cv-export-sheet") || cardEl
+        : null;
+      const html = sheetEl ? sheetEl.outerHTML : "";
 
       const blob = await exportService.exportPDF(targetCVData, html);
-      if (blob?.type === 'application/json') {
+      if (blob?.type === "application/json") {
         const text = await blob.text();
         const json = JSON.parse(text);
-        throw new Error(json.message || 'Export error');
+        throw new Error(json.message || "Export error");
       }
-      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
-      const link = document.createElement('a');
+      const url = window.URL.createObjectURL(
+        new Blob([blob], { type: "application/pdf" }),
+      );
+      const link = document.createElement("a");
       link.href = url;
-      link.setAttribute('download', `${(personalInfo.fullName || 'Resume').replace(/\s+/g, '_')}_${template.id}.pdf`);
+      link.setAttribute(
+        "download",
+        `${(targetCVData.personalInfo?.fullName || "Resume").replace(/\s+/g, "_")}_${template.id}.pdf`,
+      );
       document.body.appendChild(link);
       link.click();
       link.remove();
       setTimeout(() => window.URL.revokeObjectURL(url), 10000);
     } catch (error) {
-      console.error('Download error:', error);
-      alert('Failed to generate PDF. You can also click "Customize & Edit" to download from the editor.');
+      console.error("Download error:", error);
+      alert(
+        'Failed to generate PDF. You can also click "Customize & Edit" to download from the editor.',
+      );
     } finally {
       setDownloadingTemplateId(null);
       setDownloadType(null);
@@ -299,7 +535,7 @@ export const QuickCVWizard = () => {
   const handleDownloadPDF = async (template) => {
     if (!paymentService.isExportUnlocked(user)) {
       setPendingExportTemplate(template);
-      setPendingExportType('pdf');
+      setPendingExportType("pdf");
       setPaymentModalOpen(true);
       return;
     }
@@ -310,30 +546,27 @@ export const QuickCVWizard = () => {
   const executeDownloadDOCX = async (template) => {
     try {
       setDownloadingTemplateId(template.id);
-      setDownloadType('docx');
-      const targetCVData = {
-        ...cvData,
-        templateId: template.id,
-      };
+      setDownloadType("docx");
+      const targetCVData = getTemplateCVData(template);
 
       const blob = await exportService.exportDOCX(targetCVData);
       const url = window.URL.createObjectURL(
         new Blob([blob], {
-          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        })
+          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        }),
       );
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
       link.setAttribute(
-        'download',
-        `${(personalInfo.fullName || 'Resume').replace(/\s+/g, '_')}.docx`
+        "download",
+        `${(targetCVData.personalInfo?.fullName || "Resume").replace(/\s+/g, "_")}.docx`,
       );
       document.body.appendChild(link);
       link.click();
       link.remove();
     } catch (error) {
-      console.error('DOCX download error:', error);
-      alert('Failed to generate DOCX document.');
+      console.error("DOCX download error:", error);
+      alert("Failed to generate DOCX document.");
     } finally {
       setDownloadingTemplateId(null);
       setDownloadType(null);
@@ -344,7 +577,7 @@ export const QuickCVWizard = () => {
   const handleDownloadDOCX = async (template) => {
     if (!paymentService.isExportUnlocked(user)) {
       setPendingExportTemplate(template);
-      setPendingExportType('docx');
+      setPendingExportType("docx");
       setPaymentModalOpen(true);
       return;
     }
@@ -353,37 +586,44 @@ export const QuickCVWizard = () => {
 
   // Open full editor with selected template
   const handleCustomize = (templateId) => {
+    const tmpl = TEMPLATES_REGISTRY.find((t) => t.id === templateId) || { id: templateId };
+    const cvToLoad = getTemplateCVData(tmpl);
+    dispatch(setCVData(cvToLoad));
     dispatch(setTemplateId(templateId));
-    navigate('/builder');
+    navigate("/builder");
   };
 
   // Popular quick skill suggestions
   const QUICK_SKILLS = [
-    'MS Office (Word, Excel)',
-    'English Communication',
-    'JavaScript',
-    'React',
-    'Python',
-    'Node.js',
-    'Financial Analysis',
-    'Project Management',
-    'Data Analysis',
-    'Team Leadership',
+    "MS Office (Word, Excel)",
+    "English Communication",
+    "JavaScript",
+    "React",
+    "Python",
+    "Node.js",
+    "Financial Analysis",
+    "Project Management",
+    "Data Analysis",
+    "Team Leadership",
   ];
 
   const handleToggleQuickSkill = (skillName) => {
-    const exists = skills.some((s) => s.name.toLowerCase() === skillName.toLowerCase());
+    const exists = skills.some(
+      (s) => s.name.toLowerCase() === skillName.toLowerCase(),
+    );
     if (exists) {
-      const idx = skills.findIndex((s) => s.name.toLowerCase() === skillName.toLowerCase());
+      const idx = skills.findIndex(
+        (s) => s.name.toLowerCase() === skillName.toLowerCase(),
+      );
       if (idx !== -1) dispatch(removeSkill(idx));
     } else {
       dispatch(
         addSkill({
           id: `skill-${Date.now()}`,
           name: skillName,
-          level: 'Expert',
-          category: 'General',
-        })
+          level: "Expert",
+          category: "General",
+        }),
       );
     }
   };
@@ -395,11 +635,11 @@ export const QuickCVWizard = () => {
       addSkill({
         id: `skill-${Date.now()}`,
         name: newSkillInput.trim(),
-        level: 'Advanced',
-        category: 'Custom',
-      })
+        level: "Advanced",
+        category: "Custom",
+      }),
     );
-    setNewSkillInput('');
+    setNewSkillInput("");
   };
 
   return (
@@ -408,22 +648,27 @@ export const QuickCVWizard = () => {
       <div className="text-center max-w-3xl mx-auto mb-10 space-y-4">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/80 dark:border-blue-800/80 text-xs font-semibold text-blue-700 dark:text-blue-300 shadow-sm">
           <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-          <span>Effortless Professional CV Builder • Instant Preview & 1-Click Export</span>
+          <span>
+            Effortless Professional CV Builder • Instant Preview & 1-Click
+            Export
+          </span>
         </div>
         <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-          Enter Your Details Once. Get{' '}
+          Enter Your Details Once. Get{" "}
           <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
             50+ Styled CVs Instantly.
           </span>
         </h1>
         <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
-          Fill in your details below or launch our full desktop editor. Your CV automatically renders across 50+ recruiter-approved styles—including Bangladesh BDJobs standards and modern dual-column layouts.
+          Fill in your details below or launch our full desktop editor. Your CV
+          automatically renders across 50+ recruiter-approved styles—including
+          Bangladesh BDJobs standards and modern dual-column layouts.
         </p>
 
         <div className="flex items-center justify-center gap-3 pt-2">
           <button
             type="button"
-            onClick={() => navigate('/builder')}
+            onClick={() => navigate("/builder")}
             className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
           >
             <Edit3 className="w-4 h-4" />
@@ -432,8 +677,8 @@ export const QuickCVWizard = () => {
           <button
             type="button"
             onClick={() => {
-              const el = document.getElementById('quick-creator-card');
-              el?.scrollIntoView({ behavior: 'smooth' });
+              const el = document.getElementById("quick-creator-card");
+              el?.scrollIntoView({ behavior: "smooth" });
             }}
             className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-500 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-semibold text-xs shadow-sm transition-all cursor-pointer"
           >
@@ -443,7 +688,10 @@ export const QuickCVWizard = () => {
       </div>
 
       {/* 2. Primary Feature: Quick Input Form (Apple Native Style) */}
-      <div id="quick-creator-card" className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800 shadow-xl rounded-2xl p-6 sm:p-8 mb-16">
+      <div
+        id="quick-creator-card"
+        className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800 shadow-xl rounded-2xl p-6 sm:p-8 mb-16"
+      >
         <div className="space-y-8">
           {/* Section A: Photo & Key Personal Details */}
           <div>
@@ -457,7 +705,10 @@ export const QuickCVWizard = () => {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => dispatch(setCVData({ ...TAHMIDUR_RAHMAN_CV }))}
+                  onClick={() => {
+                    setShowSampleInInputs(true);
+                    dispatch(setCVData({ ...TAHMIDUR_RAHMAN_CV }));
+                  }}
                   className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300 transition-colors cursor-pointer"
                   title="Fill with sample data to preview"
                 >
@@ -465,7 +716,10 @@ export const QuickCVWizard = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => dispatch(setCVData({ ...INITIAL_CV_DATA }))}
+                  onClick={() => {
+                    setShowSampleInInputs(false);
+                    dispatch(setCVData({ ...BLANK_SAMPLE }));
+                  }}
                   className="text-xs font-medium px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
                   title="Clear all fields"
                 >
@@ -508,7 +762,9 @@ export const QuickCVWizard = () => {
                       <span className="text-[11px] font-semibold block text-slate-700 dark:text-slate-300">
                         Passport Photo
                       </span>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">35×45mm ratio</span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">
+                        35×45mm ratio
+                      </span>
                     </div>
                   )}
                 </div>
@@ -519,14 +775,18 @@ export const QuickCVWizard = () => {
                     onClick={() => fileInputRef.current?.click()}
                     className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold hover:underline"
                   >
-                    {personalInfo.photo ? 'Change' : 'Upload Photo'}
+                    {personalInfo.photo ? "Change" : "Upload Photo"}
                   </button>
                   {personalInfo.photo && (
                     <>
-                      <span className="text-slate-300 dark:text-slate-700">•</span>
+                      <span className="text-slate-300 dark:text-slate-700">
+                        •
+                      </span>
                       <button
                         type="button"
-                        onClick={() => dispatch(updatePersonalInfo({ photo: null }))}
+                        onClick={() =>
+                          dispatch(updatePersonalInfo({ photo: null }))
+                        }
                         className="text-xs text-rose-500 hover:underline"
                       >
                         Remove
@@ -544,8 +804,10 @@ export const QuickCVWizard = () => {
                   </label>
                   <input
                     type="text"
-                    value={personalInfo.fullName || ''}
-                    onChange={(e) => dispatch(updatePersonalInfo({ fullName: e.target.value }))}
+                    value={getInputValue(personalInfo.fullName)}
+                    onChange={(e) =>
+                      dispatch(updatePersonalInfo({ fullName: e.target.value }))
+                    }
                     placeholder="e.g. Tahmidur Rahman"
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
@@ -553,12 +815,15 @@ export const QuickCVWizard = () => {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Job Title / Target Designation <span className="text-rose-500">*</span>
+                    Job Title / Target Designation{" "}
+                    <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
-                    value={personalInfo.jobTitle || ''}
-                    onChange={(e) => dispatch(updatePersonalInfo({ jobTitle: e.target.value }))}
+                    value={getInputValue(personalInfo.jobTitle)}
+                    onChange={(e) =>
+                      dispatch(updatePersonalInfo({ jobTitle: e.target.value }))
+                    }
                     placeholder="e.g. Senior Software Engineer / Bank Officer"
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
@@ -570,8 +835,10 @@ export const QuickCVWizard = () => {
                   </label>
                   <input
                     type="email"
-                    value={personalInfo.email || ''}
-                    onChange={(e) => dispatch(updatePersonalInfo({ email: e.target.value }))}
+                    value={getInputValue(personalInfo.email)}
+                    onChange={(e) =>
+                      dispatch(updatePersonalInfo({ email: e.target.value }))
+                    }
                     placeholder="e.g. tahmid.rahman@email.com"
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
@@ -583,8 +850,10 @@ export const QuickCVWizard = () => {
                   </label>
                   <input
                     type="tel"
-                    value={personalInfo.phone || ''}
-                    onChange={(e) => dispatch(updatePersonalInfo({ phone: e.target.value }))}
+                    value={getInputValue(personalInfo.phone)}
+                    onChange={(e) =>
+                      dispatch(updatePersonalInfo({ phone: e.target.value }))
+                    }
                     placeholder="e.g. +880 1712-345678"
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
                   />
@@ -596,8 +865,10 @@ export const QuickCVWizard = () => {
                   </label>
                   <input
                     type="text"
-                    value={personalInfo.location || ''}
-                    onChange={(e) => dispatch(updatePersonalInfo({ location: e.target.value }))}
+                    value={getInputValue(personalInfo.location)}
+                    onChange={(e) =>
+                      dispatch(updatePersonalInfo({ location: e.target.value }))
+                    }
                     placeholder="e.g. Banani, Dhaka, Bangladesh"
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
@@ -609,8 +880,10 @@ export const QuickCVWizard = () => {
                   </label>
                   <input
                     type="text"
-                    value={personalInfo.linkedin || ''}
-                    onChange={(e) => dispatch(updatePersonalInfo({ linkedin: e.target.value }))}
+                    value={getInputValue(personalInfo.linkedin)}
+                    onChange={(e) =>
+                      dispatch(updatePersonalInfo({ linkedin: e.target.value }))
+                    }
                     placeholder="e.g. linkedin.com/in/tahmidrahman"
                     className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
@@ -636,14 +909,22 @@ export const QuickCVWizard = () => {
                 disabled={isGeneratingBio}
                 className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 text-white text-xs font-semibold shadow-md shadow-emerald-500/20 hover:opacity-95 active:scale-95 transition-all disabled:opacity-50"
               >
-                <Sparkles className={`w-3.5 h-3.5 ${isGeneratingBio ? 'animate-spin' : ''}`} />
-                <span>{isGeneratingBio ? 'Crafting Bio...' : '✨ Generate Bio with AI'}</span>
+                <Sparkles
+                  className={`w-3.5 h-3.5 ${isGeneratingBio ? "animate-spin" : ""}`}
+                />
+                <span>
+                  {isGeneratingBio
+                    ? "Crafting Bio..."
+                    : "✨ Generate Bio with AI"}
+                </span>
               </button>
             </div>
 
             {/* Quick 1-click Preset Selector */}
             <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="text-[11px] font-medium text-slate-500">Quick Bio Presets:</span>
+              <span className="text-[11px] font-medium text-slate-500">
+                Quick Bio Presets:
+              </span>
               {PRESET_ROLES.slice(0, 4).map((preset) => (
                 <button
                   key={preset.role}
@@ -651,15 +932,17 @@ export const QuickCVWizard = () => {
                   onClick={() => handleGenerateBio(preset)}
                   className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950 hover:text-emerald-600 text-[11px] font-medium text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700 transition-colors"
                 >
-                  + {preset.role.split('/')[0]}
+                  + {preset.role.split("/")[0]}
                 </button>
               ))}
             </div>
 
             <textarea
               rows={3}
-              value={personalInfo.summary || ''}
-              onChange={(e) => dispatch(updatePersonalInfo({ summary: e.target.value }))}
+              value={getInputValue(personalInfo.summary)}
+              onChange={(e) =>
+                dispatch(updatePersonalInfo({ summary: e.target.value }))
+              }
               placeholder="Click 'Generate Bio with AI' or type your career objective here..."
               className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all leading-relaxed"
             />
@@ -681,13 +964,13 @@ export const QuickCVWizard = () => {
                   dispatch(
                     addEducation({
                       id: `edu-${Date.now()}`,
-                      degree: 'Degree / Certificate',
-                      institution: 'University / Board',
-                      fieldOfStudy: 'Field / Major',
-                      startDate: '',
-                      endDate: '2024',
-                      grade: 'CGPA 3.80',
-                    })
+                      degree: "Degree / Certificate",
+                      institution: "University / Board",
+                      fieldOfStudy: "Field / Major",
+                      startDate: "",
+                      endDate: "2024",
+                      grade: "CGPA 3.80",
+                    }),
                   )
                 }
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
@@ -705,9 +988,14 @@ export const QuickCVWizard = () => {
                   <div className="sm:col-span-3">
                     <input
                       type="text"
-                      value={edu.degree || ''}
+                      value={getInputValue(edu.degree)}
                       onChange={(e) =>
-                        dispatch(updateEducation({ index: idx, data: { degree: e.target.value } }))
+                        dispatch(
+                          updateEducation({
+                            index: idx,
+                            data: { degree: e.target.value },
+                          }),
+                        )
                       }
                       placeholder="Exam / Degree (e.g. B.Sc. / HSC)"
                       className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
@@ -716,10 +1004,13 @@ export const QuickCVWizard = () => {
                   <div className="sm:col-span-4">
                     <input
                       type="text"
-                      value={edu.institution || ''}
+                      value={getInputValue(edu.institution)}
                       onChange={(e) =>
                         dispatch(
-                          updateEducation({ index: idx, data: { institution: e.target.value } })
+                          updateEducation({
+                            index: idx,
+                            data: { institution: e.target.value },
+                          }),
                         )
                       }
                       placeholder="Institution / Board (e.g. Dhaka University)"
@@ -729,10 +1020,13 @@ export const QuickCVWizard = () => {
                   <div className="sm:col-span-2">
                     <input
                       type="text"
-                      value={edu.fieldOfStudy || ''}
+                      value={getInputValue(edu.fieldOfStudy)}
                       onChange={(e) =>
                         dispatch(
-                          updateEducation({ index: idx, data: { fieldOfStudy: e.target.value } })
+                          updateEducation({
+                            index: idx,
+                            data: { fieldOfStudy: e.target.value },
+                          }),
                         )
                       }
                       placeholder="Major (e.g. Science / CSE)"
@@ -742,9 +1036,14 @@ export const QuickCVWizard = () => {
                   <div className="sm:col-span-2">
                     <input
                       type="text"
-                      value={edu.grade || ''}
+                      value={getInputValue(edu.grade)}
                       onChange={(e) =>
-                        dispatch(updateEducation({ index: idx, data: { grade: e.target.value } }))
+                        dispatch(
+                          updateEducation({
+                            index: idx,
+                            data: { grade: e.target.value },
+                          }),
+                        )
                       }
                       placeholder="Result (e.g. CGPA 3.82)"
                       className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-semibold"
@@ -781,14 +1080,14 @@ export const QuickCVWizard = () => {
                   dispatch(
                     addExperience({
                       id: `exp-${Date.now()}`,
-                      jobTitle: 'Job Title',
-                      company: 'Company Name',
-                      location: 'Dhaka',
-                      startDate: '2022',
-                      endDate: 'Present',
+                      jobTitle: "Job Title",
+                      company: "Company Name",
+                      location: "Dhaka",
+                      startDate: "2022",
+                      endDate: "Present",
                       current: true,
-                      description: 'Key responsibilities and achievements...',
-                    })
+                      description: "Key responsibilities and achievements...",
+                    }),
                   )
                 }
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
@@ -807,10 +1106,13 @@ export const QuickCVWizard = () => {
                     <div className="sm:col-span-4">
                       <input
                         type="text"
-                        value={exp.jobTitle || ''}
+                        value={getInputValue(exp.jobTitle)}
                         onChange={(e) =>
                           dispatch(
-                            updateExperience({ index: idx, data: { jobTitle: e.target.value } })
+                            updateExperience({
+                              index: idx,
+                              data: { jobTitle: e.target.value },
+                            }),
                           )
                         }
                         placeholder="Job Title"
@@ -820,10 +1122,13 @@ export const QuickCVWizard = () => {
                     <div className="sm:col-span-4">
                       <input
                         type="text"
-                        value={exp.company || ''}
+                        value={getInputValue(exp.company)}
                         onChange={(e) =>
                           dispatch(
-                            updateExperience({ index: idx, data: { company: e.target.value } })
+                            updateExperience({
+                              index: idx,
+                              data: { company: e.target.value },
+                            }),
                           )
                         }
                         placeholder="Company Name"
@@ -833,14 +1138,17 @@ export const QuickCVWizard = () => {
                     <div className="sm:col-span-3">
                       <input
                         type="text"
-                        value={`${exp.startDate || ''} – ${exp.current ? 'Present' : exp.endDate || ''}`}
+                        value={`${exp.startDate || ""} – ${exp.current ? "Present" : exp.endDate || ""}`}
                         onChange={(e) => {
-                          const parts = e.target.value.split('–');
+                          const parts = e.target.value.split("–");
                           dispatch(
                             updateExperience({
                               index: idx,
-                              data: { startDate: parts[0]?.trim(), endDate: parts[1]?.trim() },
-                            })
+                              data: {
+                                startDate: parts[0]?.trim(),
+                                endDate: parts[1]?.trim(),
+                              },
+                            }),
                           );
                         }}
                         placeholder="2021 – Present"
@@ -862,10 +1170,13 @@ export const QuickCVWizard = () => {
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
-                      value={exp.description || ''}
+                      value={exp.description || ""}
                       onChange={(e) =>
                         dispatch(
-                          updateExperience({ index: idx, data: { description: e.target.value } })
+                          updateExperience({
+                            index: idx,
+                            data: { description: e.target.value },
+                          }),
                         )
                       }
                       placeholder="Brief description of your daily responsibilities..."
@@ -874,9 +1185,15 @@ export const QuickCVWizard = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        const enhanced = enhanceBulletPoint(exp.description, exp.jobTitle);
+                        const enhanced = enhanceBulletPoint(
+                          exp.description,
+                          exp.jobTitle,
+                        );
                         dispatch(
-                          updateExperience({ index: idx, data: { description: enhanced } })
+                          updateExperience({
+                            index: idx,
+                            data: { description: enhanced },
+                          }),
                         );
                       }}
                       className="shrink-0 px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-semibold hover:bg-emerald-100 transition-colors flex items-center gap-1"
@@ -903,7 +1220,7 @@ export const QuickCVWizard = () => {
             <div className="flex flex-wrap gap-2 mb-3">
               {QUICK_SKILLS.map((qs) => {
                 const isSelected = skills.some(
-                  (s) => s.name.toLowerCase() === qs.toLowerCase()
+                  (s) => s.name.toLowerCase() === qs.toLowerCase(),
                 );
                 return (
                   <button
@@ -912,8 +1229,8 @@ export const QuickCVWizard = () => {
                     onClick={() => handleToggleQuickSkill(qs)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 ${
                       isSelected
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                        ? "bg-emerald-600 text-white shadow-sm"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
                     }`}
                   >
                     {isSelected && <Check className="w-3 h-3" />}
@@ -924,7 +1241,10 @@ export const QuickCVWizard = () => {
             </div>
 
             {/* Custom skill input */}
-            <form onSubmit={handleAddCustomSkill} className="flex gap-2 max-w-md">
+            <form
+              onSubmit={handleAddCustomSkill}
+              className="flex gap-2 max-w-md"
+            >
               <input
                 type="text"
                 value={newSkillInput}
@@ -955,7 +1275,8 @@ export const QuickCVWizard = () => {
                     Bangladeshi Recruiter Details (BDJobs / Bank Standard)
                   </span>
                   <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
-                    Father/Mother's name, DOB, NID, Blood Group, Permanent Address & References
+                    Father/Mother's name, DOB, NID, Blood Group, Permanent
+                    Address & References
                   </span>
                 </div>
               </div>
@@ -974,9 +1295,11 @@ export const QuickCVWizard = () => {
                   </label>
                   <input
                     type="text"
-                    value={personalDetails.fatherName || ''}
+                    value={getInputValue(personalDetails.fatherName)}
                     onChange={(e) =>
-                      dispatch(updatePersonalDetails({ fatherName: e.target.value }))
+                      dispatch(
+                        updatePersonalDetails({ fatherName: e.target.value }),
+                      )
                     }
                     placeholder="e.g. Md. Abdur Rahman"
                     className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
@@ -989,9 +1312,11 @@ export const QuickCVWizard = () => {
                   </label>
                   <input
                     type="text"
-                    value={personalDetails.motherName || ''}
+                    value={getInputValue(personalDetails.motherName)}
                     onChange={(e) =>
-                      dispatch(updatePersonalDetails({ motherName: e.target.value }))
+                      dispatch(
+                        updatePersonalDetails({ motherName: e.target.value }),
+                      )
                     }
                     placeholder="e.g. Begum Rokeya Sultana"
                     className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
@@ -1004,8 +1329,10 @@ export const QuickCVWizard = () => {
                   </label>
                   <input
                     type="text"
-                    value={personalDetails.dob || ''}
-                    onChange={(e) => dispatch(updatePersonalDetails({ dob: e.target.value }))}
+                    value={getInputValue(personalDetails.dob)}
+                    onChange={(e) =>
+                      dispatch(updatePersonalDetails({ dob: e.target.value }))
+                    }
                     placeholder="e.g. 15/10/1996"
                     className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono"
                   />
@@ -1017,8 +1344,10 @@ export const QuickCVWizard = () => {
                   </label>
                   <input
                     type="text"
-                    value={personalDetails.nid || ''}
-                    onChange={(e) => dispatch(updatePersonalDetails({ nid: e.target.value }))}
+                    value={getInputValue(personalDetails.nid)}
+                    onChange={(e) =>
+                      dispatch(updatePersonalDetails({ nid: e.target.value }))
+                    }
                     placeholder="e.g. 19962692518000123"
                     className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono"
                   />
@@ -1029,17 +1358,21 @@ export const QuickCVWizard = () => {
                     Blood Group
                   </label>
                   <select
-                    value={personalDetails.bloodGroup || 'B+'}
+                    value={personalDetails.bloodGroup || "B+"}
                     onChange={(e) =>
-                      dispatch(updatePersonalDetails({ bloodGroup: e.target.value }))
+                      dispatch(
+                        updatePersonalDetails({ bloodGroup: e.target.value }),
+                      )
                     }
                     className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-semibold"
                   >
-                    {['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'].map((bg) => (
-                      <option key={bg} value={bg}>
-                        {bg}
-                      </option>
-                    ))}
+                    {["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map(
+                      (bg) => (
+                        <option key={bg} value={bg}>
+                          {bg}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </div>
 
@@ -1049,9 +1382,11 @@ export const QuickCVWizard = () => {
                   </label>
                   <input
                     type="text"
-                    value={personalDetails.religion || 'Islam'}
+                    value={personalDetails.religion || "Islam"}
                     onChange={(e) =>
-                      dispatch(updatePersonalDetails({ religion: e.target.value }))
+                      dispatch(
+                        updatePersonalDetails({ religion: e.target.value }),
+                      )
                     }
                     placeholder="e.g. Islam / Hinduism / Christianity"
                     className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
@@ -1064,9 +1399,13 @@ export const QuickCVWizard = () => {
                   </label>
                   <input
                     type="text"
-                    value={personalDetails.permanentAddress || ''}
+                    value={getInputValue(personalDetails.permanentAddress)}
                     onChange={(e) =>
-                      dispatch(updatePersonalDetails({ permanentAddress: e.target.value }))
+                      dispatch(
+                        updatePersonalDetails({
+                          permanentAddress: e.target.value,
+                        }),
+                      )
                     }
                     placeholder="e.g. Vill: Shantinagar, P.O: Mirpur, Dist: Kushtia, Bangladesh"
                     className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
@@ -1091,7 +1430,8 @@ export const QuickCVWizard = () => {
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
-              Select any design below. One-click download genuine PDF or Word DOCX with your details and portrait photo.
+              Select any design below. One-click download genuine PDF or Word
+              DOCX with your details and portrait photo.
             </p>
           </div>
 
@@ -1104,11 +1444,13 @@ export const QuickCVWizard = () => {
                 onClick={() => setActiveCategory(category)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                   activeCategory === category
-                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md'
-                    : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md"
+                    : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
-                {category === 'Bangladesh Standard' ? '🇧🇩 BD Standard' : category}
+                {category === "Bangladesh Standard"
+                  ? "🇧🇩 BD Standard"
+                  : category}
               </button>
             ))}
           </div>
@@ -1118,14 +1460,7 @@ export const QuickCVWizard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredTemplates.map((template) => {
             const isDownloadingThis = downloadingTemplateId === template.id;
-            const templateCVData = {
-              ...cvData,
-              templateId: template.id,
-              design: {
-                ...cvData.design,
-                primaryColor: template.thumbnailColor || cvData.design?.primaryColor,
-              },
-            };
+            const templateCVData = getTemplateCVData(template);
 
             return (
               <div
@@ -1159,7 +1494,7 @@ export const QuickCVWizard = () => {
                   <div
                     id={`preview-sheet-${template.id}`}
                     className="w-[794px] origin-top pointer-events-none select-none transition-transform group-hover:scale-[0.37]"
-                    style={{ transform: 'scale(0.35)' }}
+                    style={{ transform: "scale(0.35)" }}
                   >
                     <RenderCVTemplate cvData={templateCVData} scale={1} />
                   </div>
@@ -1183,7 +1518,11 @@ export const QuickCVWizard = () => {
                       className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold shadow hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>{isDownloadingThis && downloadType === 'pdf' ? 'Exporting...' : 'PDF'}</span>
+                      <span>
+                        {isDownloadingThis && downloadType === "pdf"
+                          ? "Exporting..."
+                          : "PDF"}
+                      </span>
                     </button>
 
                     {/* Instant DOCX Download */}
@@ -1194,7 +1533,11 @@ export const QuickCVWizard = () => {
                       className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all disabled:opacity-50"
                     >
                       <FileText className="w-3.5 h-3.5" />
-                      <span>{isDownloadingThis && downloadType === 'docx' ? 'Exporting...' : 'Word'}</span>
+                      <span>
+                        {isDownloadingThis && downloadType === "docx"
+                          ? "Exporting..."
+                          : "Word"}
+                      </span>
                     </button>
                   </div>
 
@@ -1225,7 +1568,9 @@ export const QuickCVWizard = () => {
                 <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base truncate">
                   {fullscreenPreview.name}
                 </h3>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{fullscreenPreview.category}</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                  {fullscreenPreview.category}
+                </span>
               </div>
               <button
                 type="button"
@@ -1241,27 +1586,20 @@ export const QuickCVWizard = () => {
               <div
                 className="shrink-0 origin-top shadow-2xl rounded bg-white my-2"
                 style={{
-                  width: `${Math.round(794 * Math.min(0.85, Math.max(0.38, ((typeof window !== 'undefined' ? window.innerWidth : 400) - 32) / 794)))}px`,
-                  minHeight: `${Math.round(1123 * Math.min(0.85, Math.max(0.38, ((typeof window !== 'undefined' ? window.innerWidth : 400) - 32) / 794)))}px`,
+                  width: `${Math.round(794 * previewScaleFactor)}px`,
+                  minHeight: `${Math.round(1123 * previewScaleFactor)}px`,
                 }}
               >
                 <div
                   style={{
-                    width: '794px',
-                    minHeight: '1123px',
-                    transform: `scale(${Math.min(0.85, Math.max(0.38, ((typeof window !== 'undefined' ? window.innerWidth : 400) - 32) / 794))})`,
-                    transformOrigin: 'top left',
+                    width: "794px",
+                    minHeight: "1123px",
+                    transform: `scale(${previewScaleFactor})`,
+                    transformOrigin: "top left",
                   }}
                 >
                   <RenderCVTemplate
-                    cvData={{
-                      ...cvData,
-                      templateId: fullscreenPreview.id,
-                      design: {
-                        ...cvData.design,
-                        primaryColor: fullscreenPreview.thumbnailColor || cvData.design?.primaryColor,
-                      },
-                    }}
+                    cvData={getTemplateCVData(fullscreenPreview)}
                     scale={1}
                   />
                 </div>
@@ -1303,7 +1641,7 @@ export const QuickCVWizard = () => {
         exportType={pendingExportType}
         onSuccess={() => {
           if (pendingExportTemplate) {
-            if (pendingExportType === 'docx') {
+            if (pendingExportType === "docx") {
               executeDownloadDOCX(pendingExportTemplate);
             } else {
               executeDownloadPDF(pendingExportTemplate);

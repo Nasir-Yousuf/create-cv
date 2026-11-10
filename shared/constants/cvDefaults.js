@@ -262,80 +262,8 @@ export const TAHMIDUR_RAHMAN_CV = {
 };
 
 export const INITIAL_CV_DATA = {
-  title: "Untitled Resume",
-  templateId: "bd-corporate-standard",
-  personalInfo: {
-    fullName: "",
-    jobTitle: "",
-    email: "",
-    phone: "",
-    location: "",
-    website: "",
-    linkedin: "",
-    github: "",
-    photo: null,
-    photoStyle: "portrait",
-    summary: ""
-  },
-
-  // Personal details expected by Bangladesh corporate recruiters, banks, and BDJobs
-  personalDetails: {
-    fatherName: "",
-    motherName: "",
-    dob: "",
-    gender: "Male",
-    maritalStatus: "Single",
-    nationality: "Bangladeshi",
-    nid: "",
-    religion: "Islam",
-    bloodGroup: "B+",
-    permanentAddress: "",
-    presentAddress: "",
-  },
-
-  design: {
-    primaryColor: "#059669", // Emerald Green (Bangladesh national flag green / corporate)
-    accentColor: "#0284c7",
-    textColor: "#1e293b",
-    backgroundColor: "#ffffff",
-    fontFamily: "Inter",
-    fontSize: "medium", // small | medium | large
-    lineSpacing: "normal", // compact | normal | relaxed
-    sectionSpacing: "normal", // compact | normal | relaxed
-    margins: "normal", // compact | normal | wide
-    pageSize: "A4",
-    showPhoto: true,
-    photoSize: "md", // sm | md | lg | xl
-    photoPosition: "right", // left | center | right
-    columnRatio: "33/67",
-    textAlignment: "left",
-    sectionOrder: [
-      "summary",
-      "experience",
-      "education",
-      "skills",
-      "projects",
-      "certifications",
-      "personalDetails",
-      "languages",
-      "references",
-      "declaration"
-    ]
-  },
-
-  experience: [],
-  education: [],
-  skills: [],
-  projects: [],
-  certifications: [],
-  languages: [],
-  references: [],
-  declaration: {
-    text: "I hereby declare that all the information provided above is true and correct to the best of my knowledge and belief.",
-    date: new Date().toLocaleDateString('en-GB'),
-    signedBy: ""
-  },
-  customSections: []
+  ...TAHMIDUR_RAHMAN_CV,
+  title: "Professional Resume",
 };
 
 export const TEMPLATES_REGISTRY = [
