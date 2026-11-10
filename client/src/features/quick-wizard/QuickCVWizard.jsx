@@ -37,6 +37,7 @@ import {
   Award,
   Layers,
   ArrowRight,
+  Edit3,
 } from 'lucide-react';
 import Button from '../../components/common/Button';
 
@@ -266,6 +267,11 @@ export const QuickCVWizard = () => {
       const html = sheetEl ? sheetEl.outerHTML : '';
 
       const blob = await exportService.exportPDF(targetCVData, html);
+      if (blob?.type === 'application/json') {
+        const text = await blob.text();
+        const json = JSON.parse(text);
+        throw new Error(json.message || 'Export error');
+      }
       const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
@@ -273,6 +279,7 @@ export const QuickCVWizard = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 10000);
     } catch (error) {
       console.error('Download error:', error);
       alert('Failed to generate PDF. You can also click "Customize & Edit" to download from the editor.');

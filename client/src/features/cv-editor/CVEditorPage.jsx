@@ -85,6 +85,7 @@ export const CVEditorPage = () => {
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isRightDockOpen, setIsRightDockOpen] = useState(true);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [activeActionDock, setActiveActionDock] = useState('edit');
 
@@ -101,10 +102,10 @@ export const CVEditorPage = () => {
   // Auto-fit canvas calculation
   const handleFitZoom = () => {
     const leftWidth = isSidebarOpen ? 370 : 70;
-    const rightMargin = 80;
+    const rightMargin = isRightDockOpen ? 90 : 28;
     const availableWidth = window.innerWidth - leftWidth - rightMargin;
-    const targetPaperWidth = devicePreview === 'mobile' ? 400 : devicePreview === 'tablet' ? 650 : 820;
-    const optimalScale = Math.min(1.0, Math.max(0.45, (availableWidth - 40) / targetPaperWidth));
+    const targetPaperWidth = devicePreview === 'mobile' ? 400 : devicePreview === 'tablet' ? 680 : 800;
+    const optimalScale = Math.min(1.0, Math.max(0.38, (availableWidth - 32) / targetPaperWidth));
     dispatch(setPreviewScale(Math.round(optimalScale * 100) / 100));
   };
 
@@ -115,7 +116,10 @@ export const CVEditorPage = () => {
 
   useEffect(() => {
     handleFitZoom();
-  }, [isSidebarOpen, devicePreview]);
+    const handleResize = () => handleFitZoom();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isSidebarOpen, isRightDockOpen, devicePreview]);
 
   // Keyboard shortcuts (Ctrl/Cmd+Z, Ctrl/Cmd+Y, Ctrl/Cmd+S)
   useEffect(() => {
@@ -191,6 +195,11 @@ export const CVEditorPage = () => {
         })
       );
       const blob = await exportService.exportPDF(currentCV);
+      if (blob?.type === 'application/json') {
+        const text = await blob.text();
+        const json = JSON.parse(text);
+        throw new Error(json.message || 'Export failed');
+      }
       const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
@@ -198,6 +207,7 @@ export const CVEditorPage = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 10000);
       dispatch(
         showToast({
           message: 'PDF exported and downloaded successfully!',
@@ -928,17 +938,19 @@ export const CVEditorPage = () => {
             <div className="h-12 px-4 flex items-center justify-between shrink-0 z-10 select-none">
               {/* Left Group: Undo / Redo + Zoom Dropdown */}
               <div className="flex items-center gap-2">
-                {/* Collapsed Sidebar Restore Button */}
-                {!isSidebarOpen && (
-                  <button
-                    type="button"
-                    onClick={() => setIsSidebarOpen(true)}
-                    className="p-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 shadow-sm text-slate-600 dark:text-slate-300 hover:text-blue-600"
-                    title="Open Sidebar"
-                  >
-                    <PanelLeft className="w-4 h-4" />
-                  </button>
-                )}
+                {/* Left Sidebar Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  className={`p-1.5 rounded-xl border transition-all text-xs font-semibold cursor-pointer ${
+                    isSidebarOpen
+                      ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400'
+                      : 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600'
+                  }`}
+                  title={isSidebarOpen ? 'Collapse Left Sidebar' : 'Expand Left Sidebar'}
+                >
+                  {isSidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
+                </button>
 
                 {/* Undo, Redo & Divider Container */}
                 <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2.5 py-1 rounded-xl shadow-sm border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300">
@@ -1042,8 +1054,22 @@ export const CVEditorPage = () => {
                 </button>
               </div>
 
-              {/* Right Group: Save Changes & Export Dropdown */}
+              {/* Right Group: Save Changes, Export Dropdown, and Action Dock Toggle */}
               <div className="flex items-center gap-2">
+                {/* Right Actions Dock Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsRightDockOpen(!isRightDockOpen)}
+                  className={`p-1.5 rounded-xl border transition-all text-xs font-semibold cursor-pointer ${
+                    isRightDockOpen
+                      ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400'
+                      : 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600'
+                  }`}
+                  title={isRightDockOpen ? 'Hide Right Action Dock' : 'Show Right Action Dock'}
+                >
+                  <Sliders className="w-4 h-4" />
+                </button>
+
                 {/* [✔ Save Changes] Pill Button from Reference Image */}
                 <button
                   type="button"
@@ -1106,30 +1132,38 @@ export const CVEditorPage = () => {
             ------------------------------------------------------------------ */}
             <div
               ref={canvasScrollContainerRef}
-              className="flex-1 overflow-auto p-4 sm:p-6 md:p-8 flex justify-center items-start relative select-text"
+              className="flex-1 overflow-auto p-4 sm:p-6 md:p-8 relative select-text"
             >
-              {/* Device Frame Wrapper (for Desktop, Tablet, Mobile) */}
-              <div
-                className={`transition-all duration-300 origin-top flex justify-center ${
-                  devicePreview === 'mobile'
-                    ? 'w-[400px] border-[10px] border-slate-800 rounded-[38px] p-2 bg-slate-800 shadow-2xl my-2'
-                    : devicePreview === 'tablet'
-                    ? 'w-[680px] border-[12px] border-slate-700 rounded-[28px] p-2 bg-slate-700 shadow-2xl my-2'
-                    : 'w-auto'
-                }`}
-              >
+              <div className="min-w-fit w-full flex justify-center py-2">
                 <div
-                  className="shadow-xl rounded-md transition-transform duration-150 origin-top bg-white"
+                  className="m-auto my-0 transition-all duration-150"
                   style={{
-                    transform: `scale(${previewScale})`,
-                    transformOrigin: 'top center',
+                    width: `${Math.round((devicePreview === 'mobile' ? 400 : devicePreview === 'tablet' ? 680 : 794) * previewScale)}px`,
+                    minHeight: `${Math.round(1123 * previewScale)}px`,
                   }}
                 >
-                  <RenderCVTemplate
-                    cvData={currentCV}
-                    scale={1}
-                    onOpenPhotoModal={() => setPhotoModalOpen(true)}
-                  />
+                  {/* Device Frame Wrapper (for Desktop, Tablet, Mobile) */}
+                  <div
+                    className={`transition-all duration-300 ${
+                      devicePreview === 'mobile'
+                        ? 'border-[10px] border-slate-800 rounded-[38px] p-2 bg-slate-800 shadow-2xl'
+                        : devicePreview === 'tablet'
+                        ? 'border-[12px] border-slate-700 rounded-[28px] p-2 bg-slate-700 shadow-2xl'
+                        : 'shadow-2xl rounded-sm'
+                    } bg-white`}
+                    style={{
+                      width: `${devicePreview === 'mobile' ? 400 : devicePreview === 'tablet' ? 680 : 794}px`,
+                      minHeight: '1123px',
+                      transform: `scale(${previewScale})`,
+                      transformOrigin: 'top left',
+                    }}
+                  >
+                    <RenderCVTemplate
+                      cvData={currentCV}
+                      scale={1}
+                      onOpenPhotoModal={() => setPhotoModalOpen(true)}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1162,8 +1196,18 @@ export const CVEditorPage = () => {
             {/* ===============================================================
                 D. FAR-RIGHT FLOATING ACTION DOCK (Exact Match to Reference Image)
             ================================================================ */}
-            <div className="absolute right-4 sm:right-6 top-1/2 -translate-y-1/2 z-20">
-              <div className="bg-white dark:bg-slate-800 shadow-xl border border-slate-200/80 dark:border-slate-700 rounded-2xl py-3 px-2 flex flex-col items-center gap-3.5">
+            {isRightDockOpen && (
+              <div className="absolute right-4 sm:right-6 top-1/2 -translate-y-1/2 z-20 animate-fade-in">
+                <div className="bg-white dark:bg-slate-800 shadow-xl border border-slate-200/80 dark:border-slate-700 rounded-2xl py-3 px-2 flex flex-col items-center gap-3.5 relative">
+                  {/* Minimize dock button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsRightDockOpen(false)}
+                    className="w-4 h-4 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center text-[10px] hover:scale-110 transition-transform cursor-pointer"
+                    title="Minimize Dock"
+                  >
+                    ×
+                  </button>
                 {/* 1. Edit */}
                 <button
                   type="button"
@@ -1252,6 +1296,7 @@ export const CVEditorPage = () => {
                 </button>
               </div>
             </div>
+          )}
           </main>
         </div>
 
