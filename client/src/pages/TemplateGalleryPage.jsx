@@ -2,10 +2,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { setTemplateId, setCVData } from '../store/cvSlice';
-import { showToast } from '../store/uiSlice';
+import {
+  showToast,
+  openExportModal,
+  updateExportState,
+  closeExportModal,
+} from '../store/uiSlice';
 import exportService from '../services/exportService';
 import paymentService from '../services/paymentService';
 import PaymentExportModal from '../components/common/PaymentExportModal';
+import ExportStatusModal from '../components/common/ExportStatusModal';
 import { RenderCVTemplate } from '../templates';
 import {
   Search,
@@ -45,6 +51,7 @@ export const TemplateGalleryPage = () => {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [pendingExportTemplate, setPendingExportTemplate] = useState(null);
   const [pendingExportType, setPendingExportType] = useState('pdf');
+  const [lastExportTemplate, setLastExportTemplate] = useState(null);
   const [windowWidth, setWindowWidth] = useState(
     typeof window !== 'undefined' ? window.innerWidth : 1024
   );
@@ -97,31 +104,59 @@ export const TemplateGalleryPage = () => {
 
   // Execute Instant PDF Download
   const executeDownloadPDF = async (template) => {
+    if (!template || downloadingId) return;
     try {
+      setLastExportTemplate(template);
       setDownloadingId(template.id);
       setDownloadType('pdf');
       dispatch(
-        showToast({
-          message: `Generating vector PDF for ${template.name}...`,
-          type: 'info',
+        openExportModal({
+          format: 'pdf',
+          stage: 'preparing',
+          progress: 15,
+          statusMessage: `Preparing vector PDF for ${template.name}...`,
         })
       );
+
       const cvToExport = getCardCVData(template);
-      await exportService.exportPDF(cvToExport);
+      const elementId = `gallery-preview-sheet-${template.id}`;
+      await exportService.exportPDF(cvToExport, '', elementId, (update) => {
+        if (typeof update === 'object') {
+          dispatch(
+            updateExportState({
+              stage: update.stage || 'rendering',
+              progress: update.progress || 50,
+              statusMessage: update.message || 'Processing...',
+            })
+          );
+        } else {
+          dispatch(updateExportState({ statusMessage: String(update) }));
+        }
+      });
+
       dispatch(
-        showToast({
-          message: 'PDF downloaded successfully!',
-          type: 'success',
+        updateExportState({
+          stage: 'ready',
+          progress: 100,
+          isGenerating: false,
+          statusMessage: 'PDF downloaded successfully!',
         })
       );
+      setTimeout(() => {
+        dispatch(closeExportModal());
+      }, 1500);
     } catch (err) {
+      console.error('Template PDF export error:', err);
       dispatch(
-        showToast({
-          message: 'PDF export failed. Opening print dialog.',
-          type: 'info',
+        updateExportState({
+          stage: 'error',
+          isGenerating: false,
+          error: {
+            title: 'PDF Generation Interrupted',
+            message: `We encountered an issue preparing the PDF for ${template.name}. You can try again or download as Word (.docx).`,
+          },
         })
       );
-      window.print();
     } finally {
       setDownloadingId(null);
       setDownloadType(null);
@@ -141,28 +176,56 @@ export const TemplateGalleryPage = () => {
 
   // Execute Instant DOCX Download
   const executeDownloadDOCX = async (template) => {
+    if (!template || downloadingId) return;
     try {
+      setLastExportTemplate(template);
       setDownloadingId(template.id);
       setDownloadType('docx');
       dispatch(
-        showToast({
-          message: `Compiling Microsoft Word (.docx) for ${template.name}...`,
-          type: 'info',
+        openExportModal({
+          format: 'docx',
+          stage: 'preparing',
+          progress: 20,
+          statusMessage: `Compiling Word document for ${template.name}...`,
         })
       );
+
       const cvToExport = getCardCVData(template);
-      await exportService.exportDOCX(cvToExport);
+      await exportService.exportDOCX(cvToExport, (update) => {
+        if (typeof update === 'object') {
+          dispatch(
+            updateExportState({
+              stage: update.stage || 'generating',
+              progress: update.progress || 50,
+              statusMessage: update.message || 'Processing...',
+            })
+          );
+        } else {
+          dispatch(updateExportState({ statusMessage: String(update) }));
+        }
+      });
+
       dispatch(
-        showToast({
-          message: 'Word document (.docx) downloaded successfully!',
-          type: 'success',
+        updateExportState({
+          stage: 'ready',
+          progress: 100,
+          isGenerating: false,
+          statusMessage: 'Word document downloaded successfully!',
         })
       );
+      setTimeout(() => {
+        dispatch(closeExportModal());
+      }, 1500);
     } catch (err) {
+      console.error('Template DOCX export error:', err);
       dispatch(
-        showToast({
-          message: 'DOCX generation failed. Please try PDF.',
-          type: 'error',
+        updateExportState({
+          stage: 'error',
+          isGenerating: false,
+          error: {
+            title: 'Word Export Interrupted',
+            message: `We encountered an issue compiling the Word document for ${template.name}. You can try again or download as PDF.`,
+          },
         })
       );
     } finally {
@@ -517,6 +580,28 @@ export const TemplateGalleryPage = () => {
               executeDownloadDOCX(pendingExportTemplate);
             } else {
               executeDownloadPDF(pendingExportTemplate);
+            }
+          }
+        }}
+      />
+
+      {/* Modern macOS Export Status & Error Modal */}
+      <ExportStatusModal
+        onRetry={() => {
+          if (lastExportTemplate) {
+            if (downloadType === 'docx') {
+              executeDownloadDOCX(lastExportTemplate);
+            } else {
+              executeDownloadPDF(lastExportTemplate);
+            }
+          }
+        }}
+        onAlternativeExport={(altFormat) => {
+          if (lastExportTemplate) {
+            if (altFormat === 'docx') {
+              executeDownloadDOCX(lastExportTemplate);
+            } else {
+              executeDownloadPDF(lastExportTemplate);
             }
           }
         }}

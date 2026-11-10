@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { authSuccess } from '../store/authSlice';
+import { showToast } from '../store/uiSlice';
 import authService from '../services/authService';
 import paymentService from '../services/paymentService';
 import {
@@ -179,9 +180,10 @@ export const AdminPaymentsPage = () => {
         }));
         // Also refresh users list so plan status reflects immediately
         fetchUsers();
+        dispatch(showToast({ message: 'Payment approved successfully', type: 'success' }));
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Error approving payment');
+      dispatch(showToast({ message: err.response?.data?.message || 'Error approving payment', type: 'error' }));
     } finally {
       setActionLoadingId(null);
     }
@@ -201,9 +203,10 @@ export const AdminPaymentsPage = () => {
           pending: Math.max(0, prev.pending - 1),
           rejected: prev.rejected + 1,
         }));
+        dispatch(showToast({ message: 'Payment marked as rejected', type: 'info' }));
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Error rejecting payment');
+      dispatch(showToast({ message: err.response?.data?.message || 'Error rejecting payment', type: 'error' }));
     } finally {
       setActionLoadingId(null);
     }
@@ -216,8 +219,9 @@ export const AdminPaymentsPage = () => {
       await paymentService.deletePayment(id, adminKey);
       setPayments((prev) => prev.filter((p) => p._id !== id));
       setPaymentStats((prev) => ({ ...prev, total: Math.max(0, prev.total - 1) }));
+      dispatch(showToast({ message: 'Payment record deleted', type: 'info' }));
     } catch (err) {
-      alert('Error deleting payment');
+      dispatch(showToast({ message: 'Error deleting payment', type: 'error' }));
     }
   };
 
@@ -230,9 +234,10 @@ export const AdminPaymentsPage = () => {
         setUsers((prev) =>
           prev.map((u) => (u._id === userId ? { ...u, plan: targetPlan } : u))
         );
+        dispatch(showToast({ message: `User plan updated to ${targetPlan}`, type: 'success' }));
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Error updating user plan');
+      dispatch(showToast({ message: err.response?.data?.message || 'Error updating user plan', type: 'error' }));
     } finally {
       setUserActionLoadingId(null);
     }

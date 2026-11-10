@@ -10,97 +10,263 @@ import {
   TableRow,
   TableCell,
   WidthType,
+  ImageRun,
 } from 'docx';
 
+/**
+ * Validates image buffer magic bytes to ensure compatibility with Word OpenXML.
+ */
+const isValidImageBuffer = (buf) => {
+  if (!buf || !Buffer.isBuffer(buf) || buf.length < 8) return false;
+  // PNG: 89 50 4E 47
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return true;
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true;
+  // GIF: 47 49 46
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return true;
+  return false;
+};
+
+/**
+ * Resolves an image buffer from base64 data URI or remote HTTP URL safely.
+ */
+const resolveImageBuffer = async (photoUri) => {
+  if (!photoUri || typeof photoUri !== 'string') return null;
+
+  try {
+    if (photoUri.startsWith('data:image')) {
+      const commaIndex = photoUri.indexOf(',');
+      if (commaIndex !== -1) {
+        const base64Data = photoUri.slice(commaIndex + 1);
+        const buf = Buffer.from(base64Data, 'base64');
+        return isValidImageBuffer(buf) ? buf : null;
+      }
+    } else if (photoUri.startsWith('http://') || photoUri.startsWith('https://')) {
+      const res = await fetch(photoUri, { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const arrayBuf = await res.arrayBuffer();
+        const buf = Buffer.from(arrayBuf);
+        return isValidImageBuffer(buf) ? buf : null;
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to resolve photo for DOCX embed:', err.message);
+  }
+  return null;
+};
+
+/**
+ * Generates genuine, fully-editable Microsoft Word (.docx) document
+ * with true headings, tables, bullet points, and embedded profile photos.
+ */
 export const generateDOCX = async (cvData) => {
   const {
+    templateId = 'bd-corporate-standard',
     personalInfo = {},
+    personalDetails = {},
     experience = [],
     education = [],
     skills = [],
     projects = [],
     certifications = [],
     languages = [],
+    references = [],
+    declaration = {},
     customSections = [],
     design = {},
-  } = cvData;
+  } = cvData || {};
 
-  const primaryColorHex = (design?.primaryColor || '#4F46E5').replace('#', '');
-  const textColorHex = '1E293B';
-  const grayColorHex = '64748B';
+  const isLetter = design?.pageSize === 'Letter';
+  const primaryHex = (design?.primaryColor || '#1E40AF').replace('#', '');
+  const darkTextHex = '1E293B';
+  const grayHex = '475569';
+  const lightGrayHex = '64748B';
 
-  const sections = [];
+  const fontName =
+    design?.fontFamily === 'Merriweather'
+      ? 'Georgia'
+      : design?.fontFamily === 'JetBrains Mono'
+      ? 'Consolas'
+      : 'Calibri';
 
-  // 1. Header: Name & Target Role
-  sections.push(
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 100 },
-      children: [
-        new TextRun({
-          text: personalInfo.fullName || 'Your Name',
-          bold: true,
-          size: 36, // 18pt
-          color: primaryColorHex,
-          font: 'Calibri',
-        }),
-      ],
-    })
-  );
+  const paragraphs = [];
 
-  if (personalInfo.jobTitle) {
-    sections.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 120 },
-        children: [
-          new TextRun({
-            text: personalInfo.jobTitle,
-            size: 24, // 12pt
-            bold: true,
-            color: grayColorHex,
-            font: 'Calibri',
-          }),
-        ],
-      })
-    );
+  // 1. Resolve photo for embedding (omitted for ATS-compliant templates)
+  let photoBuffer = null;
+  if (templateId !== 'ats-classic' && design?.showPhoto !== false && personalInfo?.photo) {
+    photoBuffer = await resolveImageBuffer(personalInfo.photo);
   }
 
-  // Contact Strip
-  const contactParts = [
-    personalInfo.email,
-    personalInfo.phone,
-    personalInfo.location,
-    personalInfo.website,
-    personalInfo.linkedin,
-    personalInfo.github,
-  ].filter(Boolean);
-
-  if (contactParts.length > 0) {
-    sections.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 250 },
-        children: [
-          new TextRun({
-            text: contactParts.join('  |  '),
-            size: 18, // 9pt
-            color: grayColorHex,
-            font: 'Calibri',
+  // 2. HEADER
+  if (photoBuffer) {
+    // Header with Photo (Table with 2 cells: Name & Info on left, Photo on right)
+    paragraphs.push(
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: {
+          top: { style: BorderStyle.NONE },
+          bottom: { style: BorderStyle.SINGLE, size: 8, color: primaryHex },
+          left: { style: BorderStyle.NONE },
+          right: { style: BorderStyle.NONE },
+          insideHorizontal: { style: BorderStyle.NONE },
+          insideVertical: { style: BorderStyle.NONE },
+        },
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                width: { size: 75, type: WidthType.PERCENTAGE },
+                borders: {
+                  top: { style: BorderStyle.NONE },
+                  bottom: { style: BorderStyle.NONE },
+                  left: { style: BorderStyle.NONE },
+                  right: { style: BorderStyle.NONE },
+                },
+                children: [
+                  new Paragraph({
+                    spacing: { before: 0, after: 60 },
+                    children: [
+                      new TextRun({
+                        text: personalInfo.fullName || 'CURRICULUM VITAE',
+                        bold: true,
+                        size: 44, // 22pt
+                        color: primaryHex,
+                        font: fontName,
+                      }),
+                    ],
+                  }),
+                  ...(personalInfo.jobTitle
+                    ? [
+                        new Paragraph({
+                          spacing: { before: 0, after: 80 },
+                          children: [
+                            new TextRun({
+                              text: personalInfo.jobTitle.toUpperCase(),
+                              bold: true,
+                              size: 22,
+                              color: grayHex,
+                              font: fontName,
+                            }),
+                          ],
+                        }),
+                      ]
+                    : []),
+                  new Paragraph({
+                    spacing: { before: 0, after: 120 },
+                    children: [
+                      new TextRun({
+                        text: [
+                          personalInfo.location,
+                          personalInfo.phone,
+                          personalInfo.email,
+                          personalInfo.linkedin,
+                        ]
+                          .filter(Boolean)
+                          .join('  •  '),
+                        size: 19,
+                        color: grayHex,
+                        font: fontName,
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+              new TableCell({
+                width: { size: 25, type: WidthType.PERCENTAGE },
+                borders: {
+                  top: { style: BorderStyle.NONE },
+                  bottom: { style: BorderStyle.NONE },
+                  left: { style: BorderStyle.NONE },
+                  right: { style: BorderStyle.NONE },
+                },
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.RIGHT,
+                    spacing: { before: 0, after: 120 },
+                    children: [
+                      new ImageRun({
+                        data: photoBuffer,
+                        transformation: { width: 95, height: 120 },
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
           }),
         ],
       })
     );
+  } else {
+    // Standard Centered Header (No Photo)
+    paragraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 60 },
+        children: [
+          new TextRun({
+            text: personalInfo.fullName || 'CURRICULUM VITAE',
+            bold: true,
+            size: 48, // 24pt
+            color: primaryHex,
+            font: fontName,
+          }),
+        ],
+      })
+    );
+
+    if (personalInfo.jobTitle) {
+      paragraphs.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 0, after: 80 },
+          children: [
+            new TextRun({
+              text: personalInfo.jobTitle.toUpperCase(),
+              bold: true,
+              size: 24,
+              color: grayHex,
+              font: fontName,
+            }),
+          ],
+        })
+      );
+    }
+
+    const contactItems = [
+      personalInfo.phone,
+      personalInfo.email,
+      personalInfo.location,
+      personalInfo.linkedin,
+      personalInfo.website,
+    ].filter(Boolean);
+
+    if (contactItems.length > 0) {
+      paragraphs.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 0, after: 200 },
+          children: [
+            new TextRun({
+              text: contactItems.join('   •   '),
+              size: 19,
+              color: grayHex,
+              font: fontName,
+            }),
+          ],
+        })
+      );
+    }
   }
 
   // Section Heading Helper
-  const createSectionHeading = (title) => {
-    return new Paragraph({
+  const createHeading = (title) =>
+    new Paragraph({
       heading: HeadingLevel.HEADING_2,
-      spacing: { before: 240, after: 100 },
+      spacing: { before: 240, after: 120 },
       border: {
         bottom: {
-          color: primaryColorHex,
+          color: primaryHex,
           space: 4,
           style: BorderStyle.SINGLE,
           size: 12,
@@ -111,105 +277,113 @@ export const generateDOCX = async (cvData) => {
           text: title.toUpperCase(),
           bold: true,
           size: 22, // 11pt
-          color: primaryColorHex,
-          font: 'Calibri',
+          color: primaryHex,
+          font: fontName,
         }),
       ],
     });
-  };
 
-  // 2. Summary
+  // 3. CAREER SUMMARY
   if (personalInfo.summary) {
-    sections.push(createSectionHeading('Professional Summary'));
-    sections.push(
+    paragraphs.push(createHeading('Professional Summary'));
+    paragraphs.push(
       new Paragraph({
-        spacing: { after: 180 },
+        spacing: { after: 160, line: 260 },
         children: [
           new TextRun({
             text: personalInfo.summary,
-            size: 20, // 10pt
-            font: 'Calibri',
+            size: 20,
+            color: darkTextHex,
+            font: fontName,
           }),
         ],
       })
     );
   }
 
-  // 3. Work Experience
+  // 4. WORK EXPERIENCE
   if (experience && experience.length > 0) {
-    sections.push(createSectionHeading('Work Experience'));
+    paragraphs.push(createHeading('Work Experience'));
 
     experience.forEach((exp) => {
-      // Job Title and Date
-      sections.push(
+      const dateRange = [
+        exp.startDate,
+        exp.current ? 'Present' : exp.endDate,
+      ].filter(Boolean).join(' – ');
+
+      paragraphs.push(
         new Paragraph({
-          spacing: { before: 120, after: 40 },
+          spacing: { before: 100, after: 30 },
           children: [
             new TextRun({
-              text: exp.jobTitle || 'Job Title',
+              text: exp.jobTitle || 'Role / Position',
               bold: true,
-              size: 22,
-              font: 'Calibri',
+              size: 21,
+              color: darkTextHex,
+              font: fontName,
             }),
-            new TextRun({
-              text: `\t${exp.startDate || ''} – ${exp.current ? 'Present' : exp.endDate || ''}`,
-              bold: true,
-              size: 18,
-              color: grayColorHex,
-              font: 'Calibri',
-            }),
+            ...(dateRange
+              ? [
+                  new TextRun({
+                    text: `   |   ${dateRange}`,
+                    bold: true,
+                    size: 18,
+                    color: lightGrayHex,
+                    font: fontName,
+                  }),
+                ]
+              : []),
           ],
         })
       );
 
-      // Company and Location
       const compLoc = [exp.company, exp.location].filter(Boolean).join(' • ');
       if (compLoc) {
-        sections.push(
+        paragraphs.push(
           new Paragraph({
-            spacing: { after: 60 },
+            spacing: { after: 50 },
             children: [
               new TextRun({
                 text: compLoc,
                 italics: true,
-                size: 20,
-                color: grayColorHex,
-                font: 'Calibri',
+                size: 19,
+                color: grayHex,
+                font: fontName,
               }),
             ],
           })
         );
       }
 
-      // Description
       if (exp.description) {
-        sections.push(
+        paragraphs.push(
           new Paragraph({
-            spacing: { after: 60 },
+            spacing: { after: 50, line: 240 },
             children: [
               new TextRun({
                 text: exp.description,
                 size: 20,
-                font: 'Calibri',
+                color: darkTextHex,
+                font: fontName,
               }),
             ],
           })
         );
       }
 
-      // Highlights / Bullets
       if (exp.highlights && exp.highlights.length > 0) {
         exp.highlights.forEach((h) => {
           if (h && h.trim()) {
-            sections.push(
+            paragraphs.push(
               new Paragraph({
                 bullet: { level: 0 },
-                spacing: { after: 40 },
+                spacing: { after: 30, line: 240 },
                 children: [
                   new TextRun({
                     text: h.replace(/^•\s*/, ''),
-                    size: 20,
-                    font: 'Calibri',
+                    size: 19,
+                    color: darkTextHex,
+                    font: fontName,
                   }),
                 ],
               })
@@ -220,92 +394,208 @@ export const generateDOCX = async (cvData) => {
     });
   }
 
-  // 4. Skills
-  if (skills && skills.length > 0) {
-    sections.push(createSectionHeading('Skills & Competencies'));
-    const skillStrings = skills.map((s) => (s.level ? `${s.name} (${s.level})` : s.name));
-    sections.push(
-      new Paragraph({
-        spacing: { after: 180 },
+  // 5. EDUCATION & QUALIFICATIONS
+  if (education && education.length > 0) {
+    paragraphs.push(createHeading('Academic Qualifications'));
+
+    // Check if Bangladesh Standard: Render Table
+    if (templateId.includes('bd') || templateId.includes('bangladesh')) {
+      const headerRow = new TableRow({
         children: [
-          new TextRun({
-            text: skillStrings.join('   •   '),
-            size: 20,
-            font: 'Calibri',
+          new TableCell({
+            width: { size: 30, type: WidthType.PERCENTAGE },
+            shading: { fill: 'F1F5F9' },
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: 'Exam / Degree', bold: true, size: 19, font: fontName })],
+              }),
+            ],
+          }),
+          new TableCell({
+            width: { size: 35, type: WidthType.PERCENTAGE },
+            shading: { fill: 'F1F5F9' },
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: 'Institute / Board', bold: true, size: 19, font: fontName })],
+              }),
+            ],
+          }),
+          new TableCell({
+            width: { size: 18, type: WidthType.PERCENTAGE },
+            shading: { fill: 'F1F5F9' },
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [new TextRun({ text: 'Passing Year', bold: true, size: 19, font: fontName })],
+              }),
+            ],
+          }),
+          new TableCell({
+            width: { size: 17, type: WidthType.PERCENTAGE },
+            shading: { fill: 'F1F5F9' },
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [new TextRun({ text: 'Result', bold: true, size: 19, font: fontName })],
+              }),
+            ],
           }),
         ],
-      })
-    );
+      });
+
+      const dataRows = education.map(
+        (edu) =>
+          new TableRow({
+            children: [
+              new TableCell({
+                width: { size: 30, type: WidthType.PERCENTAGE },
+                children: [
+                  new Paragraph({
+                    children: [new TextRun({ text: edu.degree || '', bold: true, size: 19, font: fontName })],
+                  }),
+                ],
+              }),
+              new TableCell({
+                width: { size: 35, type: WidthType.PERCENTAGE },
+                children: [
+                  new Paragraph({
+                    children: [new TextRun({ text: edu.institution || '', size: 19, font: fontName })],
+                  }),
+                ],
+              }),
+              new TableCell({
+                width: { size: 18, type: WidthType.PERCENTAGE },
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    children: [new TextRun({ text: edu.endDate || edu.startDate || '', size: 19, font: fontName })],
+                  }),
+                ],
+              }),
+              new TableCell({
+                width: { size: 17, type: WidthType.PERCENTAGE },
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    children: [new TextRun({ text: edu.grade || '', bold: true, size: 19, font: fontName })],
+                  }),
+                ],
+              }),
+            ],
+          })
+      );
+
+      paragraphs.push(
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [headerRow, ...dataRows],
+        })
+      );
+    } else {
+      // Standard List Style
+      education.forEach((edu) => {
+        const dateRange = [edu.startDate, edu.endDate].filter(Boolean).join(' – ');
+        paragraphs.push(
+          new Paragraph({
+            spacing: { before: 80, after: 20 },
+            children: [
+              new TextRun({
+                text: edu.degree || 'Degree',
+                bold: true,
+                size: 21,
+                color: darkTextHex,
+                font: fontName,
+              }),
+              ...(dateRange
+                ? [
+                    new TextRun({
+                      text: `   |   ${dateRange}`,
+                      bold: true,
+                      size: 18,
+                      color: lightGrayHex,
+                      font: fontName,
+                    }),
+                  ]
+                : []),
+            ],
+          })
+        );
+
+        const eduDetails = [
+          edu.institution,
+          edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : null,
+          edu.grade ? `GPA: ${edu.grade}` : null,
+        ].filter(Boolean).join(' • ');
+
+        if (eduDetails) {
+          paragraphs.push(
+            new Paragraph({
+              spacing: { after: 50 },
+              children: [
+                new TextRun({
+                  text: eduDetails,
+                  italics: true,
+                  size: 19,
+                  color: grayHex,
+                  font: fontName,
+                }),
+              ],
+            })
+          );
+        }
+      });
+    }
   }
 
-  // 5. Education
-  if (education && education.length > 0) {
-    sections.push(createSectionHeading('Education'));
+  // 6. SKILLS
+  if (skills && skills.length > 0) {
+    paragraphs.push(createHeading('Skills & Competencies'));
+    const skillList = skills
+      .map((s) => (typeof s === 'string' ? s : s.name))
+      .filter(Boolean);
 
-    education.forEach((edu) => {
-      sections.push(
+    if (skillList.length > 0) {
+      paragraphs.push(
         new Paragraph({
-          spacing: { before: 100, after: 40 },
+          spacing: { after: 140, line: 260 },
           children: [
             new TextRun({
-              text: `${edu.degree || 'Degree'}${edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}`,
+              text: skillList.join('   •   '),
               bold: true,
-              size: 22,
-              font: 'Calibri',
-            }),
-            new TextRun({
-              text: `\t${edu.startDate || ''} – ${edu.endDate || ''}`,
-              bold: true,
-              size: 18,
-              color: grayColorHex,
-              font: 'Calibri',
+              size: 20,
+              color: darkTextHex,
+              font: fontName,
             }),
           ],
         })
       );
-
-      const instGrade = [edu.institution, edu.grade ? `GPA: ${edu.grade}` : null].filter(Boolean).join(' • ');
-      if (instGrade) {
-        sections.push(
-          new Paragraph({
-            spacing: { after: 80 },
-            children: [
-              new TextRun({
-                text: instGrade,
-                italics: true,
-                size: 20,
-                color: grayColorHex,
-                font: 'Calibri',
-              }),
-            ],
-          })
-        );
-      }
-    });
+    }
   }
 
-  // 6. Projects
+  // 7. KEY PROJECTS
   if (projects && projects.length > 0) {
-    sections.push(createSectionHeading('Key Projects'));
+    paragraphs.push(createHeading('Key Projects'));
 
     projects.forEach((proj) => {
-      sections.push(
+      paragraphs.push(
         new Paragraph({
-          spacing: { before: 100, after: 40 },
+          spacing: { before: 80, after: 20 },
           children: [
             new TextRun({
-              text: proj.title || 'Project',
+              text: proj.title || proj.name || 'Project Name',
               bold: true,
-              size: 22,
-              font: 'Calibri',
+              size: 20,
+              color: darkTextHex,
+              font: fontName,
             }),
-            ...(proj.startDate
+            ...(proj.technologies
               ? [
                   new TextRun({
-                    text: `\t${proj.startDate} – ${proj.endDate || 'Present'}`,
+                    text: `   [${Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies}]`,
+                    italics: true,
                     size: 18,
-                    color: grayColorHex,
-                    font: 'Calibri',
+                    color: lightGrayHex,
+                    font: fontName,
                   }),
                 ]
               : []),
@@ -314,31 +604,15 @@ export const generateDOCX = async (cvData) => {
       );
 
       if (proj.description) {
-        sections.push(
+        paragraphs.push(
           new Paragraph({
-            spacing: { after: 40 },
+            spacing: { after: 50, line: 240 },
             children: [
               new TextRun({
                 text: proj.description,
-                size: 20,
-                font: 'Calibri',
-              }),
-            ],
-          })
-        );
-      }
-
-      if (proj.technologies && proj.technologies.length > 0) {
-        sections.push(
-          new Paragraph({
-            spacing: { after: 80 },
-            children: [
-              new TextRun({
-                text: `Technologies: ${proj.technologies.join(', ')}`,
-                italics: true,
-                size: 18,
-                color: grayColorHex,
-                font: 'Calibri',
+                size: 19,
+                color: darkTextHex,
+                font: fontName,
               }),
             ],
           })
@@ -347,99 +621,31 @@ export const generateDOCX = async (cvData) => {
     });
   }
 
-  // 7. Certifications & Languages
+  // 8. CERTIFICATIONS & LANGUAGES
   if (certifications && certifications.length > 0) {
-    sections.push(createSectionHeading('Certifications'));
-    certifications.forEach((c) => {
-      sections.push(
+    paragraphs.push(createHeading('Certifications & Licenses'));
+    certifications.forEach((cert) => {
+      const certInfo = [cert.issuer, cert.date || cert.year].filter(Boolean).join(' • ');
+      paragraphs.push(
         new Paragraph({
           bullet: { level: 0 },
-          spacing: { after: 40 },
+          spacing: { after: 30 },
           children: [
             new TextRun({
-              text: `${c.name} (${c.issuer})${c.date ? ` — ${c.date}` : ''}`,
-              size: 20,
-              font: 'Calibri',
-            }),
-          ],
-        })
-      );
-    });
-  }
-
-  if (languages && languages.length > 0) {
-    sections.push(createSectionHeading('Languages'));
-    const langStrings = languages.map((l) => `${l.language}: ${l.proficiency}`);
-    sections.push(
-      new Paragraph({
-        spacing: { after: 120 },
-        children: [
-          new TextRun({
-            text: langStrings.join('   •   '),
-            size: 20,
-            font: 'Calibri',
-          }),
-        ],
-      })
-    );
-  }
-
-  // 8. Personal Details (Bangladesh Recruiter standard)
-  const { personalDetails = {}, references = [], declaration = {} } = cvData;
-  if (personalDetails && (personalDetails.fatherName || personalDetails.nid)) {
-    sections.push(createSectionHeading('Personal Details'));
-    const details = [
-      personalDetails.fatherName ? `Father's Name: ${personalDetails.fatherName}` : null,
-      personalDetails.motherName ? `Mother's Name: ${personalDetails.motherName}` : null,
-      personalDetails.dob ? `Date of Birth: ${personalDetails.dob}` : null,
-      personalDetails.nationality ? `Nationality: ${personalDetails.nationality}` : null,
-      personalDetails.nid ? `National ID (NID): ${personalDetails.nid}` : null,
-      personalDetails.bloodGroup ? `Blood Group: ${personalDetails.bloodGroup}` : null,
-      personalDetails.permanentAddress ? `Permanent Address: ${personalDetails.permanentAddress}` : null,
-    ].filter(Boolean);
-
-    details.forEach((d) => {
-      sections.push(
-        new Paragraph({
-          spacing: { after: 40 },
-          children: [
-            new TextRun({
-              text: d,
-              size: 20,
-              font: 'Calibri',
-            }),
-          ],
-        })
-      );
-    });
-  }
-
-  // 9. References
-  if (references && references.length > 0) {
-    sections.push(createSectionHeading('References'));
-    references.forEach((ref) => {
-      sections.push(
-        new Paragraph({
-          spacing: { after: 20 },
-          children: [
-            new TextRun({
-              text: ref.name,
+              text: cert.name || 'Certification',
               bold: true,
-              size: 20,
-              font: 'Calibri',
+              size: 19,
+              color: darkTextHex,
+              font: fontName,
             }),
-            new TextRun({
-              text: ` — ${ref.designation}, ${ref.company}`,
-              size: 20,
-              font: 'Calibri',
-            }),
-            ...(ref.phone
+            ...(certInfo
               ? [
                   new TextRun({
-                    text: ` (Phone: ${ref.phone})`,
+                    text: ` (${certInfo})`,
+                    italics: true,
                     size: 18,
-                    color: grayColorHex,
-                    font: 'Calibri',
+                    color: lightGrayHex,
+                    font: fontName,
                   }),
                 ]
               : []),
@@ -449,59 +655,229 @@ export const generateDOCX = async (cvData) => {
     });
   }
 
-  // 10. Declaration
-  if (declaration && (declaration.signedBy || declaration.text)) {
-    sections.push(createSectionHeading('Declaration'));
-    sections.push(
+  if (languages && languages.length > 0) {
+    paragraphs.push(createHeading('Languages'));
+    const langItems = languages.map((lang) => {
+      if (typeof lang === 'string') return lang;
+      return `${lang.language || lang.name || ''} ${lang.proficiency ? `(${lang.proficiency})` : ''}`.trim();
+    }).filter(Boolean);
+
+    paragraphs.push(
       new Paragraph({
-        spacing: { before: 80, after: 120 },
+        spacing: { after: 120 },
         children: [
           new TextRun({
-            text: declaration.text || 'I hereby declare that all the information provided above is true and correct.',
-            italics: true,
-            size: 18,
-            color: grayColorHex,
-            font: 'Calibri',
-          }),
-        ],
-      })
-    );
-    sections.push(
-      new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        spacing: { before: 100 },
-        children: [
-          new TextRun({
-            text: `Signed by: ${declaration.signedBy || personalInfo.fullName || 'Applicant'}`,
-            bold: true,
+            text: langItems.join('   •   '),
             size: 20,
-            font: 'Calibri',
+            color: darkTextHex,
+            font: fontName,
           }),
         ],
       })
     );
   }
 
+  // 9. PERSONAL DETAILS (BD Standard)
+  const bdFields = [
+    { label: "Father's Name", value: personalDetails.fatherName },
+    { label: "Mother's Name", value: personalDetails.motherName },
+    { label: 'Date of Birth', value: personalDetails.dob || personalDetails.dateOfBirth },
+    { label: 'Gender', value: personalDetails.gender },
+    { label: 'Marital Status', value: personalDetails.maritalStatus },
+    { label: 'Nationality', value: personalDetails.nationality || 'Bangladeshi' },
+    { label: 'National ID (NID)', value: personalDetails.nid || personalDetails.nationalId },
+    { label: 'Blood Group', value: personalDetails.bloodGroup },
+    { label: 'Present Address', value: personalDetails.presentAddress },
+    { label: 'Permanent Address', value: personalDetails.permanentAddress },
+  ].filter((f) => Boolean(f.value));
+
+  if (bdFields.length > 0) {
+    paragraphs.push(createHeading('Personal Details'));
+
+    const rows = bdFields.map(
+      (field) =>
+        new TableRow({
+          children: [
+            new TableCell({
+              width: { size: 35, type: WidthType.PERCENTAGE },
+              borders: {
+                top: { style: BorderStyle.NONE },
+                bottom: { style: BorderStyle.NONE },
+                left: { style: BorderStyle.NONE },
+                right: { style: BorderStyle.NONE },
+              },
+              children: [
+                new Paragraph({
+                  spacing: { before: 20, after: 20 },
+                  children: [
+                    new TextRun({
+                      text: `${field.label}:`,
+                      bold: true,
+                      size: 19,
+                      color: grayHex,
+                      font: fontName,
+                    }),
+                  ],
+                }),
+              ],
+            }),
+            new TableCell({
+              width: { size: 65, type: WidthType.PERCENTAGE },
+              borders: {
+                top: { style: BorderStyle.NONE },
+                bottom: { style: BorderStyle.NONE },
+                left: { style: BorderStyle.NONE },
+                right: { style: BorderStyle.NONE },
+              },
+              children: [
+                new Paragraph({
+                  spacing: { before: 20, after: 20 },
+                  children: [
+                    new TextRun({
+                      text: String(field.value),
+                      size: 19,
+                      color: darkTextHex,
+                      font: fontName,
+                    }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        })
+    );
+
+    paragraphs.push(
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: {
+          top: { style: BorderStyle.NONE },
+          bottom: { style: BorderStyle.NONE },
+          left: { style: BorderStyle.NONE },
+          right: { style: BorderStyle.NONE },
+          insideHorizontal: { style: BorderStyle.NONE },
+          insideVertical: { style: BorderStyle.NONE },
+        },
+        rows,
+      })
+    );
+  }
+
+  // 10. REFERENCES
+  if (references && references.length > 0) {
+    paragraphs.push(createHeading('References'));
+
+    references.forEach((ref) => {
+      paragraphs.push(
+        new Paragraph({
+          spacing: { before: 60, after: 20 },
+          children: [
+            new TextRun({
+              text: ref.name || 'Reference Person',
+              bold: true,
+              size: 20,
+              color: darkTextHex,
+              font: fontName,
+            }),
+          ],
+        })
+      );
+
+      const refDetails = [
+        ref.designation,
+        ref.company,
+        ref.phone ? `Phone: ${ref.phone}` : null,
+        ref.email ? `Email: ${ref.email}` : null,
+      ].filter(Boolean).join('   |   ');
+
+      if (refDetails) {
+        paragraphs.push(
+          new Paragraph({
+            spacing: { after: 50 },
+            children: [
+              new TextRun({
+                text: refDetails,
+                size: 18,
+                color: grayHex,
+                font: fontName,
+              }),
+            ],
+          })
+        );
+      }
+    });
+  }
+
+  // 11. DECLARATION
+  if (declaration && (declaration.signedBy || declaration.text)) {
+    paragraphs.push(createHeading('Declaration'));
+    paragraphs.push(
+      new Paragraph({
+        spacing: { after: 120, line: 240 },
+        children: [
+          new TextRun({
+            text: declaration.text || 'I hereby declare that all information provided above is true and correct.',
+            italics: true,
+            size: 19,
+            color: darkTextHex,
+            font: fontName,
+          }),
+        ],
+      })
+    );
+    paragraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        spacing: { before: 120, after: 60 },
+        children: [
+          new TextRun({
+            text: declaration.signedBy || personalInfo.fullName || 'Authorized Signature',
+            bold: true,
+            size: 20,
+            color: primaryHex,
+            font: fontName,
+          }),
+        ],
+      })
+    );
+  }
+
+  // Construct Document with accurate page dimensions
   const doc = new Document({
     sections: [
       {
         properties: {
           page: {
+            size: {
+              width: isLetter ? 12240 : 11906, // Letter vs A4 dxa
+              height: isLetter ? 15840 : 16838,
+            },
             margin: {
-              top: 720, // 0.5 inch (720 dxa)
-              right: 720,
-              bottom: 720,
-              left: 720,
+              top: 864, // 0.6 inch
+              bottom: 864,
+              left: 864,
+              right: 864,
             },
           },
         },
-        children: sections,
+        children: paragraphs,
       },
     ],
   });
 
-  return await Packer.toBuffer(doc);
+  const buffer = await Packer.toBuffer(doc);
+
+  // Validate generated DOCX buffer (magic header PK\x03\x04 for zip)
+  if (!buffer || buffer.length < 3000) {
+    throw new Error('DOCX generation produced an empty or corrupted document.');
+  }
+
+  const magic = buffer.subarray(0, 4).toString('hex');
+  if (magic !== '504b0304') {
+    throw new Error('Generated DOCX does not contain valid OpenXML ZIP header.');
+  }
+
+  return buffer;
 };
 
 export default generateDOCX;
-

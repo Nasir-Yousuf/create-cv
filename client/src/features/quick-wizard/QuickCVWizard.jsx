@@ -23,10 +23,16 @@ import {
   DANIEL_CARTER_CV,
 } from "@shared/constants/cvDefaults.js";
 import { RenderCVTemplate } from "../../templates";
-import { showToast } from "../../store/uiSlice";
+import {
+  showToast,
+  openExportModal,
+  updateExportState,
+  closeExportModal,
+} from "../../store/uiSlice";
 import exportService from "../../services/exportService";
 import paymentService from "../../services/paymentService";
 import PaymentExportModal from "../../components/common/PaymentExportModal";
+import ExportStatusModal from "../../components/common/ExportStatusModal";
 import {
   generateSmartBio,
   enhanceBulletPoint,
@@ -247,6 +253,7 @@ export const QuickCVWizard = () => {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [pendingExportType, setPendingExportType] = useState("pdf");
   const [pendingExportTemplate, setPendingExportTemplate] = useState(null);
+  const [lastExportTemplate, setLastExportTemplate] = useState(null);
   const [showSampleInInputs, setShowSampleInInputs] = useState(false);
   const [windowWidth, setWindowWidth] = useState(
     typeof window !== "undefined" ? window.innerWidth : 1024,
@@ -459,7 +466,12 @@ export const QuickCVWizard = () => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert("Please choose an image under 5MB.");
+        dispatch(
+          showToast({
+            message: "Please choose an image under 5MB.",
+            type: "warning",
+          })
+        );
         return;
       }
       const reader = new FileReader();
@@ -492,15 +504,19 @@ export const QuickCVWizard = () => {
 
   // Execute One-click PDF download
   const executeDownloadPDF = async (template) => {
+    if (!template || downloadingTemplateId) return;
     try {
+      setLastExportTemplate(template);
       setDownloadingTemplateId(template.id);
       setDownloadType("pdf");
       const targetCVData = getTemplateCVData(template);
 
       dispatch(
-        showToast({
-          message: `Preparing crisp A4 PDF for ${template.name}...`,
-          type: "info",
+        openExportModal({
+          format: "pdf",
+          stage: "preparing",
+          progress: 15,
+          statusMessage: `Preparing crisp A4 PDF for ${template.name}...`,
         })
       );
 
@@ -512,23 +528,43 @@ export const QuickCVWizard = () => {
         : null;
       const html = sheetEl ? sheetEl.outerHTML : "";
 
-      await exportService.exportPDF(targetCVData, html, elementId);
+      await exportService.exportPDF(targetCVData, html, elementId, (update) => {
+        if (typeof update === "object") {
+          dispatch(
+            updateExportState({
+              stage: update.stage || "rendering",
+              progress: update.progress || 50,
+              statusMessage: update.message || "Processing...",
+            })
+          );
+        } else {
+          dispatch(updateExportState({ statusMessage: String(update) }));
+        }
+      });
 
       dispatch(
-        showToast({
-          message: "PDF downloaded successfully!",
-          type: "success",
+        updateExportState({
+          stage: "ready",
+          progress: 100,
+          isGenerating: false,
+          statusMessage: "PDF downloaded successfully!",
         })
       );
+      setTimeout(() => {
+        dispatch(closeExportModal());
+      }, 1500);
     } catch (error) {
       console.error("Download error:", error);
       dispatch(
-        showToast({
-          message: "Opening print dialog...",
-          type: "info",
+        updateExportState({
+          stage: "error",
+          isGenerating: false,
+          error: {
+            title: "PDF Generation Interrupted",
+            message: `We encountered an issue preparing the PDF for ${template.name}. You can try again or download as Word (.docx).`,
+          },
         })
       );
-      window.print();
     } finally {
       setDownloadingTemplateId(null);
       setDownloadType(null);
@@ -548,32 +584,57 @@ export const QuickCVWizard = () => {
 
   // Execute One-click DOCX download
   const executeDownloadDOCX = async (template) => {
+    if (!template || downloadingTemplateId) return;
     try {
+      setLastExportTemplate(template);
       setDownloadingTemplateId(template.id);
       setDownloadType("docx");
       const targetCVData = getTemplateCVData(template);
 
       dispatch(
-        showToast({
-          message: `Generating Word (.docx) document...`,
-          type: "info",
+        openExportModal({
+          format: "docx",
+          stage: "preparing",
+          progress: 20,
+          statusMessage: `Compiling Word document for ${template.name}...`,
         })
       );
 
-      await exportService.exportDOCX(targetCVData);
+      await exportService.exportDOCX(targetCVData, (update) => {
+        if (typeof update === "object") {
+          dispatch(
+            updateExportState({
+              stage: update.stage || "generating",
+              progress: update.progress || 50,
+              statusMessage: update.message || "Processing...",
+            })
+          );
+        } else {
+          dispatch(updateExportState({ statusMessage: String(update) }));
+        }
+      });
 
       dispatch(
-        showToast({
-          message: "Word document (.docx) downloaded successfully!",
-          type: "success",
+        updateExportState({
+          stage: "ready",
+          progress: 100,
+          isGenerating: false,
+          statusMessage: "Word document (.docx) downloaded successfully!",
         })
       );
+      setTimeout(() => {
+        dispatch(closeExportModal());
+      }, 1500);
     } catch (error) {
       console.error("DOCX download error:", error);
       dispatch(
-        showToast({
-          message: "Failed to generate Word document.",
-          type: "error",
+        updateExportState({
+          stage: "error",
+          isGenerating: false,
+          error: {
+            title: "Word Export Interrupted",
+            message: `We encountered an issue compiling the Word document for ${template.name}. You can try again or download as PDF.`,
+          },
         })
       );
     } finally {
@@ -1713,6 +1774,28 @@ export const QuickCVWizard = () => {
               executeDownloadDOCX(pendingExportTemplate);
             } else {
               executeDownloadPDF(pendingExportTemplate);
+            }
+          }
+        }}
+      />
+
+      {/* Modern macOS Export Status & Error Modal */}
+      <ExportStatusModal
+        onRetry={() => {
+          if (lastExportTemplate) {
+            if (downloadType === "docx") {
+              executeDownloadDOCX(lastExportTemplate);
+            } else {
+              executeDownloadPDF(lastExportTemplate);
+            }
+          }
+        }}
+        onAlternativeExport={(altFormat) => {
+          if (lastExportTemplate) {
+            if (altFormat === "docx") {
+              executeDownloadDOCX(lastExportTemplate);
+            } else {
+              executeDownloadPDF(lastExportTemplate);
             }
           }
         }}

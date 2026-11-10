@@ -5,6 +5,7 @@ import {
   updateExperience,
   updateEducation,
   updateSkill,
+  updateReference,
 } from '../store/cvSlice';
 import EditableElement from '../features/cv-editor/components/EditableElement';
 import { Mail, Phone, MapPin, Globe, Linkedin, Github, Terminal, Camera } from 'lucide-react';
@@ -24,7 +25,7 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
     references = [],
     declaration = {},
     design = {},
-  } = cvData;
+  } = cvData || {};
 
   const primary = design?.primaryColor || '#6366f1'; // Indigo tech
   const fontFamily = design?.fontFamily || 'Inter';
@@ -39,7 +40,7 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
       : 'w-24 h-32';
 
   return (
-    <div className="bg-white text-slate-900 transition-all text-xs" style={{ fontFamily }}>
+    <div className="bg-white text-slate-900 transition-all text-xs font-sans" style={{ fontFamily }}>
       {/* 1. Linear Obsidian Dark Top Header */}
       <div className="bg-slate-950 text-white p-6 sm:p-8 border-b-2 border-indigo-500/50">
         <div className="flex flex-col sm:flex-row justify-between items-start gap-6">
@@ -74,32 +75,60 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
               {personalInfo.email && (
                 <span className="flex items-center gap-1.5">
                   <Mail className="w-3 h-3 text-indigo-400" />
-                  <span>{personalInfo.email}</span>
+                  <EditableElement
+                    section="personalInfo"
+                    field="email"
+                    value={personalInfo.email}
+                    onSave={(val) => dispatch(updatePersonalInfo({ email: val }))}
+                    placeholder="email@example.com"
+                    className="inline text-slate-300 hover:text-white"
+                  />
                 </span>
               )}
               {personalInfo.phone && (
                 <span className="flex items-center gap-1.5">
                   <Phone className="w-3 h-3 text-indigo-400" />
-                  <span>{personalInfo.phone}</span>
+                  <EditableElement
+                    section="personalInfo"
+                    field="phone"
+                    value={personalInfo.phone}
+                    onSave={(val) => dispatch(updatePersonalInfo({ phone: val }))}
+                    placeholder="+1 555-0199"
+                    className="inline text-slate-300 hover:text-white"
+                  />
                 </span>
               )}
               {personalInfo.location && (
                 <span className="flex items-center gap-1.5">
                   <MapPin className="w-3 h-3 text-indigo-400" />
-                  <span>{personalInfo.location}</span>
+                  <EditableElement
+                    section="personalInfo"
+                    field="location"
+                    value={personalInfo.location}
+                    onSave={(val) => dispatch(updatePersonalInfo({ location: val }))}
+                    placeholder="City, Country"
+                    className="inline text-slate-300 hover:text-white"
+                  />
                 </span>
               )}
               {personalInfo.github && (
                 <span className="flex items-center gap-1.5">
                   <Github className="w-3 h-3 text-indigo-400" />
-                  <span>{personalInfo.github.replace(/^https?:\/\/(www\.)?github\.com\//, '')}</span>
+                  <EditableElement
+                    section="personalInfo"
+                    field="github"
+                    value={personalInfo.github}
+                    onSave={(val) => dispatch(updatePersonalInfo({ github: val }))}
+                    placeholder="github.com/username"
+                    className="inline text-slate-300 hover:text-white"
+                  />
                 </span>
               )}
             </div>
           </div>
 
           {/* Portrait Photo with Dark Tech Border */}
-          {design?.showPhoto && (
+          {design?.showPhoto !== false && (
             <div
               onClick={() => onOpenPhotoModal && onOpenPhotoModal()}
               className="shrink-0 relative group cursor-pointer"
@@ -111,13 +140,13 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
                 >
                   <img
                     src={personalInfo.photo}
-                    alt={personalInfo.fullName}
+                    alt={personalInfo.fullName || 'Photo'}
                     className="w-full h-full object-cover"
                   />
                 </div>
               ) : (
                 <div
-                  className={`${photoSizeClass} border border-dashed border-slate-700 rounded-md bg-slate-900 flex flex-col items-center justify-center text-slate-500 p-2 text-center group-hover:border-indigo-400 transition-colors`}
+                  className={`${photoSizeClass} border border-dashed border-slate-700 rounded-md bg-slate-900 flex flex-col items-center justify-center text-slate-500 p-2 text-center group-hover:border-indigo-400 transition-colors print:hidden cv-photo-placeholder`}
                 >
                   <Camera className="w-5 h-5 mb-1 text-slate-500" />
                   <span className="text-[9px] font-mono">PORTRAIT</span>
@@ -136,7 +165,15 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
             <h2 className="text-[11px] font-mono font-bold uppercase tracking-wider text-indigo-600 pb-1 mb-2 border-b border-slate-200">
               01 // Professional Overview
             </h2>
-            <p className="text-slate-700 leading-relaxed text-xs">{personalInfo.summary}</p>
+            <EditableElement
+              section="personalInfo"
+              field="summary"
+              value={personalInfo.summary}
+              multiline={true}
+              onSave={(val) => dispatch(updatePersonalInfo({ summary: val }))}
+              placeholder="Write your technical overview..."
+              className="text-slate-700 leading-relaxed text-xs block"
+            />
           </section>
         )}
 
@@ -150,15 +187,65 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
               {experience.map((exp, index) => (
                 <div key={exp.id || index} className="space-y-1">
                   <div className="flex flex-col sm:flex-row sm:items-baseline justify-between text-xs">
-                    <span className="font-bold text-slate-950">{exp.jobTitle}</span>
+                    <EditableElement
+                      section="experience"
+                      field="jobTitle"
+                      index={index}
+                      value={exp.jobTitle}
+                      onSave={(val) => dispatch(updateExperience({ index, data: { jobTitle: val } }))}
+                      placeholder="Role Title"
+                      className="font-bold text-slate-950 inline-block text-xs"
+                    />
                     <span className="text-[11px] font-mono text-slate-500">
-                      {exp.startDate} – {exp.current ? 'Present' : exp.endDate}
+                      <EditableElement
+                        section="experience"
+                        field="startDate"
+                        index={index}
+                        value={exp.startDate}
+                        onSave={(val) => dispatch(updateExperience({ index, data: { startDate: val } }))}
+                        placeholder="Start"
+                        className="inline"
+                      />
+                      {' – '}
+                      {exp.current ? (
+                        'Present'
+                      ) : (
+                        <EditableElement
+                          section="experience"
+                          field="endDate"
+                          index={index}
+                          value={exp.endDate}
+                          onSave={(val) => dispatch(updateExperience({ index, data: { endDate: val } }))}
+                          placeholder="End"
+                          className="inline"
+                        />
+                      )}
                     </span>
                   </div>
                   <div className="text-[11px] text-indigo-900 font-semibold">
-                    {exp.company} {exp.location && `• ${exp.location}`}
+                    <EditableElement
+                      section="experience"
+                      field="company"
+                      index={index}
+                      value={exp.company}
+                      onSave={(val) => dispatch(updateExperience({ index, data: { company: val } }))}
+                      placeholder="Company"
+                      className="inline"
+                    />
+                    {exp.location && ` • ${exp.location}`}
                   </div>
-                  {exp.description && <p className="text-slate-600 text-xs">{exp.description}</p>}
+                  {exp.description && (
+                    <EditableElement
+                      section="experience"
+                      field="description"
+                      index={index}
+                      value={exp.description}
+                      multiline={true}
+                      onSave={(val) => dispatch(updateExperience({ index, data: { description: val } }))}
+                      placeholder="Responsibilities and impact..."
+                      className="text-slate-600 text-xs leading-relaxed block"
+                    />
+                  )}
                   {exp.highlights && exp.highlights.length > 0 && (
                     <ul className="list-disc pl-4 space-y-0.5 text-slate-600 text-xs mt-1">
                       {exp.highlights.map((h, i) => h && <li key={i}>{h}</li>)}
@@ -179,12 +266,20 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
                 03 // Technical Stack
               </h2>
               <div className="flex flex-wrap gap-1.5">
-                {skills.map((s) => (
+                {skills.map((s, index) => (
                   <span
-                    key={s.id || s.name}
+                    key={s.id || index}
                     className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 text-[10px] font-mono border border-slate-200"
                   >
-                    {s.name}
+                    <EditableElement
+                      section="skills"
+                      field="name"
+                      index={index}
+                      value={s.name}
+                      onSave={(val) => dispatch(updateSkill({ index, data: { name: val } }))}
+                      placeholder="Skill"
+                      className="inline font-mono"
+                    />
                   </span>
                 ))}
               </div>
@@ -197,12 +292,29 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
               <h2 className="text-[11px] font-mono font-bold uppercase tracking-wider text-indigo-600 pb-1 mb-2.5 border-b border-slate-200">
                 04 // Education
               </h2>
-              <div className="space-y-2">
+              <div className="space-y-2 text-xs">
                 {education.map((edu, idx) => (
                   <div key={edu.id || idx}>
-                    <p className="font-bold text-slate-900 text-xs">{edu.degree}</p>
+                    <EditableElement
+                      section="education"
+                      field="degree"
+                      index={idx}
+                      value={edu.degree}
+                      onSave={(val) => dispatch(updateEducation({ index: idx, data: { degree: val } }))}
+                      placeholder="Degree"
+                      className="font-bold text-slate-900 block"
+                    />
                     <p className="text-slate-600 text-[11px]">
-                      {edu.institution} {edu.grade && `• ${edu.grade}`}
+                      <EditableElement
+                        section="education"
+                        field="institution"
+                        index={idx}
+                        value={edu.institution}
+                        onSave={(val) => dispatch(updateEducation({ index: idx, data: { institution: val } }))}
+                        placeholder="Institution"
+                        className="inline"
+                      />
+                      {edu.grade && ` • ${edu.grade}`}
                     </p>
                     <p className="text-slate-400 text-[10px] font-mono">{edu.endDate || edu.startDate}</p>
                   </div>
@@ -238,7 +350,15 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
               {references.map((r, i) => (
                 <div key={r.id || i} className="p-2 bg-slate-50 rounded border border-slate-200 font-mono text-[10px]">
-                  <p className="font-bold text-slate-900">{r.name}</p>
+                  <EditableElement
+                    section="references"
+                    field="name"
+                    index={i}
+                    value={r.name}
+                    onSave={(val) => dispatch(updateReference({ index: i, data: { name: val } }))}
+                    placeholder="Referee Name"
+                    className="font-bold text-slate-900 block"
+                  />
                   <p className="text-slate-600">{r.designation}, {r.company}</p>
                   {r.phone && <p className="text-slate-500">Tel: {r.phone}</p>}
                 </div>
@@ -252,4 +372,3 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
 };
 
 export default LinearDark;
-

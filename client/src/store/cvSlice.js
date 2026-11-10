@@ -3,8 +3,25 @@ import { INITIAL_CV_DATA } from '@shared/constants/cvDefaults.js';
 
 const MAX_HISTORY = 20;
 
+const loadInitialDraft = () => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const saved = localStorage.getItem('resumecraft_draft');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object' && parsed.personalInfo) {
+          return { ...INITIAL_CV_DATA, ...parsed };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Could not restore draft from localStorage:', err);
+  }
+  return { ...INITIAL_CV_DATA };
+};
+
 const initialState = {
-  currentCV: { ...INITIAL_CV_DATA },
+  currentCV: loadInitialDraft(),
   past: [],
   future: [],
   cvId: null,
@@ -301,6 +318,50 @@ export const cvSlice = createSlice({
       state.currentCV.languages.splice(action.payload, 1);
     },
 
+    // References Actions
+    addReference: (state, action) => {
+      pushHistory(state);
+      if (!Array.isArray(state.currentCV.references)) {
+        state.currentCV.references = [];
+      }
+      const newRef = action.payload || {
+        id: `ref-${Date.now()}`,
+        name: '',
+        designation: '',
+        company: '',
+        phone: '',
+        email: '',
+      };
+      state.currentCV.references.push(newRef);
+    },
+    updateReference: (state, action) => {
+      const { index, data } = action.payload;
+      if (!Array.isArray(state.currentCV.references)) {
+        state.currentCV.references = [];
+      }
+      if (state.currentCV.references[index]) {
+        pushHistory(state);
+        state.currentCV.references[index] = {
+          ...state.currentCV.references[index],
+          ...data,
+        };
+      }
+    },
+    removeReference: (state, action) => {
+      pushHistory(state);
+      if (Array.isArray(state.currentCV.references)) {
+        state.currentCV.references.splice(action.payload, 1);
+      }
+    },
+    reorderReferences: (state, action) => {
+      pushHistory(state);
+      if (Array.isArray(state.currentCV.references)) {
+        const { sourceIndex, destinationIndex } = action.payload;
+        const [removed] = state.currentCV.references.splice(sourceIndex, 1);
+        state.currentCV.references.splice(destinationIndex, 0, removed);
+      }
+    },
+
     // Custom Sections
     addCustomSection: (state, action) => {
       pushHistory(state);
@@ -389,6 +450,10 @@ export const {
   addLanguage,
   updateLanguage,
   removeLanguage,
+  addReference,
+  updateReference,
+  removeReference,
+  reorderReferences,
   addCustomSection,
   updateCustomSection,
   removeCustomSection,

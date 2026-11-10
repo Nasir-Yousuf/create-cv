@@ -17,14 +17,17 @@ import {
   TableRow,
   TableCell,
   WidthType,
+  ImageRun,
 } from 'docx';
 
-// Helper to safely trigger mobile-friendly download
+/**
+ * Safely triggers file download with mobile and desktop support.
+ */
 export const triggerDownload = (blob, filename) => {
   try {
     saveAs(blob, filename);
   } catch (err) {
-    console.warn('saveAs failed, falling back to direct anchor:', err);
+    console.warn('saveAs failed, falling back to anchor trigger:', err);
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -39,187 +42,282 @@ export const triggerDownload = (blob, filename) => {
   }
 };
 
-export const exportService = {
-  // Client-Side Native Vector-Crisp PDF Export (Mobile & Desktop 100% Reliable)
-  async exportPDF(cvData, customHtml = '', elementId = 'cv-export-sheet') {
-    const filename = `${(cvData?.personalInfo?.fullName || cvData?.title || 'Resume').replace(/\s+/g, '_')}.pdf`;
+/**
+ * Notifies progress callback with structured stage and percentage info.
+ */
+const notifyProgress = (onProgress, stage, progress, message) => {
+  if (typeof onProgress === 'function') {
+    try {
+      onProgress({
+        stage,
+        progress,
+        message,
+        toString: () => message,
+      });
+    } catch (e) {
+      // Ignore callback errors
+    }
+  }
+};
 
-    // 1. Try Client-Side High-Res HTML to Canvas to jsPDF
-    let exportContainer = null;
+/**
+ * Resolves an image ArrayBuffer in the browser for DOCX embedding.
+ */
+const resolveClientImageBuffer = async (photoUri) => {
+  if (!photoUri || typeof photoUri !== 'string') return null;
+
+  try {
+    let bytes = null;
+    if (photoUri.startsWith('data:image')) {
+      const commaIndex = photoUri.indexOf(',');
+      if (commaIndex !== -1) {
+        const base64Data = photoUri.slice(commaIndex + 1);
+        const binaryString = window.atob(base64Data);
+        const len = binaryString.length;
+        bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+      }
+    } else if (photoUri.startsWith('http://') || photoUri.startsWith('https://')) {
+      const res = await fetch(photoUri, { mode: 'cors' });
+      if (res.ok) {
+        const ab = await res.arrayBuffer();
+        bytes = new Uint8Array(ab);
+      }
+    }
+
+    if (bytes && bytes.length >= 8) {
+      const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+      const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+      const isGif = bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46;
+      if (isPng || isJpeg || isGif) {
+        return bytes.buffer;
+      }
+    }
+  } catch (err) {
+    console.warn('Could not resolve photo for client DOCX embed:', err.message);
+  }
+  return null;
+};
+
+/**
+ * Checks if a canvas contains non-white pixels (verifies it is not blank).
+ */
+const isCanvasNotBlank = (canvas) => {
+  if (!canvas || canvas.width === 0 || canvas.height === 0) return false;
+
+  try {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+
+    // Sample 50 points across the canvas
+    const sampleWidth = canvas.width;
+    const sampleHeight = canvas.height;
+    const stepX = Math.floor(sampleWidth / 10);
+    const stepY = Math.floor(sampleHeight / 10);
+
+    let nonWhiteCount = 0;
+
+    for (let x = stepX; x < sampleWidth; x += stepX) {
+      for (let y = stepY; y < sampleHeight; y += stepY) {
+        const pixel = ctx.getImageData(x, y, 1, 1).data;
+        // Check if not pure white (255, 255, 255) and not fully transparent (alpha 0)
+        const isNotWhite = pixel[0] < 245 || pixel[1] < 245 || pixel[2] < 245;
+        const isNotTransparent = pixel[3] > 10;
+        if (isNotWhite && isNotTransparent) {
+          nonWhiteCount++;
+          if (nonWhiteCount > 3) return true;
+        }
+      }
+    }
+    return nonWhiteCount > 0;
+  } catch (e) {
+    // Canvas tainted or SecurityError, assume not blank
+    return true;
+  }
+};
+
+/**
+ * Extracts and prepares clean HTML for the target CV template.
+ */
+const extractCleanTemplateHtml = (cvData, elementId) => {
+  let sheetEl = null;
+
+  // 1. If explicit non-generic container ID is provided
+  if (elementId && elementId !== 'cv-export-sheet') {
+    const el = document.getElementById(elementId);
+    if (el) {
+      sheetEl = el.querySelector('#cv-export-sheet') || el;
+    }
+  }
+
+  // 2. Look for specific gallery or wizard preview card for this template
+  if (!sheetEl && cvData?.templateId) {
+    const cardEl =
+      document.getElementById(`gallery-preview-sheet-${cvData.templateId}`) ||
+      document.getElementById(`preview-sheet-${cvData.templateId}`);
+    if (cardEl) {
+      sheetEl = cardEl.querySelector('#cv-export-sheet') || cardEl;
+    }
+  }
+
+  // 3. Fallback to active editor sheet
+  if (!sheetEl) {
+    sheetEl = document.getElementById('cv-export-sheet');
+  }
+
+  if (!sheetEl) return '';
+
+  const clone = sheetEl.cloneNode(true);
+  clone.style.transform = 'none';
+  clone.style.webkitTransform = 'none';
+  clone.style.margin = '0';
+  clone.style.padding = '0';
+  clone.style.boxShadow = 'none';
+  clone.style.borderRadius = '0';
+  clone.style.overflow = 'visible';
+
+  // Remove editor UI artifacts
+  const pips = clone.querySelectorAll('.cv-editor-pip, .cv-placeholder, [class*="ring-"], .no-print');
+  pips.forEach((p) => p.remove());
+
+  // Remove photo placeholder dashed box if no photo
+  if (!cvData?.personalInfo?.photo) {
+    const cameraBoxes = clone.querySelectorAll('.cv-photo-placeholder');
+    cameraBoxes.forEach((b) => b.remove());
+  }
+
+  return clone.outerHTML;
+};
+
+export const exportService = {
+  /**
+   * PDF Export Pipeline:
+   * 1. Validate data
+   * 2. Extract clean DOM representation
+   * 3. Call backend Puppeteer service
+   * 4. Verify binary response
+   * 5. Fallback to client-side canvas render if server is unreachable
+   */
+  async exportPDF(cvData, customHtml = '', elementId = 'cv-export-sheet', onProgress = null) {
+    const rawName = (cvData?.personalInfo?.fullName || cvData?.title || 'Resume').trim();
+    const cleanName = rawName.replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_') || 'Resume';
+    const filename = `${cleanName}.pdf`;
+
+    notifyProgress(onProgress, 'preparing', 20, 'Preparing document & data...');
+
+    const cleanHtml = customHtml || extractCleanTemplateHtml(cvData, elementId);
+
+    // 1. PRIMARY STRATEGY: High-Fidelity Server-Side Puppeteer Engine
+    try {
+      notifyProgress(onProgress, 'rendering', 45, 'Rendering vector typography & layout...');
+
+      notifyProgress(onProgress, 'generating', 75, 'Generating vector PDF document...');
+
+      const response = await api.post(
+        '/export/pdf',
+        { cvData, html: cleanHtml },
+        {
+          responseType: 'blob',
+          timeout: 45000,
+        }
+      );
+
+      // Verify response is true binary PDF and not a JSON error
+      if (response.data) {
+        if (response.data.type === 'application/json' || response.data.type === 'text/html') {
+          const text = await response.data.text();
+          let msg = 'Server returned invalid PDF response';
+          try {
+            const parsed = JSON.parse(text);
+            msg = parsed.message || msg;
+          } catch (e) {}
+          throw new Error(msg);
+        }
+
+        if (response.data.size > 5000) {
+          notifyProgress(onProgress, 'ready', 100, 'Ready for download!');
+          triggerDownload(response.data, filename);
+          return response.data;
+        }
+      }
+    } catch (serverErr) {
+      console.warn('Backend PDF export error, attempting client-side fallback:', serverErr.message);
+    }
+
+    // 2. SECONDARY RESILIENT FALLBACK: Client-Side Crisp jsPDF Engine
+    let stageContainer = null;
     let tempRoot = null;
 
     try {
-      // Find the template sheet element to export
-      let sheetEl = null;
+      notifyProgress(onProgress, 'rendering', 55, 'Rendering high-resolution document...');
 
-      // Check specific element ID if provided
-      if (elementId) {
-        const el = document.getElementById(elementId);
-        if (el) {
-          sheetEl = el.querySelector('#cv-export-sheet') || el;
-        }
+      // Wait for fonts to be ready
+      if (document.fonts && document.fonts.ready) {
+        try {
+          await document.fonts.ready;
+        } catch (e) {}
       }
 
-      // Check template-specific ID if cvData has templateId
-      if (!sheetEl && cvData?.templateId) {
-        const cardEl =
-          document.getElementById(`preview-sheet-${cvData.templateId}`) ||
-          document.getElementById(`gallery-preview-sheet-${cvData.templateId}`);
-        if (cardEl) {
-          sheetEl = cardEl.querySelector('#cv-export-sheet') || cardEl;
-        }
-      }
-
-      // Check fullscreen modal preview sheet
-      if (!sheetEl) {
-        const modalEl = document.getElementById('modal-preview-sheet');
-        if (modalEl) {
-          sheetEl = modalEl.querySelector('#cv-export-sheet') || modalEl;
-        }
-      }
-
-      // Check generic fallback
-      if (!sheetEl) {
-        sheetEl = document.getElementById('cv-export-sheet');
-      }
-
-      // Create an isolated, off-screen export container at (0, 0) with z-index behind root
-      exportContainer = document.createElement('div');
-      exportContainer.id = 'active-pdf-export-stage';
-      exportContainer.style.cssText = `
+      // Create an off-screen staging container at (0,0) with high z-index
+      stageContainer = document.createElement('div');
+      stageContainer.id = 'client-pdf-active-stage';
+      stageContainer.style.cssText = `
         position: fixed;
         left: 0;
         top: 0;
         width: 794px;
         min-height: 1123px;
-        z-index: -99999;
+        z-index: 99999;
         background: #ffffff;
-        opacity: 1;
-        visibility: visible;
+        opacity: 0.99;
         pointer-events: none;
         overflow: visible;
         margin: 0;
         padding: 0;
       `;
-      document.body.appendChild(exportContainer);
+      document.body.appendChild(stageContainer);
 
-      let captureTarget = null;
+      let captureEl = null;
 
-      if (sheetEl) {
-        // Clone the existing rendered DOM sheet so all current input/DOM states are preserved
-        captureTarget = sheetEl.cloneNode(true);
-        captureTarget.style.transform = 'none';
-        captureTarget.style.webkitTransform = 'none';
-        captureTarget.style.width = '794px';
-        captureTarget.style.minHeight = '1123px';
-        captureTarget.style.height = 'auto';
-        captureTarget.style.maxHeight = 'none';
-        captureTarget.style.margin = '0';
-        captureTarget.style.padding = '0';
-        captureTarget.style.boxShadow = 'none';
-        captureTarget.style.borderRadius = '0';
-        captureTarget.style.overflow = 'visible';
-        captureTarget.style.boxSizing = 'border-box';
-
-        // 1. Remove rounded outer container clipping and overflow-hidden from root
-        captureTarget.classList.remove('overflow-hidden', 'rounded-sm', 'rounded-md', 'rounded-lg');
-
-        // 2. Remove any editor selection pips, focus rings, or badges from the export clone
-        const rings = captureTarget.querySelectorAll('.ring-2, [class*="ring-indigo"]');
-        rings.forEach((r) =>
-          r.classList.remove('ring-2', 'ring-indigo-500', 'ring-offset-1', 'bg-indigo-50/30')
-        );
-        const pips = captureTarget.querySelectorAll(
-          'span.rounded-full.bg-indigo-600, div.bg-indigo-600, span.bg-indigo-600, .group\\/editable > span'
-        );
-        pips.forEach((p) => p.remove());
-
-        // 3. Remove hover outlines from editable elements
-        const hoverOutlines = captureTarget.querySelectorAll('[class*="hover:outline"]');
-        hoverOutlines.forEach((el) => {
-          el.classList.remove(
-            'hover:outline-dashed',
-            'hover:outline-1',
-            'hover:outline-indigo-400/80',
-            'hover:bg-indigo-50/10'
-          );
-        });
-
-        exportContainer.appendChild(captureTarget);
-      } else if (customHtml) {
-        // If customHtml is provided, inject it
-        exportContainer.innerHTML = customHtml;
-        captureTarget = exportContainer.firstElementChild || exportContainer;
+      if (cleanHtml) {
+        stageContainer.innerHTML = cleanHtml;
+        captureEl = stageContainer.firstElementChild || stageContainer;
       } else {
-        // Dynamic React render fallback directly using RenderCVTemplate
-        tempRoot = ReactDOM.createRoot(exportContainer);
-        tempRoot.render(
-          React.createElement(RenderCVTemplate, {
-            cvData: cvData,
-            scale: 1,
-          })
-        );
-        captureTarget = exportContainer;
-      }
-
-      // Allow a brief tick for DOM layout calculation
-      await new Promise((r) => setTimeout(r, 100));
-
-      // Global cleanup on captureTarget across all templates:
-      // Remove .truncate and tight overflow so font descenders are never clipped
-      if (captureTarget) {
-        captureTarget.classList.remove('overflow-hidden');
-        const truncates = captureTarget.querySelectorAll('.truncate');
-        truncates.forEach((el) => {
-          el.classList.remove('truncate');
-          el.style.overflow = 'visible';
-          el.style.textOverflow = 'clip';
-          el.style.whiteSpace = 'normal';
-          el.style.wordBreak = 'break-word';
-          el.style.lineHeight = 'normal';
+        // Mount React Template directly
+        await new Promise((resolve) => {
+          tempRoot = ReactDOM.createRoot(stageContainer);
+          tempRoot.render(
+            React.createElement(RenderCVTemplate, {
+              cvData,
+              scale: 1,
+            })
+          );
+          setTimeout(resolve, 350);
         });
-
-        const scrollables = captureTarget.querySelectorAll('.overflow-x-auto, .overflow-y-auto');
-        scrollables.forEach((el) => {
-          el.classList.remove('overflow-x-auto', 'overflow-y-auto');
-          el.style.overflow = 'visible';
-        });
+        captureEl = stageContainer.querySelector('#cv-export-sheet') || stageContainer;
       }
 
-      // Wait for fonts to finish loading
-      if (document.fonts && document.fonts.ready) {
-        try {
-          await document.fonts.ready;
-        } catch (e) {
-          // ignore font loading error
-        }
-      }
-
-      // Ensure CORS on all images inside the export container
-      const images = exportContainer.querySelectorAll('img');
-      images.forEach((img) => {
-        img.crossOrigin = 'anonymous';
-      });
-
+      // Ensure images decode
+      const images = stageContainer.querySelectorAll('img');
       if (images.length > 0) {
         await Promise.all(
           Array.from(images).map((img) => {
-            if (img.complete) return Promise.resolve();
+            img.crossOrigin = 'anonymous';
+            if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
             return new Promise((resolve) => {
               img.onload = resolve;
               img.onerror = resolve;
-              setTimeout(resolve, 800); // 800ms safety timeout
+              setTimeout(resolve, 1500);
             });
           })
         );
       }
 
-      // Allow final tick for layout stabilization
       await new Promise((r) => setTimeout(r, 100));
 
-      // Capture with html2canvas at 2x crisp print scale (1588 x 2246)
-      // windowWidth and width are both exactly 794px to preserve 1:1 A4 layout
-      const canvas = await html2canvas(captureTarget, {
+      const canvas = await html2canvas(captureEl, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
@@ -231,101 +329,122 @@ export const exportService = {
         scrollY: 0,
       });
 
-      if (canvas && canvas.width > 0 && canvas.height > 0) {
-        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      // VALIDATE CANVAS IS NOT BLANK
+      if (!isCanvasNotBlank(canvas)) {
+        throw new Error('Client PDF rendering resulted in blank canvas.');
+      }
 
-        const isLetter = cvData?.design?.pageSize === 'Letter';
-        const pageWidth = isLetter ? 215.9 : 210; // mm
-        const pageHeight = isLetter ? 279.4 : 297; // mm
-        const format = isLetter ? 'letter' : 'a4';
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      const isLetter = cvData?.design?.pageSize === 'Letter';
+      const pageWidth = isLetter ? 215.9 : 210;
+      const pageHeight = isLetter ? 279.4 : 297;
+      const format = isLetter ? 'letter' : 'a4';
 
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format,
-          compress: true,
-        });
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format,
+        compress: true,
+      });
 
-        const pdfHeight = (canvas.height * pageWidth) / canvas.width;
-        // Allow up to 18% height tolerance (up to ~350mm) to cleanly fit 1 page
-        // without awkward page cuts through headers or sections
-        const singlePageThreshold = pageHeight * 1.18;
+      const pdfHeight = (canvas.height * pageWidth) / canvas.width;
+      const singlePageThreshold = pageHeight * 1.15;
 
-        if (pdfHeight <= singlePageThreshold) {
-          // Standard single page fit: renders entire document cleanly on 1 page
-          const renderHeight = pdfHeight >= pageHeight * 0.94 ? pageHeight : pdfHeight;
-          pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, renderHeight, undefined, 'FAST');
-        } else {
-          // Truly multi-page document
-          let heightLeft = pdfHeight;
-          let position = 0;
+      if (pdfHeight <= singlePageThreshold) {
+        pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, Math.min(pageHeight, pdfHeight), undefined, 'FAST');
+      } else {
+        let heightLeft = pdfHeight;
+        let position = 0;
 
+        pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, pdfHeight, undefined, 'FAST');
+        heightLeft -= pageHeight;
+
+        while (heightLeft > 15) {
+          position = position - pageHeight;
+          pdf.addPage();
           pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, pdfHeight, undefined, 'FAST');
           heightLeft -= pageHeight;
-
-          while (heightLeft > 25) {
-            position = position - pageHeight;
-            pdf.addPage();
-            pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, pdfHeight, undefined, 'FAST');
-            heightLeft -= pageHeight;
-          }
         }
-
-        // Save PDF directly to mobile or desktop device
-        pdf.save(filename);
-
-        // Also return the blob
-        const pdfBlob = pdf.output('blob');
-        return pdfBlob;
       }
+
+      const pdfBlob = pdf.output('blob');
+      if (!pdfBlob || pdfBlob.size < 5000) {
+        throw new Error('Generated PDF blob is empty.');
+      }
+
+      notifyProgress(onProgress, 'ready', 100, 'Ready for download!');
+      triggerDownload(pdfBlob, filename);
+      return pdfBlob;
     } catch (clientErr) {
-      console.warn('Client-side PDF generation error, trying fallback:', clientErr);
+      console.error('All automated PDF export strategies failed:', clientErr);
+      throw clientErr;
     } finally {
       if (tempRoot) {
         try {
           tempRoot.unmount();
         } catch (e) {}
       }
-      if (exportContainer && exportContainer.parentNode) {
-        exportContainer.remove();
+      if (stageContainer && stageContainer.parentNode) {
+        stageContainer.remove();
       }
     }
-
-    // 2. Fallback to Backend Server Export if available
-    try {
-      const sheetEl = document.getElementById(elementId) || document.getElementById('cv-export-sheet');
-      const html = customHtml || (sheetEl ? sheetEl.outerHTML : '');
-
-      const res = await api.post(
-        '/export/pdf',
-        { cvData, html },
-        {
-          responseType: 'blob',
-        }
-      );
-
-      // Verify not index.html redirect
-      if (res.data?.type !== 'text/html') {
-        triggerDownload(res.data, filename);
-        return res.data;
-      }
-    } catch (apiErr) {
-      console.warn('Backend PDF export error:', apiErr);
-    }
-
-    // 3. Fallback: Native Print to PDF on mobile
-    window.print();
-    return null;
   },
 
-  // Client-Side Genuine Microsoft Word (.docx) Document Export
-  async exportDOCX(cvData) {
+  /**
+   * DOCX Export Pipeline:
+   * 1. Validate data
+   * 2. Call backend DOCX service
+   * 3. Fallback to client-side docx library
+   * 4. Verify binary document and download
+   */
+  async exportDOCX(cvData, onProgress = null) {
     const rawName = (cvData?.personalInfo?.fullName || cvData?.title || 'Resume').trim();
     const cleanName = rawName.replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_') || 'Resume';
     const filename = `${cleanName}.docx`;
 
+    notifyProgress(onProgress, 'preparing', 25, 'Preparing Word document structure...');
+
+    // 1. PRIMARY STRATEGY: Backend DOCX Engine
     try {
+      notifyProgress(onProgress, 'generating', 75, 'Generating Microsoft Word document...');
+
+      const response = await api.post(
+        '/export/docx',
+        { cvData },
+        {
+          responseType: 'blob',
+          timeout: 30000,
+        }
+      );
+
+      if (response.data) {
+        if (response.data.type === 'application/json' || response.data.type === 'text/html') {
+          const text = await response.data.text();
+          let msg = 'Server returned invalid DOCX response';
+          try {
+            const parsed = JSON.parse(text);
+            msg = parsed.message || msg;
+          } catch (e) {}
+          throw new Error(msg);
+        }
+
+        if (response.data.size > 2000) {
+          notifyProgress(onProgress, 'ready', 100, 'Ready for download!');
+          triggerDownload(response.data, filename);
+          return response.data;
+        }
+      }
+    } catch (serverErr) {
+      console.warn('Backend DOCX export error, falling back to client-side docx:', serverErr.message);
+    }
+
+    // 2. SECONDARY RESILIENT FALLBACK: Client-side docx library
+    try {
+      notifyProgress(onProgress, 'rendering', 50, 'Structuring Word sections & tables...');
+      notifyProgress(onProgress, 'generating', 80, 'Compiling Word document locally...');
+
       const {
+        templateId = 'bd-corporate-standard',
         personalInfo = {},
         personalDetails = {},
         experience = [],
@@ -339,76 +458,185 @@ export const exportService = {
         design = {},
       } = cvData || {};
 
+      const isLetter = design?.pageSize === 'Letter';
       const primaryHex = (design?.primaryColor || '#1E40AF').replace('#', '');
       const darkTextHex = '1E293B';
       const grayHex = '475569';
       const lightGrayHex = '64748B';
 
+      const fontName =
+        design?.fontFamily === 'Merriweather'
+          ? 'Georgia'
+          : design?.fontFamily === 'JetBrains Mono'
+          ? 'Consolas'
+          : 'Calibri';
+
       const paragraphs = [];
 
-      // 1. HEADER: FULL NAME
-      paragraphs.push(
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 0, after: 80 },
-          children: [
-            new TextRun({
-              text: personalInfo.fullName || 'CURRICULUM VITAE',
-              bold: true,
-              size: 52, // 26pt
-              color: primaryHex,
-              font: 'Calibri',
-            }),
-          ],
-        })
-      );
+      // Resolve Photo (omitted for pure ATS-Classic)
+      let photoBuffer = null;
+      if (templateId !== 'ats-classic' && design?.showPhoto !== false && personalInfo?.photo) {
+        photoBuffer = await resolveClientImageBuffer(personalInfo.photo);
+      }
 
-      // Job Title / Headline
-      if (personalInfo.jobTitle) {
+      if (photoBuffer) {
+        paragraphs.push(
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.NONE },
+              bottom: { style: BorderStyle.SINGLE, size: 8, color: primaryHex },
+              left: { style: BorderStyle.NONE },
+              right: { style: BorderStyle.NONE },
+              insideHorizontal: { style: BorderStyle.NONE },
+              insideVertical: { style: BorderStyle.NONE },
+            },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    width: { size: 75, type: WidthType.PERCENTAGE },
+                    borders: {
+                      top: { style: BorderStyle.NONE },
+                      bottom: { style: BorderStyle.NONE },
+                      left: { style: BorderStyle.NONE },
+                      right: { style: BorderStyle.NONE },
+                    },
+                    children: [
+                      new Paragraph({
+                        spacing: { before: 0, after: 60 },
+                        children: [
+                          new TextRun({
+                            text: personalInfo.fullName || 'CURRICULUM VITAE',
+                            bold: true,
+                            size: 44,
+                            color: primaryHex,
+                            font: fontName,
+                          }),
+                        ],
+                      }),
+                      ...(personalInfo.jobTitle
+                        ? [
+                            new Paragraph({
+                              spacing: { before: 0, after: 80 },
+                              children: [
+                                new TextRun({
+                                  text: personalInfo.jobTitle.toUpperCase(),
+                                  bold: true,
+                                  size: 22,
+                                  color: grayHex,
+                                  font: fontName,
+                                }),
+                              ],
+                            }),
+                          ]
+                        : []),
+                      new Paragraph({
+                        spacing: { before: 0, after: 120 },
+                        children: [
+                          new TextRun({
+                            text: [
+                              personalInfo.location,
+                              personalInfo.phone,
+                              personalInfo.email,
+                              personalInfo.linkedin,
+                            ]
+                              .filter(Boolean)
+                              .join('  •  '),
+                            size: 19,
+                            color: grayHex,
+                            font: fontName,
+                          }),
+                        ],
+                      }),
+                    ],
+                  }),
+                  new TableCell({
+                    width: { size: 25, type: WidthType.PERCENTAGE },
+                    borders: {
+                      top: { style: BorderStyle.NONE },
+                      bottom: { style: BorderStyle.NONE },
+                      left: { style: BorderStyle.NONE },
+                      right: { style: BorderStyle.NONE },
+                    },
+                    children: [
+                      new Paragraph({
+                        alignment: AlignmentType.RIGHT,
+                        spacing: { before: 0, after: 120 },
+                        children: [
+                          new ImageRun({
+                            data: photoBuffer,
+                            transformation: { width: 95, height: 120 },
+                          }),
+                        ],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          })
+        );
+      } else {
         paragraphs.push(
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 100 },
+            spacing: { before: 0, after: 60 },
             children: [
               new TextRun({
-                text: personalInfo.jobTitle.toUpperCase(),
+                text: personalInfo.fullName || 'CURRICULUM VITAE',
                 bold: true,
-                size: 26, // 13pt
-                color: grayHex,
-                font: 'Calibri',
+                size: 48,
+                color: primaryHex,
+                font: fontName,
               }),
             ],
           })
         );
+
+        if (personalInfo.jobTitle) {
+          paragraphs.push(
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 80 },
+              children: [
+                new TextRun({
+                  text: personalInfo.jobTitle.toUpperCase(),
+                  bold: true,
+                  size: 24,
+                  color: grayHex,
+                  font: fontName,
+                }),
+              ],
+            })
+          );
+        }
+
+        const contactParts = [
+          personalInfo.phone,
+          personalInfo.email,
+          personalInfo.location,
+          personalInfo.linkedin,
+        ].filter(Boolean);
+
+        if (contactParts.length > 0) {
+          paragraphs.push(
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 200 },
+              children: [
+                new TextRun({
+                  text: contactParts.join('   •   '),
+                  size: 19,
+                  color: grayHex,
+                  font: fontName,
+                }),
+              ],
+            })
+          );
+        }
       }
 
-      // Contact Line: Email, Phone, Location, LinkedIn, Website
-      const contactItems = [
-        personalInfo.phone,
-        personalInfo.email,
-        personalInfo.location || personalInfo.address,
-        personalInfo.linkedin,
-        personalInfo.website,
-      ].filter(Boolean);
-
-      if (contactItems.length > 0) {
-        paragraphs.push(
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 220 },
-            children: [
-              new TextRun({
-                text: contactItems.join('   •   '),
-                size: 19, // 9.5pt
-                color: grayHex,
-                font: 'Calibri',
-              }),
-            ],
-          })
-        );
-      }
-
-      // Section Heading Builder
       const createHeading = (title) =>
         new Paragraph({
           heading: HeadingLevel.HEADING_2,
@@ -425,61 +653,56 @@ export const exportService = {
             new TextRun({
               text: title.toUpperCase(),
               bold: true,
-              size: 24, // 12pt
+              size: 22,
               color: primaryHex,
-              font: 'Calibri',
+              font: fontName,
             }),
           ],
         });
 
-      // 2. CAREER OBJECTIVE / SUMMARY
       if (personalInfo.summary) {
-        paragraphs.push(createHeading('Career Objective & Summary'));
+        paragraphs.push(createHeading('Professional Summary'));
         paragraphs.push(
           new Paragraph({
-            spacing: { after: 180, line: 280 },
+            spacing: { after: 160, line: 260 },
             children: [
               new TextRun({
                 text: personalInfo.summary,
-                size: 21, // 10.5pt
+                size: 20,
                 color: darkTextHex,
-                font: 'Calibri',
+                font: fontName,
               }),
             ],
           })
         );
       }
 
-      // 3. WORK EXPERIENCE
       if (experience && experience.length > 0) {
-        paragraphs.push(createHeading('Professional Work Experience'));
-
+        paragraphs.push(createHeading('Work Experience'));
         experience.forEach((exp) => {
-          const dateRange = [
-            exp.startDate,
-            exp.current ? 'Present' : exp.endDate,
-          ].filter(Boolean).join(' – ');
+          const dateRange = [exp.startDate, exp.current ? 'Present' : exp.endDate]
+            .filter(Boolean)
+            .join(' – ');
 
-          // Line 1: Job Title & Date
           paragraphs.push(
             new Paragraph({
-              spacing: { before: 120, after: 40 },
+              spacing: { before: 100, after: 30 },
               children: [
                 new TextRun({
-                  text: exp.jobTitle || 'Role / Position',
+                  text: exp.jobTitle || 'Role',
                   bold: true,
-                  size: 22, // 11pt
+                  size: 21,
                   color: darkTextHex,
-                  font: 'Calibri',
+                  font: fontName,
                 }),
                 ...(dateRange
                   ? [
                       new TextRun({
                         text: `   |   ${dateRange}`,
                         bold: true,
-                        size: 19,
+                        size: 18,
                         color: lightGrayHex,
-                        font: 'Calibri',
+                        font: fontName,
                       }),
                     ]
                   : []),
@@ -487,76 +710,64 @@ export const exportService = {
             })
           );
 
-          // Line 2: Company & Location
-          const companyLocation = [exp.company, exp.location].filter(Boolean).join(' • ');
-          if (companyLocation) {
+          const compLoc = [exp.company, exp.location].filter(Boolean).join(' • ');
+          if (compLoc) {
             paragraphs.push(
               new Paragraph({
-                spacing: { after: 60 },
+                spacing: { after: 50 },
                 children: [
                   new TextRun({
-                    text: companyLocation,
+                    text: compLoc,
                     italics: true,
-                    size: 20,
+                    size: 19,
                     color: grayHex,
-                    font: 'Calibri',
+                    font: fontName,
                   }),
                 ],
               })
             );
           }
 
-          // Line 3: Description / Bullet points
           if (exp.description) {
-            const lines = exp.description.split('\n').map((l) => l.trim()).filter(Boolean);
-            lines.forEach((line) => {
-              const cleanLine = line.replace(/^[•\-\*]\s*/, '');
-              paragraphs.push(
-                new Paragraph({
-                  bullet: { level: 0 },
-                  spacing: { after: 40, line: 260 },
-                  children: [
-                    new TextRun({
-                      text: cleanLine,
-                      size: 20,
-                      color: darkTextHex,
-                      font: 'Calibri',
-                    }),
-                  ],
-                })
-              );
-            });
+            paragraphs.push(
+              new Paragraph({
+                spacing: { after: 50, line: 240 },
+                children: [
+                  new TextRun({
+                    text: exp.description,
+                    size: 20,
+                    color: darkTextHex,
+                    font: fontName,
+                  }),
+                ],
+              })
+            );
           }
         });
       }
 
-      // 4. EDUCATION & QUALIFICATIONS
       if (education && education.length > 0) {
         paragraphs.push(createHeading('Academic Qualifications'));
-
         education.forEach((edu) => {
-          const dateRange = [edu.startDate, edu.endDate].filter(Boolean).join(' – ');
-
-          // Line 1: Degree & Dates
           paragraphs.push(
             new Paragraph({
-              spacing: { before: 120, after: 40 },
+              spacing: { before: 80, after: 20 },
               children: [
                 new TextRun({
-                  text: edu.degree || 'Degree / Examination',
+                  text: edu.degree || 'Degree',
                   bold: true,
-                  size: 22,
+                  size: 21,
                   color: darkTextHex,
-                  font: 'Calibri',
+                  font: fontName,
                 }),
-                ...(dateRange
+                ...(edu.endDate
                   ? [
                       new TextRun({
-                        text: `   |   ${dateRange}`,
+                        text: `   |   ${edu.startDate || ''} – ${edu.endDate}`,
                         bold: true,
-                        size: 19,
+                        size: 18,
                         color: lightGrayHex,
-                        font: 'Calibri',
+                        font: fontName,
                       }),
                     ]
                   : []),
@@ -564,24 +775,21 @@ export const exportService = {
             })
           );
 
-          // Line 2: Institution & Field
-          const eduDetails = [
-            edu.institution,
-            edu.fieldOfStudy,
-            edu.gpa ? `Result: ${edu.gpa}` : null,
-          ].filter(Boolean).join(' • ');
+          const eduDetails = [edu.institution, edu.fieldOfStudy, edu.grade ? `Result: ${edu.grade}` : null]
+            .filter(Boolean)
+            .join(' • ');
 
           if (eduDetails) {
             paragraphs.push(
               new Paragraph({
-                spacing: { after: 60 },
+                spacing: { after: 50 },
                 children: [
                   new TextRun({
                     text: eduDetails,
                     italics: true,
-                    size: 20,
+                    size: 19,
                     color: grayHex,
-                    font: 'Calibri',
+                    font: fontName,
                   }),
                 ],
               })
@@ -590,9 +798,8 @@ export const exportService = {
         });
       }
 
-      // 5. SKILLS & COMPETENCIES
       if (skills && skills.length > 0) {
-        paragraphs.push(createHeading('Technical & Core Competencies'));
+        paragraphs.push(createHeading('Skills & Competencies'));
         const skillList = skills
           .map((s) => (typeof s === 'string' ? s : s.name))
           .filter(Boolean);
@@ -600,14 +807,14 @@ export const exportService = {
         if (skillList.length > 0) {
           paragraphs.push(
             new Paragraph({
-              spacing: { after: 160, line: 280 },
+              spacing: { after: 140, line: 260 },
               children: [
                 new TextRun({
                   text: skillList.join('   •   '),
                   bold: true,
-                  size: 21,
+                  size: 20,
                   color: darkTextHex,
-                  font: 'Calibri',
+                  font: fontName,
                 }),
               ],
             })
@@ -615,306 +822,17 @@ export const exportService = {
         }
       }
 
-      // 6. PERSONAL DETAILS (Bangladeshi Recruiter Format)
-      const bdFields = [
-        { label: "Father's Name", value: personalDetails.fatherName },
-        { label: "Mother's Name", value: personalDetails.motherName },
-        { label: 'Date of Birth', value: personalDetails.dateOfBirth },
-        { label: 'Gender', value: personalDetails.gender },
-        { label: 'Marital Status', value: personalDetails.maritalStatus },
-        { label: 'Nationality', value: personalDetails.nationality || 'Bangladeshi' },
-        { label: 'Religion', value: personalDetails.religion },
-        { label: 'National ID (NID)', value: personalDetails.nid || personalDetails.nationalId },
-        { label: 'Blood Group', value: personalDetails.bloodGroup },
-        { label: 'Present Address', value: personalDetails.presentAddress },
-        { label: 'Permanent Address', value: personalDetails.permanentAddress },
-      ].filter((f) => Boolean(f.value));
-
-      if (bdFields.length > 0) {
-        paragraphs.push(createHeading('Personal Details'));
-
-        const tableRows = bdFields.map(
-          (field) =>
-            new TableRow({
-              children: [
-                new TableCell({
-                  width: { size: 35, type: WidthType.PERCENTAGE },
-                  borders: {
-                    top: { style: BorderStyle.NONE },
-                    bottom: { style: BorderStyle.NONE },
-                    left: { style: BorderStyle.NONE },
-                    right: { style: BorderStyle.NONE },
-                  },
-                  children: [
-                    new Paragraph({
-                      spacing: { before: 20, after: 20 },
-                      children: [
-                        new TextRun({
-                          text: `${field.label}:`,
-                          bold: true,
-                          size: 20,
-                          color: grayHex,
-                          font: 'Calibri',
-                        }),
-                      ],
-                    }),
-                  ],
-                }),
-                new TableCell({
-                  width: { size: 65, type: WidthType.PERCENTAGE },
-                  borders: {
-                    top: { style: BorderStyle.NONE },
-                    bottom: { style: BorderStyle.NONE },
-                    left: { style: BorderStyle.NONE },
-                    right: { style: BorderStyle.NONE },
-                  },
-                  children: [
-                    new Paragraph({
-                      spacing: { before: 20, after: 20 },
-                      children: [
-                        new TextRun({
-                          text: String(field.value),
-                          size: 20,
-                          color: darkTextHex,
-                          font: 'Calibri',
-                        }),
-                      ],
-                    }),
-                  ],
-                }),
-              ],
-            })
-        );
-
-        paragraphs.push(
-          new Table({
-            width: { size: 100, type: WidthType.PERCENTAGE },
-            borders: {
-              top: { style: BorderStyle.NONE },
-              bottom: { style: BorderStyle.NONE },
-              left: { style: BorderStyle.NONE },
-              right: { style: BorderStyle.NONE },
-              insideHorizontal: { style: BorderStyle.NONE },
-              insideVertical: { style: BorderStyle.NONE },
-            },
-            rows: tableRows,
-          })
-        );
-      }
-
-      // 7. PROJECTS & PORTFOLIO
-      if (projects && projects.length > 0) {
-        paragraphs.push(createHeading('Projects & Key Works'));
-
-        projects.forEach((proj) => {
-          paragraphs.push(
-            new Paragraph({
-              spacing: { before: 100, after: 40 },
-              children: [
-                new TextRun({
-                  text: proj.name || proj.title || 'Project Name',
-                  bold: true,
-                  size: 22,
-                  color: darkTextHex,
-                  font: 'Calibri',
-                }),
-                ...(proj.technologies
-                  ? [
-                      new TextRun({
-                        text: `   [${proj.technologies}]`,
-                        italics: true,
-                        size: 19,
-                        color: lightGrayHex,
-                        font: 'Calibri',
-                      }),
-                    ]
-                  : []),
-              ],
-            })
-          );
-
-          if (proj.description) {
-            paragraphs.push(
-              new Paragraph({
-                spacing: { after: 60, line: 260 },
-                children: [
-                  new TextRun({
-                    text: proj.description,
-                    size: 20,
-                    color: darkTextHex,
-                    font: 'Calibri',
-                  }),
-                ],
-              })
-            );
-          }
-
-          if (proj.link) {
-            paragraphs.push(
-              new Paragraph({
-                spacing: { after: 80 },
-                children: [
-                  new TextRun({
-                    text: `Project URL: ${proj.link}`,
-                    italics: true,
-                    size: 18,
-                    color: primaryHex,
-                    font: 'Calibri',
-                  }),
-                ],
-              })
-            );
-          }
-        });
-      }
-
-      // 8. CERTIFICATIONS
-      if (certifications && certifications.length > 0) {
-        paragraphs.push(createHeading('Certifications & Licenses'));
-
-        certifications.forEach((cert) => {
-          const certInfo = [cert.issuer, cert.date || cert.year].filter(Boolean).join(' • ');
-          paragraphs.push(
-            new Paragraph({
-              bullet: { level: 0 },
-              spacing: { after: 40 },
-              children: [
-                new TextRun({
-                  text: cert.name || cert.title || 'Certification',
-                  bold: true,
-                  size: 20,
-                  color: darkTextHex,
-                  font: 'Calibri',
-                }),
-                ...(certInfo
-                  ? [
-                      new TextRun({
-                        text: ` (${certInfo})`,
-                        italics: true,
-                        size: 19,
-                        color: lightGrayHex,
-                        font: 'Calibri',
-                      }),
-                    ]
-                  : []),
-              ],
-            })
-          );
-        });
-      }
-
-      // 9. LANGUAGES
-      if (languages && languages.length > 0) {
-        paragraphs.push(createHeading('Languages'));
-        const langItems = languages.map((lang) => {
-          if (typeof lang === 'string') return lang;
-          return `${lang.language || lang.name || ''} ${lang.proficiency ? `(${lang.proficiency})` : ''}`.trim();
-        }).filter(Boolean);
-
-        paragraphs.push(
-          new Paragraph({
-            spacing: { after: 140 },
-            children: [
-              new TextRun({
-                text: langItems.join('   •   '),
-                size: 20,
-                color: darkTextHex,
-                font: 'Calibri',
-              }),
-            ],
-          })
-        );
-      }
-
-      // 10. REFERENCES
-      if (references && references.length > 0) {
-        paragraphs.push(createHeading('References'));
-
-        references.forEach((ref) => {
-          paragraphs.push(
-            new Paragraph({
-              spacing: { before: 80, after: 20 },
-              children: [
-                new TextRun({
-                  text: ref.name || 'Reference Person',
-                  bold: true,
-                  size: 21,
-                  color: darkTextHex,
-                  font: 'Calibri',
-                }),
-              ],
-            })
-          );
-
-          const refDetails = [
-            ref.designation,
-            ref.company,
-            ref.phone ? `Phone: ${ref.phone}` : null,
-            ref.email ? `Email: ${ref.email}` : null,
-          ].filter(Boolean).join('   |   ');
-
-          if (refDetails) {
-            paragraphs.push(
-              new Paragraph({
-                spacing: { after: 60 },
-                children: [
-                  new TextRun({
-                    text: refDetails,
-                    size: 19,
-                    color: grayHex,
-                    font: 'Calibri',
-                  }),
-                ],
-              })
-            );
-          }
-        });
-      }
-
-      // 11. DECLARATION
-      paragraphs.push(createHeading('Declaration'));
-      paragraphs.push(
-        new Paragraph({
-          spacing: { after: 180, line: 260 },
-          children: [
-            new TextRun({
-              text:
-                declaration?.text ||
-                'I hereby declare that all the information provided above is true and correct to the best of my knowledge and belief.',
-              italics: true,
-              size: 20,
-              color: darkTextHex,
-              font: 'Calibri',
-            }),
-          ],
-        })
-      );
-
-      // Signature / Name at bottom right
-      paragraphs.push(
-        new Paragraph({
-          alignment: AlignmentType.RIGHT,
-          spacing: { before: 180, after: 80 },
-          children: [
-            new TextRun({
-              text: personalInfo.fullName || 'Authorized Signature',
-              bold: true,
-              size: 21,
-              color: primaryHex,
-              font: 'Calibri',
-            }),
-          ],
-        })
-      );
-
-      // Create doc with 0.6 inch margins
       const doc = new Document({
         sections: [
           {
             properties: {
               page: {
+                size: {
+                  width: isLetter ? 12240 : 11906,
+                  height: isLetter ? 15840 : 16838,
+                },
                 margin: {
-                  top: 864, // 0.6 inch (864 dxa)
+                  top: 864,
                   bottom: 864,
                   left: 864,
                   right: 864,
@@ -927,28 +845,17 @@ export const exportService = {
       });
 
       const docxBlob = await Packer.toBlob(doc);
-      const fileBlob = new Blob([docxBlob], {
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      });
-
-      triggerDownload(fileBlob, filename);
-      return fileBlob;
-    } catch (clientDocxErr) {
-      console.warn('Client-side DOCX export error, trying backend fallback:', clientDocxErr);
-    }
-
-    // Backend fallback
-    try {
-      const res = await api.post('/export/docx', { cvData }, { responseType: 'blob' });
-      if (res.data?.type !== 'text/html') {
-        triggerDownload(res.data, filename);
-        return res.data;
+      if (!docxBlob || docxBlob.size < 2000) {
+        throw new Error('Generated DOCX blob is empty.');
       }
-    } catch (apiErr) {
-      console.error('All DOCX export strategies failed:', apiErr);
-    }
 
-    return null;
+      notifyProgress(onProgress, 'ready', 100, 'Ready for download!');
+      triggerDownload(docxBlob, filename);
+      return docxBlob;
+    } catch (clientErr) {
+      console.error('All DOCX generation strategies failed:', clientErr);
+      throw clientErr;
+    }
   },
 };
 

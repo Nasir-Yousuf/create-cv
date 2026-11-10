@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { setCVData, setCVId } from '../store/cvSlice';
-import { showToast, openExportModal } from '../store/uiSlice';
+import { showToast, openExportModal, updateExportState, closeExportModal } from '../store/uiSlice';
 import cvService from '../services/cvService';
+import exportService from '../services/exportService';
+import ExportStatusModal from '../components/common/ExportStatusModal';
 import {
   Plus,
   Sparkles,
@@ -136,6 +138,58 @@ export const DashboardPage = ({ onOpenAuth }) => {
       }
     } catch (err) {
       dispatch(showToast({ message: 'Could not duplicate resume', type: 'error' }));
+    }
+  };
+
+  const handleDownloadPDF = async (cv) => {
+    try {
+      const fullCv = { ...INITIAL_CV_DATA, ...cv };
+      dispatch(
+        openExportModal({
+          format: 'pdf',
+          stage: 'preparing',
+          progress: 15,
+          statusMessage: `Preparing vector PDF for ${fullCv.title || 'Resume'}...`,
+        })
+      );
+
+      await exportService.exportPDF(fullCv, '', 'cv-export-sheet', (update) => {
+        if (typeof update === 'object') {
+          dispatch(
+            updateExportState({
+              stage: update.stage || 'rendering',
+              progress: update.progress || 50,
+              statusMessage: update.message || 'Processing...',
+            })
+          );
+        } else {
+          dispatch(updateExportState({ statusMessage: String(update) }));
+        }
+      });
+
+      dispatch(
+        updateExportState({
+          stage: 'ready',
+          progress: 100,
+          isGenerating: false,
+          statusMessage: 'PDF downloaded successfully!',
+        })
+      );
+      setTimeout(() => {
+        dispatch(closeExportModal());
+      }, 1500);
+    } catch (err) {
+      console.error('Dashboard PDF download error:', err);
+      dispatch(
+        updateExportState({
+          stage: 'error',
+          isGenerating: false,
+          error: {
+            title: 'PDF Generation Interrupted',
+            message: 'We were unable to render this resume. You can open it in the editor to review and download.',
+          },
+        })
+      );
     }
   };
 
@@ -297,10 +351,7 @@ export const DashboardPage = ({ onOpenAuth }) => {
                       </button>
 
                       <button
-                        onClick={() => {
-                          dispatch(setCVData({ ...INITIAL_CV_DATA, ...cv }));
-                          dispatch(openExportModal({ format: 'pdf' }));
-                        }}
+                        onClick={() => handleDownloadPDF(cv)}
                         title="Download PDF"
                         className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
                       >
@@ -362,6 +413,9 @@ export const DashboardPage = ({ onOpenAuth }) => {
           </Button>
         </div>
       </Modal>
+
+      {/* Modern macOS Export Status & Error Modal */}
+      <ExportStatusModal />
     </div>
   );
 };

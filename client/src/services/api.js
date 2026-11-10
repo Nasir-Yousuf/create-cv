@@ -23,12 +23,22 @@ api.interceptors.request.use(
 // Response interceptor for centralized error formatting
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    const message =
-      error.response?.data?.message ||
-      error.response?.data?.error ||
-      error.message ||
-      'An unexpected error occurred';
+  async (error) => {
+    let message = error.message || 'An unexpected error occurred';
+
+    if (error.response?.data) {
+      if (typeof error.response.data === 'object' && !(error.response.data instanceof Blob)) {
+        message = error.response.data.message || error.response.data.error || message;
+      } else if (typeof Blob !== 'undefined' && error.response.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const parsed = JSON.parse(text);
+          message = parsed.message || parsed.error || message;
+        } catch (e) {
+          // If not JSON text, retain default error message
+        }
+      }
+    }
 
     // If 401 unauthorized on protected routes, can clear stale token
     if (error.response?.status === 401) {

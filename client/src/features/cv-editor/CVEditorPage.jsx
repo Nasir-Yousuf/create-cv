@@ -17,6 +17,9 @@ import {
   showToast,
   openAIModal,
   toggleDarkMode,
+  openExportModal,
+  updateExportState,
+  closeExportModal,
 } from '../../store/uiSlice';
 import cvService from '../../services/cvService';
 import exportService from '../../services/exportService';
@@ -27,6 +30,7 @@ import PhotoUploadCropModal from './components/PhotoUploadCropModal';
 import AIAssistantModal from '../../components/common/AIAssistantModal';
 import WhatsAppSupportButton from '../../components/common/WhatsAppSupportButton';
 import PaymentExportModal from '../../components/common/PaymentExportModal';
+import ExportStatusModal from '../../components/common/ExportStatusModal';
 import paymentService from '../../services/paymentService';
 import { TEMPLATES_REGISTRY, DANIEL_CARTER_CV, TAHMIDUR_RAHMAN_CV, INITIAL_CV_DATA } from '@shared/constants/cvDefaults.js';
 import {
@@ -265,25 +269,60 @@ export const CVEditorPage = () => {
 
   // Core PDF Export execution
   const executeExportPDF = async () => {
+    if (isExporting) return;
+    // Commit any active in-line edits before reading CV state
+    if (typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
     try {
       setIsExporting(true);
       setExportDropdownOpen(false);
       dispatch(
-        showToast({
-          message: 'Rendering vector-crisp PDF document...',
-          type: 'info',
+        openExportModal({
+          format: 'pdf',
+          stage: 'preparing',
+          progress: 15,
+          statusMessage: 'Preparing vector document...',
         })
       );
-      await exportService.exportPDF(currentCV, '', 'cv-export-sheet');
+
+      await exportService.exportPDF(currentCV, '', 'cv-export-sheet', (update) => {
+        if (typeof update === 'object') {
+          dispatch(
+            updateExportState({
+              stage: update.stage || 'rendering',
+              progress: update.progress || 50,
+              statusMessage: update.message || 'Processing...',
+            })
+          );
+        } else {
+          dispatch(updateExportState({ statusMessage: String(update) }));
+        }
+      });
+
       dispatch(
-        showToast({
-          message: 'PDF exported and downloaded successfully!',
-          type: 'success',
+        updateExportState({
+          stage: 'ready',
+          progress: 100,
+          isGenerating: false,
+          statusMessage: 'PDF downloaded successfully!',
         })
       );
+      setTimeout(() => {
+        dispatch(closeExportModal());
+      }, 1500);
     } catch (err) {
-      console.warn('Backend export error, falling back to print dialog:', err.message);
-      window.print();
+      console.error('PDF export error:', err);
+      dispatch(
+        updateExportState({
+          stage: 'error',
+          isGenerating: false,
+          error: {
+            title: 'PDF Generation Interrupted',
+            message: 'We were unable to render this template to PDF. Your CV edits and content are completely safe. You can try again or export as Word (.docx).',
+          },
+        })
+      );
     } finally {
       setIsExporting(false);
     }
@@ -302,27 +341,58 @@ export const CVEditorPage = () => {
 
   // Core DOCX Export execution
   const executeExportDOCX = async () => {
+    if (isExporting) return;
+    // Commit any active in-line edits before reading CV state
+    if (typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
     try {
       setIsExporting(true);
       setExportDropdownOpen(false);
       dispatch(
-        showToast({
-          message: 'Compiling Microsoft Word (.docx) document...',
-          type: 'info',
+        openExportModal({
+          format: 'docx',
+          stage: 'preparing',
+          progress: 20,
+          statusMessage: 'Compiling Word document structure...',
         })
       );
-      await exportService.exportDOCX(currentCV);
+
+      await exportService.exportDOCX(currentCV, (update) => {
+        if (typeof update === 'object') {
+          dispatch(
+            updateExportState({
+              stage: update.stage || 'generating',
+              progress: update.progress || 50,
+              statusMessage: update.message || 'Processing...',
+            })
+          );
+        } else {
+          dispatch(updateExportState({ statusMessage: String(update) }));
+        }
+      });
+
       dispatch(
-        showToast({
-          message: 'Word document downloaded successfully!',
-          type: 'success',
+        updateExportState({
+          stage: 'ready',
+          progress: 100,
+          isGenerating: false,
+          statusMessage: 'Word document downloaded successfully!',
         })
       );
+      setTimeout(() => {
+        dispatch(closeExportModal());
+      }, 1500);
     } catch (err) {
+      console.error('DOCX export error:', err);
       dispatch(
-        showToast({
-          message: 'DOCX generation failed. Please try PDF.',
-          type: 'error',
+        updateExportState({
+          stage: 'error',
+          isGenerating: false,
+          error: {
+            title: 'Word Export Interrupted',
+            message: 'We were unable to compile this document to .docx. Your CV edits and content are completely safe. You can try again or export as PDF.',
+          },
         })
       );
     } finally {
@@ -1601,6 +1671,14 @@ export const CVEditorPage = () => {
         onSuccess={() => {
           if (pendingExportAction) pendingExportAction();
         }}
+      />
+
+      {/* Modern macOS Export Status & Error Modal */}
+      <ExportStatusModal
+        onRetry={() => (pendingExportType === 'docx' ? executeExportDOCX() : executeExportPDF())}
+        onAlternativeExport={(altFormat) =>
+          altFormat === 'docx' ? executeExportDOCX() : executeExportPDF()
+        }
       />
     </div>
   );

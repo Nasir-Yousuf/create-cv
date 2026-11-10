@@ -2,6 +2,8 @@ import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   updatePersonalInfo,
+  updatePersonalDetails,
+  updateDeclaration,
   updateExperience,
   addExperience,
   removeExperience,
@@ -22,6 +24,9 @@ import {
   updateLanguage,
   addLanguage,
   removeLanguage,
+  addReference,
+  updateReference,
+  removeReference,
   updateCustomSection,
 } from '../../../store/cvSlice';
 import { openAIModal } from '../../../store/uiSlice';
@@ -630,6 +635,328 @@ export const SectionFormEditor = ({ onOpenPhotoModal }) => {
               />
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 7. Certifications Editor
+  if (activeSection === 'certifications') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+            Certifications & Licenses ({cvData.certifications?.length || 0})
+          </h3>
+          <Button variant="primary" size="sm" icon={Plus} onClick={() => dispatch(addCertification())}>
+            Add Certification
+          </Button>
+        </div>
+
+        <div className="space-y-3">
+          {cvData.certifications?.map((cert, index) => (
+            <div key={cert.id || index} className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-900 dark:text-white">{cert.name || 'New Certification'}</span>
+                <button type="button" onClick={() => dispatch(removeCertification(index))} className="text-slate-400 hover:text-rose-500">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <input
+                type="text"
+                placeholder="Certification Name *"
+                value={cert.name || ''}
+                onChange={(e) => dispatch(updateCertification({ index, data: { name: e.target.value } }))}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="Issuing Organization"
+                  value={cert.issuer || ''}
+                  onChange={(e) => dispatch(updateCertification({ index, data: { issuer: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+                <input
+                  type="text"
+                  placeholder="Year / Date"
+                  value={cert.date || ''}
+                  onChange={(e) => dispatch(updateCertification({ index, data: { date: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 8. Languages Editor
+  if (activeSection === 'languages') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+            Languages ({cvData.languages?.length || 0})
+          </h3>
+          <Button variant="primary" size="sm" icon={Plus} onClick={() => dispatch(addLanguage())}>
+            Add Language
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          {cvData.languages?.map((lang, index) => (
+            <div key={lang.id || index} className="flex items-center gap-2 p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <input
+                type="text"
+                placeholder="Language (e.g. English, Bengali)"
+                value={typeof lang === 'string' ? lang : lang.language || lang.name || ''}
+                onChange={(e) => dispatch(updateLanguage({ index, data: { language: e.target.value, name: e.target.value } }))}
+                className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
+              />
+              <select
+                value={typeof lang === 'object' ? lang.proficiency || 'Fluent' : 'Fluent'}
+                onChange={(e) => dispatch(updateLanguage({ index, data: { proficiency: e.target.value } }))}
+                className="px-2 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white"
+              >
+                <option value="Native">Native</option>
+                <option value="Fluent">Fluent</option>
+                <option value="Professional">Professional</option>
+                <option value="Intermediate">Intermediate</option>
+                <option value="Basic">Basic</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => dispatch(removeLanguage(index))}
+                className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 9. Personal Details Editor (Bangladeshi Recruiter Format)
+  if (activeSection === 'personalDetails') {
+    const pd = cvData.personalDetails || {};
+    return (
+      <div className="space-y-4">
+        <div className="pb-2 border-b border-slate-100 dark:border-slate-800">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+            Personal Details (BD Recruiter Standard)
+          </h3>
+          <p className="text-[11px] text-slate-500">Corporate & government standard personal information.</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Father's Name</label>
+            <input
+              type="text"
+              value={pd.fatherName || ''}
+              onChange={(e) => dispatch(updatePersonalDetails({ fatherName: e.target.value }))}
+              placeholder="e.g. Md. Abdur Rahman"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Mother's Name</label>
+            <input
+              type="text"
+              value={pd.motherName || ''}
+              onChange={(e) => dispatch(updatePersonalDetails({ motherName: e.target.value }))}
+              placeholder="e.g. Begum Rokeya Sultana"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Date of Birth</label>
+            <input
+              type="text"
+              value={pd.dob || pd.dateOfBirth || ''}
+              onChange={(e) => dispatch(updatePersonalDetails({ dob: e.target.value, dateOfBirth: e.target.value }))}
+              placeholder="DD/MM/YYYY"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">National ID (NID)</label>
+            <input
+              type="text"
+              value={pd.nid || ''}
+              onChange={(e) => dispatch(updatePersonalDetails({ nid: e.target.value }))}
+              placeholder="e.g. 19962692518..."
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Gender</label>
+            <input
+              type="text"
+              value={pd.gender || 'Male'}
+              onChange={(e) => dispatch(updatePersonalDetails({ gender: e.target.value }))}
+              placeholder="Male / Female"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Blood Group</label>
+            <input
+              type="text"
+              value={pd.bloodGroup || ''}
+              onChange={(e) => dispatch(updatePersonalDetails({ bloodGroup: e.target.value }))}
+              placeholder="e.g. B+, O+, A+"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Nationality</label>
+            <input
+              type="text"
+              value={pd.nationality || 'Bangladeshi'}
+              onChange={(e) => dispatch(updatePersonalDetails({ nationality: e.target.value }))}
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Marital Status</label>
+            <input
+              type="text"
+              value={pd.maritalStatus || 'Single'}
+              onChange={(e) => dispatch(updatePersonalDetails({ maritalStatus: e.target.value }))}
+              placeholder="Single / Married"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Present Address</label>
+          <input
+            type="text"
+            value={pd.presentAddress || ''}
+            onChange={(e) => dispatch(updatePersonalDetails({ presentAddress: e.target.value }))}
+            placeholder="Current living address"
+            className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Permanent Address</label>
+          <input
+            type="text"
+            value={pd.permanentAddress || ''}
+            onChange={(e) => dispatch(updatePersonalDetails({ permanentAddress: e.target.value }))}
+            placeholder="Village, Post Office, Upazila, District"
+            className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // 10. References Editor
+  if (activeSection === 'references') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+            References ({cvData.references?.length || 0})
+          </h3>
+          <Button variant="primary" size="sm" icon={Plus} onClick={() => dispatch(addReference())}>
+            Add Reference
+          </Button>
+        </div>
+
+        <div className="space-y-3">
+          {cvData.references?.map((ref, index) => (
+            <div key={ref.id || index} className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-900 dark:text-white">{ref.name || 'New Reference'}</span>
+                <button type="button" onClick={() => dispatch(removeReference(index))} className="text-slate-400 hover:text-rose-500">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <input
+                type="text"
+                placeholder="Full Name *"
+                value={ref.name || ''}
+                onChange={(e) => dispatch(updateReference({ index, data: { name: e.target.value } }))}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="Designation"
+                  value={ref.designation || ''}
+                  onChange={(e) => dispatch(updateReference({ index, data: { designation: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+                <input
+                  type="text"
+                  placeholder="Company / Institution"
+                  value={ref.company || ''}
+                  onChange={(e) => dispatch(updateReference({ index, data: { company: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+                <input
+                  type="text"
+                  placeholder="Phone"
+                  value={ref.phone || ''}
+                  onChange={(e) => dispatch(updateReference({ index, data: { phone: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+                <input
+                  type="text"
+                  placeholder="Email"
+                  value={ref.email || ''}
+                  onChange={(e) => dispatch(updateReference({ index, data: { email: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 11. Declaration Editor
+  if (activeSection === 'declaration') {
+    const decl = cvData.declaration || {};
+    return (
+      <div className="space-y-4">
+        <div className="pb-2 border-b border-slate-100 dark:border-slate-800">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+            Declaration & Signature
+          </h3>
+          <p className="text-[11px] text-slate-500">Legal confirmation for corporate and recruiter applications.</p>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Declaration Statement</label>
+          <textarea
+            rows={3}
+            value={decl.text || ''}
+            onChange={(e) => dispatch(updateDeclaration({ text: e.target.value }))}
+            placeholder="I hereby declare that all information..."
+            className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Signed By (Authorized Name)</label>
+          <input
+            type="text"
+            value={decl.signedBy || cvData.personalInfo?.fullName || ''}
+            onChange={(e) => dispatch(updateDeclaration({ signedBy: e.target.value }))}
+            placeholder="Your Full Name"
+            className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+          />
         </div>
       </div>
     );

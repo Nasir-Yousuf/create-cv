@@ -31,6 +31,8 @@ import {
   BookOpen,
   Globe,
   User,
+  Users,
+  FileCheck,
   Plus,
   Trash2,
   Eye,
@@ -46,6 +48,9 @@ const SECTION_METADATA = {
   projects: { label: 'Projects', icon: FolderGit2, countKey: 'projects' },
   certifications: { label: 'Certifications', icon: BookOpen, countKey: 'certifications' },
   languages: { label: 'Languages', icon: Globe, countKey: 'languages' },
+  personalDetails: { label: 'Personal Details (BD)', icon: User, countKey: null },
+  references: { label: 'References', icon: Users, countKey: 'references' },
+  declaration: { label: 'Declaration & Signature', icon: FileCheck, countKey: null },
 };
 
 export const SortableSectionList = () => {

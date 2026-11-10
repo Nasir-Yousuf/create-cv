@@ -6,6 +6,7 @@ import {
   updateEducation,
   updateSkill,
   updateProject,
+  updateReference,
 } from '../store/cvSlice';
 import EditableElement from '../features/cv-editor/components/EditableElement';
 import { Mail, Phone, MapPin, Globe, Linkedin, Github, Camera } from 'lucide-react';
@@ -410,7 +411,15 @@ export const ModernMinimal = ({ cvData, onOpenPhotoModal }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-700">
               {references.map((r, i) => (
                 <div key={r.id || i} className="p-2.5 bg-slate-50 border border-slate-200 rounded">
-                  <p className="font-bold text-slate-900">{r.name}</p>
+                  <EditableElement
+                    section="references"
+                    field="name"
+                    index={i}
+                    value={r.name}
+                    onSave={(val) => dispatch(updateReference({ index: i, data: { name: val } }))}
+                    placeholder="Referee Name"
+                    className="font-bold text-slate-900 block"
+                  />
                   <p className="text-slate-600">{r.designation}, {r.company}</p>
                   {r.phone && <p className="text-slate-500">Phone: {r.phone}</p>}
                   {r.email && <p className="text-slate-500">Email: {r.email}</p>}

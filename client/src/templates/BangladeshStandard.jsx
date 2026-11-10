@@ -6,6 +6,7 @@ import {
   updateExperience,
   updateEducation,
   updateSkill,
+  updateReference,
   updateDeclaration,
 } from '../store/cvSlice';
 import EditableElement from '../features/cv-editor/components/EditableElement';
@@ -143,7 +144,7 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
               </div>
             ) : (
               <div
-                className={`${portraitPhotoClass} border-2 border-dashed border-slate-300 rounded bg-slate-50 flex flex-col items-center justify-center text-slate-400 p-2 text-center hover:border-emerald-600 transition-colors`}
+                className={`${portraitPhotoClass} border-2 border-dashed border-slate-300 rounded bg-slate-50 flex flex-col items-center justify-center text-slate-400 p-2 text-center hover:border-emerald-600 transition-colors print:hidden cv-photo-placeholder`}
               >
                 <Camera className="w-5 h-5 mb-1" />
                 <span className="text-[9px] font-semibold leading-tight">Passport Size Photo (35×45mm)</span>
@@ -542,9 +543,7 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
                   tag="p"
                   value={ref.name}
                   onSave={(val) => {
-                    const updated = [...references];
-                    updated[idx] = { ...updated[idx], name: val };
-                    dispatch(updatePersonalInfo({ references: updated }));
+                    dispatch(updateReference({ index: idx, data: { name: val } }));
                   }}
                   placeholder="Referee Name"
                   className="font-bold text-slate-900 block"
