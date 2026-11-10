@@ -104,23 +104,7 @@ export const TemplateGalleryPage = () => {
         })
       );
       const cvToExport = getCardCVData(template);
-      const blob = await exportService.exportPDF(cvToExport);
-      if (blob?.type === 'application/json') {
-        const text = await blob.text();
-        const json = JSON.parse(text);
-        throw new Error(json.message || 'Export error');
-      }
-      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute(
-        'download',
-        `${(cvToExport.personalInfo?.fullName || 'Resume').replace(/\s+/g, '_')}_${template.id}.pdf`
-      );
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => window.URL.revokeObjectURL(url), 10000);
+      await exportService.exportPDF(cvToExport);
       dispatch(
         showToast({
           message: 'PDF downloaded successfully!',

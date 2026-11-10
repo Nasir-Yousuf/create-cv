@@ -273,20 +273,7 @@ export const CVEditorPage = () => {
           type: 'info',
         })
       );
-      const blob = await exportService.exportPDF(currentCV);
-      if (blob?.type === 'application/json') {
-        const text = await blob.text();
-        const json = JSON.parse(text);
-        throw new Error(json.message || 'Export failed');
-      }
-      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${(currentCV.title || 'Resume').replace(/\s+/g, '_')}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => window.URL.revokeObjectURL(url), 10000);
+      await exportService.exportPDF(currentCV, '', 'cv-export-sheet');
       dispatch(
         showToast({
           message: 'PDF exported and downloaded successfully!',
@@ -323,18 +310,7 @@ export const CVEditorPage = () => {
           type: 'info',
         })
       );
-      const blob = await exportService.exportDOCX(currentCV);
-      const url = window.URL.createObjectURL(
-        new Blob([blob], {
-          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        })
-      );
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${(currentCV.title || 'Resume').replace(/\s+/g, '_')}.docx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      await exportService.exportDOCX(currentCV);
       dispatch(
         showToast({
           message: 'Word document downloaded successfully!',

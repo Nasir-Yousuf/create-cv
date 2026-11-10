@@ -497,37 +497,38 @@ export const QuickCVWizard = () => {
       setDownloadType("pdf");
       const targetCVData = getTemplateCVData(template);
 
+      dispatch(
+        showToast({
+          message: `Preparing crisp A4 PDF for ${template.name}...`,
+          type: "info",
+        })
+      );
+
       // Query template container element if mounted on screen
-      const cardEl = document.getElementById(`preview-sheet-${template.id}`);
+      const elementId = `preview-sheet-${template.id}`;
+      const cardEl = document.getElementById(elementId);
       const sheetEl = cardEl
         ? cardEl.querySelector("#cv-export-sheet") || cardEl
         : null;
       const html = sheetEl ? sheetEl.outerHTML : "";
 
-      const blob = await exportService.exportPDF(targetCVData, html);
-      if (blob?.type === "application/json") {
-        const text = await blob.text();
-        const json = JSON.parse(text);
-        throw new Error(json.message || "Export error");
-      }
-      const url = window.URL.createObjectURL(
-        new Blob([blob], { type: "application/pdf" }),
+      await exportService.exportPDF(targetCVData, html, elementId);
+
+      dispatch(
+        showToast({
+          message: "PDF downloaded successfully!",
+          type: "success",
+        })
       );
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute(
-        "download",
-        `${(targetCVData.personalInfo?.fullName || "Resume").replace(/\s+/g, "_")}_${template.id}.pdf`,
-      );
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => window.URL.revokeObjectURL(url), 10000);
     } catch (error) {
       console.error("Download error:", error);
-      alert(
-        'Failed to generate PDF. You can also click "Customize & Edit" to download from the editor.',
+      dispatch(
+        showToast({
+          message: "Opening print dialog...",
+          type: "info",
+        })
       );
+      window.print();
     } finally {
       setDownloadingTemplateId(null);
       setDownloadType(null);
@@ -552,24 +553,29 @@ export const QuickCVWizard = () => {
       setDownloadType("docx");
       const targetCVData = getTemplateCVData(template);
 
-      const blob = await exportService.exportDOCX(targetCVData);
-      const url = window.URL.createObjectURL(
-        new Blob([blob], {
-          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        }),
+      dispatch(
+        showToast({
+          message: `Generating Word (.docx) document...`,
+          type: "info",
+        })
       );
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute(
-        "download",
-        `${(targetCVData.personalInfo?.fullName || "Resume").replace(/\s+/g, "_")}.docx`,
+
+      await exportService.exportDOCX(targetCVData);
+
+      dispatch(
+        showToast({
+          message: "Word document (.docx) downloaded successfully!",
+          type: "success",
+        })
       );
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
     } catch (error) {
       console.error("DOCX download error:", error);
-      alert("Failed to generate DOCX document.");
+      dispatch(
+        showToast({
+          message: "Failed to generate Word document.",
+          type: "error",
+        })
+      );
     } finally {
       setDownloadingTemplateId(null);
       setDownloadType(null);
