@@ -176,6 +176,7 @@ export const generatePDF = async (cvData, renderedHtml = '') => {
           margin: 0 auto;
           box-shadow: none !important;
           border: none !important;
+          transform: none !important;
         }
         .resume-sheet-letter {
           width: 8.5in;
@@ -184,6 +185,10 @@ export const generatePDF = async (cvData, renderedHtml = '') => {
           margin: 0 auto;
           box-shadow: none !important;
           border: none !important;
+          transform: none !important;
+        }
+        #cv-export-sheet, [id^="preview-sheet-"] {
+          transform: none !important;
         }
         /* Ensure no editing selection borders or handles show on print */
         .ring-2, [class*="ring-"] {
@@ -251,7 +256,7 @@ export const generatePDF = async (cvData, renderedHtml = '') => {
       preferCSSPageSize: true,
     });
 
-    return pdfBuffer;
+    return Buffer.from(pdfBuffer);
   } finally {
     await browser.close();
   }

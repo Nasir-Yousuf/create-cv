@@ -2,9 +2,11 @@ import React from 'react';
 import { useDispatch } from 'react-redux';
 import {
   updatePersonalInfo,
+  updatePersonalDetails,
   updateExperience,
   updateEducation,
   updateSkill,
+  updateDeclaration,
 } from '../store/cvSlice';
 import EditableElement from '../features/cv-editor/components/EditableElement';
 import { Mail, Phone, MapPin, Globe, Linkedin, Camera } from 'lucide-react';
@@ -155,25 +157,23 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
       </div>
 
       {/* 2. Career Objective / Summary */}
-      {personalInfo.summary && (
-        <section className="mb-4">
-          <h2
-            className="text-[11px] font-bold uppercase tracking-wider pb-0.5 mb-1.5 border-b"
-            style={{ color: primary, borderColor: `${primary}50` }}
-          >
-            Career Objective
-          </h2>
-          <EditableElement
-            section="personalInfo"
-            field="summary"
-            value={personalInfo.summary}
-            multiline={true}
-            onSave={(val) => dispatch(updatePersonalInfo({ summary: val }))}
-            placeholder="Write your targeted career objective..."
-            className="text-slate-700 leading-relaxed text-justify block"
-          />
-        </section>
-      )}
+      <section className="mb-4">
+        <h2
+          className="text-[11px] font-bold uppercase tracking-wider pb-0.5 mb-1.5 border-b"
+          style={{ color: primary, borderColor: `${primary}50` }}
+        >
+          Career Objective
+        </h2>
+        <EditableElement
+          section="personalInfo"
+          field="summary"
+          value={personalInfo.summary}
+          multiline={true}
+          onSave={(val) => dispatch(updatePersonalInfo({ summary: val }))}
+          placeholder="Write your targeted career objective..."
+          className="text-slate-700 leading-relaxed text-justify block"
+        />
+      </section>
 
       {/* 3. Employment History / Work Experience */}
       {experience && experience.length > 0 && (
@@ -188,17 +188,70 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
             {experience.map((exp, index) => (
               <div key={exp.id || index} className="space-y-1">
                 <div className="flex justify-between items-baseline font-bold text-slate-900 text-xs">
-                  <span>
-                    {index + 1}. {exp.jobTitle}
-                  </span>
-                  <span className="text-[11px] text-slate-600 font-normal">
-                    {exp.startDate} to {exp.current ? 'Present' : exp.endDate}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span>{index + 1}.</span>
+                    <EditableElement
+                      section="experience"
+                      field="jobTitle"
+                      index={index}
+                      tag="span"
+                      value={exp.jobTitle}
+                      onSave={(val) => dispatch(updateExperience({ index, data: { jobTitle: val } }))}
+                      placeholder="Job Title"
+                      className="font-bold inline text-slate-900"
+                    />
+                  </div>
+                  <div className="text-[11px] text-slate-600 font-normal flex items-center gap-1">
+                    <EditableElement
+                      section="experience"
+                      field="startDate"
+                      index={index}
+                      tag="span"
+                      value={exp.startDate}
+                      onSave={(val) => dispatch(updateExperience({ index, data: { startDate: val } }))}
+                      placeholder="Start Date"
+                      className="inline"
+                    />
+                    <span>to</span>
+                    <EditableElement
+                      section="experience"
+                      field="endDate"
+                      index={index}
+                      tag="span"
+                      value={exp.current ? 'Present' : exp.endDate}
+                      onSave={(val) => dispatch(updateExperience({ index, data: { endDate: val } }))}
+                      placeholder="End Date"
+                      className="inline"
+                    />
+                  </div>
                 </div>
-                <div className="text-[11px] text-slate-700 italic font-medium">
-                  {exp.company} {exp.location && `• ${exp.location}`}
+
+                <div className="text-[11px] text-slate-700 italic font-medium flex items-center gap-1">
+                  <EditableElement
+                    section="experience"
+                    field="company"
+                    index={index}
+                    tag="span"
+                    value={exp.company}
+                    onSave={(val) => dispatch(updateExperience({ index, data: { company: val } }))}
+                    placeholder="Company Name"
+                    className="inline font-medium not-italic text-slate-800"
+                  />
+                  {exp.location && <span>• {exp.location}</span>}
                 </div>
-                {exp.description && <p className="text-slate-700 text-[11px]">{exp.description}</p>}
+
+                <EditableElement
+                  section="experience"
+                  field="description"
+                  index={index}
+                  tag="p"
+                  multiline={true}
+                  value={exp.description}
+                  onSave={(val) => dispatch(updateExperience({ index, data: { description: val } }))}
+                  placeholder="Key responsibilities and achievements..."
+                  className="text-slate-700 text-[11px] mt-0.5 block"
+                />
+
                 {exp.highlights && exp.highlights.length > 0 && (
                   <ul className="list-disc pl-5 space-y-0.5 text-slate-700 text-[11px]">
                     {exp.highlights.map((h, i) => h && <li key={i}>{h}</li>)}
@@ -225,19 +278,74 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
                 <tr className="bg-slate-100 text-slate-900 text-left font-bold">
                   <th className="border border-slate-300 px-2 py-1.5">Exam / Degree</th>
                   <th className="border border-slate-300 px-2 py-1.5">Institute / Board</th>
-                  <th className="border border-slate-300 px-2 py-1.5">Passing Year</th>
+                  <th className="border border-slate-300 px-2 py-1.5 text-center">Passing Year</th>
                   <th className="border border-slate-300 px-2 py-1.5">Group / Major</th>
-                  <th className="border border-slate-300 px-2 py-1.5">Result / CGPA</th>
+                  <th className="border border-slate-300 px-2 py-1.5 text-center">Result / CGPA</th>
                 </tr>
               </thead>
               <tbody>
                 {education.map((edu, i) => (
                   <tr key={edu.id || i} className={i % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'}>
-                    <td className="border border-slate-300 px-2 py-1 font-semibold">{edu.degree}</td>
-                    <td className="border border-slate-300 px-2 py-1">{edu.institution}</td>
-                    <td className="border border-slate-300 px-2 py-1 text-center">{edu.endDate || edu.startDate}</td>
-                    <td className="border border-slate-300 px-2 py-1">{edu.fieldOfStudy || '—'}</td>
-                    <td className="border border-slate-300 px-2 py-1 font-bold text-center">{edu.grade || '—'}</td>
+                    <td className="border border-slate-300 px-2 py-1 font-semibold">
+                      <EditableElement
+                        section="education"
+                        field="degree"
+                        index={i}
+                        tag="span"
+                        value={edu.degree}
+                        onSave={(val) => dispatch(updateEducation({ index: i, data: { degree: val } }))}
+                        placeholder="Degree / Exam"
+                        className="font-semibold inline"
+                      />
+                    </td>
+                    <td className="border border-slate-300 px-2 py-1">
+                      <EditableElement
+                        section="education"
+                        field="institution"
+                        index={i}
+                        tag="span"
+                        value={edu.institution}
+                        onSave={(val) => dispatch(updateEducation({ index: i, data: { institution: val } }))}
+                        placeholder="Institute / Board"
+                        className="inline"
+                      />
+                    </td>
+                    <td className="border border-slate-300 px-2 py-1 text-center font-mono">
+                      <EditableElement
+                        section="education"
+                        field="endDate"
+                        index={i}
+                        tag="span"
+                        value={edu.endDate || edu.startDate}
+                        onSave={(val) => dispatch(updateEducation({ index: i, data: { endDate: val } }))}
+                        placeholder="Year"
+                        className="inline text-center"
+                      />
+                    </td>
+                    <td className="border border-slate-300 px-2 py-1">
+                      <EditableElement
+                        section="education"
+                        field="fieldOfStudy"
+                        index={i}
+                        tag="span"
+                        value={edu.fieldOfStudy}
+                        onSave={(val) => dispatch(updateEducation({ index: i, data: { fieldOfStudy: val } }))}
+                        placeholder="Group / Major"
+                        className="inline"
+                      />
+                    </td>
+                    <td className="border border-slate-300 px-2 py-1 font-bold text-center">
+                      <EditableElement
+                        section="education"
+                        field="grade"
+                        index={i}
+                        tag="span"
+                        value={edu.grade}
+                        onSave={(val) => dispatch(updateEducation({ index: i, data: { grade: val } }))}
+                        placeholder="Result / CGPA"
+                        className="font-bold inline text-center text-emerald-800"
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -256,10 +364,19 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
             Specialized Skills & Competencies
           </h2>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-700">
-            {skills.map((s) => (
-              <div key={s.id || s.name} className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: primary }} />
-                <span className="font-medium text-slate-800">{s.name}</span>
+            {skills.map((s, idx) => (
+              <div key={s.id || idx} className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: primary }} />
+                <EditableElement
+                  section="skills"
+                  field="name"
+                  index={idx}
+                  tag="span"
+                  value={s.name}
+                  onSave={(val) => dispatch(updateSkill({ index: idx, data: { name: val } }))}
+                  placeholder="Skill name"
+                  className="font-medium text-slate-800 inline"
+                />
                 {s.level && <span className="text-slate-500 text-[10px]">({s.level})</span>}
               </div>
             ))}
@@ -275,16 +392,115 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
         >
           Personal Details
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[11px] text-slate-700">
-          <p><strong className="text-slate-800">Father's Name:</strong> {personalDetails.fatherName || 'Md. Abdur Rahman'}</p>
-          <p><strong className="text-slate-800">Mother's Name:</strong> {personalDetails.motherName || 'Begum Rokeya Sultana'}</p>
-          <p><strong className="text-slate-800">Date of Birth:</strong> {personalDetails.dob || '15/10/1996'}</p>
-          <p><strong className="text-slate-800">Gender:</strong> {personalDetails.gender || 'Male'}</p>
-          <p><strong className="text-slate-800">Marital Status:</strong> {personalDetails.maritalStatus || 'Single'}</p>
-          <p><strong className="text-slate-800">Nationality:</strong> {personalDetails.nationality || 'Bangladeshi'}</p>
-          <p><strong className="text-slate-800">National ID (NID):</strong> {personalDetails.nid || '19962692518000123'}</p>
-          <p><strong className="text-slate-800">Blood Group:</strong> {personalDetails.bloodGroup || 'B+'}</p>
-          <p className="sm:col-span-2"><strong className="text-slate-800">Permanent Address:</strong> {personalDetails.permanentAddress || 'Vill: Shantinagar, P.O: Mirpur, Kushtia, Bangladesh'}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-[11px] text-slate-700">
+          <div className="flex items-center gap-1">
+            <strong className="text-slate-800 shrink-0">Father's Name:</strong>
+            <EditableElement
+              section="personalDetails"
+              field="fatherName"
+              tag="span"
+              value={personalDetails.fatherName}
+              onSave={(val) => dispatch(updatePersonalDetails({ fatherName: val }))}
+              placeholder="Father's Name"
+              className="inline"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <strong className="text-slate-800 shrink-0">Mother's Name:</strong>
+            <EditableElement
+              section="personalDetails"
+              field="motherName"
+              tag="span"
+              value={personalDetails.motherName}
+              onSave={(val) => dispatch(updatePersonalDetails({ motherName: val }))}
+              placeholder="Mother's Name"
+              className="inline"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <strong className="text-slate-800 shrink-0">Date of Birth:</strong>
+            <EditableElement
+              section="personalDetails"
+              field="dob"
+              tag="span"
+              value={personalDetails.dob}
+              onSave={(val) => dispatch(updatePersonalDetails({ dob: val }))}
+              placeholder="DD/MM/YYYY"
+              className="inline font-mono"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <strong className="text-slate-800 shrink-0">Gender:</strong>
+            <EditableElement
+              section="personalDetails"
+              field="gender"
+              tag="span"
+              value={personalDetails.gender || 'Male'}
+              onSave={(val) => dispatch(updatePersonalDetails({ gender: val }))}
+              placeholder="Gender"
+              className="inline"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <strong className="text-slate-800 shrink-0">Marital Status:</strong>
+            <EditableElement
+              section="personalDetails"
+              field="maritalStatus"
+              tag="span"
+              value={personalDetails.maritalStatus || 'Single'}
+              onSave={(val) => dispatch(updatePersonalDetails({ maritalStatus: val }))}
+              placeholder="Marital Status"
+              className="inline"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <strong className="text-slate-800 shrink-0">Nationality:</strong>
+            <EditableElement
+              section="personalDetails"
+              field="nationality"
+              tag="span"
+              value={personalDetails.nationality || 'Bangladeshi'}
+              onSave={(val) => dispatch(updatePersonalDetails({ nationality: val }))}
+              placeholder="Nationality"
+              className="inline"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <strong className="text-slate-800 shrink-0">National ID (NID):</strong>
+            <EditableElement
+              section="personalDetails"
+              field="nid"
+              tag="span"
+              value={personalDetails.nid}
+              onSave={(val) => dispatch(updatePersonalDetails({ nid: val }))}
+              placeholder="NID Number"
+              className="inline font-mono"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <strong className="text-slate-800 shrink-0">Blood Group:</strong>
+            <EditableElement
+              section="personalDetails"
+              field="bloodGroup"
+              tag="span"
+              value={personalDetails.bloodGroup || 'B+'}
+              onSave={(val) => dispatch(updatePersonalDetails({ bloodGroup: val }))}
+              placeholder="Blood Group"
+              className="inline font-bold"
+            />
+          </div>
+          <div className="sm:col-span-2 flex items-start gap-1">
+            <strong className="text-slate-800 shrink-0">Permanent Address:</strong>
+            <EditableElement
+              section="personalDetails"
+              field="permanentAddress"
+              tag="span"
+              value={personalDetails.permanentAddress}
+              onSave={(val) => dispatch(updatePersonalDetails({ permanentAddress: val }))}
+              placeholder="Village, PO, Upazila, District, Bangladesh"
+              className="inline"
+            />
+          </div>
         </div>
       </section>
 
@@ -319,7 +535,20 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[11px] text-slate-700">
             {references.map((ref, idx) => (
               <div key={ref.id || idx} className="p-2.5 bg-slate-50 border border-slate-200 rounded">
-                <p className="font-bold text-slate-900">{ref.name}</p>
+                <EditableElement
+                  section="references"
+                  field="name"
+                  index={idx}
+                  tag="p"
+                  value={ref.name}
+                  onSave={(val) => {
+                    const updated = [...references];
+                    updated[idx] = { ...updated[idx], name: val };
+                    dispatch(updatePersonalInfo({ references: updated }));
+                  }}
+                  placeholder="Referee Name"
+                  className="font-bold text-slate-900 block"
+                />
                 <p className="text-slate-700">{ref.designation}</p>
                 <p className="text-slate-600">{ref.company}</p>
                 {ref.phone && <p className="text-slate-600 mt-1">Phone: {ref.phone}</p>}
@@ -332,17 +561,40 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
 
       {/* 9. Declaration & Signature */}
       <section className="pt-4 border-t border-slate-200">
-        <p className="text-[10px] text-slate-600 italic leading-relaxed">
-          {declaration.text ||
-            'I hereby declare that all the information provided above is true and correct to the best of my knowledge and belief.'}
-        </p>
+        <EditableElement
+          section="declaration"
+          field="text"
+          tag="p"
+          multiline={true}
+          value={declaration.text}
+          onSave={(val) => dispatch(updateDeclaration({ text: val }))}
+          placeholder="I hereby declare that all the information provided above is true and correct..."
+          className="text-[10px] text-slate-600 italic leading-relaxed block"
+        />
         <div className="flex justify-between items-end pt-6 text-[11px]">
           <div>
-            <p className="font-semibold text-slate-700">Date: {declaration.date || new Date().toLocaleDateString('en-GB')}</p>
+            <span className="font-semibold text-slate-700">Date: </span>
+            <EditableElement
+              section="declaration"
+              field="date"
+              tag="span"
+              value={declaration.date || new Date().toLocaleDateString('en-GB')}
+              onSave={(val) => dispatch(updateDeclaration({ date: val }))}
+              placeholder="DD/MM/YYYY"
+              className="inline font-mono"
+            />
           </div>
           <div className="text-right">
             <div className="w-36 border-b border-slate-400 mb-1" />
-            <p className="font-bold text-slate-900">{personalInfo.fullName || 'Applicant Signature'}</p>
+            <EditableElement
+              section="declaration"
+              field="signedBy"
+              tag="p"
+              value={declaration.signedBy || personalInfo.fullName}
+              onSave={(val) => dispatch(updateDeclaration({ signedBy: val }))}
+              placeholder="Signatory Name"
+              className="font-bold text-slate-900 block"
+            />
           </div>
         </div>
       </section>
@@ -351,4 +603,3 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
 };
 
 export default BangladeshStandard;
-

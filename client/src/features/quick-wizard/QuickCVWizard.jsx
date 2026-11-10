@@ -117,7 +117,8 @@ export const QuickCVWizard = () => {
 
       // Query template container element if mounted on screen
       const cardEl = document.getElementById(`preview-sheet-${template.id}`);
-      const html = cardEl ? cardEl.outerHTML : '';
+      const sheetEl = cardEl ? cardEl.querySelector('#cv-export-sheet') || cardEl : null;
+      const html = sheetEl ? sheetEl.outerHTML : '';
 
       const blob = await exportService.exportPDF(targetCVData, html);
       const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));

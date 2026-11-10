@@ -12,7 +12,8 @@ export const exportPDF = async (req, res, next) => {
       });
     }
 
-    const pdfBuffer = await generatePDF(cvData, html || '');
+    const rawPdf = await generatePDF(cvData, html || '');
+    const pdfBuffer = Buffer.from(rawPdf);
 
     res.set({
       'Content-Type': 'application/pdf',
@@ -22,7 +23,7 @@ export const exportPDF = async (req, res, next) => {
       'Content-Length': pdfBuffer.length,
     });
 
-    res.send(pdfBuffer);
+    res.end(pdfBuffer);
   } catch (error) {
     console.error('PDF Export Error:', error);
     next(error);
@@ -40,7 +41,8 @@ export const exportDOCX = async (req, res, next) => {
       });
     }
 
-    const docxBuffer = await generateDOCX(cvData);
+    const rawDocx = await generateDOCX(cvData);
+    const docxBuffer = Buffer.from(rawDocx);
 
     res.set({
       'Content-Type':
@@ -51,7 +53,7 @@ export const exportDOCX = async (req, res, next) => {
       'Content-Length': docxBuffer.length,
     });
 
-    res.send(docxBuffer);
+    res.end(docxBuffer);
   } catch (error) {
     console.error('DOCX Export Error:', error);
     next(error);
