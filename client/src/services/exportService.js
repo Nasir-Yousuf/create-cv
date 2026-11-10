@@ -119,6 +119,18 @@ export const exportService = {
         captureTarget.style.boxShadow = 'none';
         captureTarget.style.borderRadius = '0';
         captureTarget.style.overflow = 'visible';
+        captureTarget.style.boxSizing = 'border-box';
+
+        // Remove any editor selection pips, focus rings, or badges from the export clone
+        const rings = captureTarget.querySelectorAll('.ring-2, [class*="ring-indigo"]');
+        rings.forEach((r) =>
+          r.classList.remove('ring-2', 'ring-indigo-500', 'ring-offset-1', 'bg-indigo-50/30')
+        );
+        const pips = captureTarget.querySelectorAll(
+          'span.rounded-full.bg-indigo-600, div.bg-indigo-600, span.bg-indigo-600'
+        );
+        pips.forEach((p) => p.remove());
+
         exportContainer.appendChild(captureTarget);
       } else if (customHtml) {
         // If customHtml is provided, inject it
@@ -145,8 +157,12 @@ export const exportService = {
         }
       }
 
-      // Wait for all images inside the export container to load
+      // Ensure CORS on all images inside the export container
       const images = exportContainer.querySelectorAll('img');
+      images.forEach((img) => {
+        img.crossOrigin = 'anonymous';
+      });
+
       if (images.length > 0) {
         await Promise.all(
           Array.from(images).map((img) => {
@@ -164,6 +180,7 @@ export const exportService = {
       await new Promise((r) => setTimeout(r, 100));
 
       // Capture with html2canvas at 2x crisp print scale (1588 x 2246)
+      // windowWidth and width are both exactly 794px to preserve 1:1 A4 layout
       const canvas = await html2canvas(captureTarget, {
         scale: 2,
         useCORS: true,
@@ -171,7 +188,7 @@ export const exportService = {
         backgroundColor: '#ffffff',
         logging: false,
         width: 794,
-        windowWidth: 1200,
+        windowWidth: 794,
         scrollX: 0,
         scrollY: 0,
       });
@@ -189,17 +206,24 @@ export const exportService = {
         const pdfWidth = 210; // A4 width in mm
         const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
         const pageHeight = 297; // A4 height in mm
-        let heightLeft = pdfHeight;
-        let position = 0;
 
-        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight, undefined, 'FAST');
-        heightLeft -= pageHeight;
+        if (pdfHeight <= 298.5) {
+          // Standard single A4 page fit
+          pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, 297, undefined, 'FAST');
+        } else {
+          // Multi-page document
+          let heightLeft = pdfHeight;
+          let position = 0;
 
-        while (heightLeft > 5) {
-          position = position - pageHeight;
-          pdf.addPage();
           pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight, undefined, 'FAST');
           heightLeft -= pageHeight;
+
+          while (heightLeft > 5) {
+            position = position - pageHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight, undefined, 'FAST');
+            heightLeft -= pageHeight;
+          }
         }
 
         // Save PDF directly to mobile or desktop device

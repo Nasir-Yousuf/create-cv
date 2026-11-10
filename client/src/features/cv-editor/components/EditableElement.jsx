@@ -157,9 +157,9 @@ export const EditableElement = ({
           <span className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-600 rounded-full border border-white pointer-events-none z-10" />
           <span className="absolute -bottom-1 -left-1 w-2 h-2 bg-indigo-600 rounded-full border border-white pointer-events-none z-10" />
           <span className="absolute -bottom-1 -right-1 w-2 h-2 bg-indigo-600 rounded-full border border-white pointer-events-none z-10" />
-          <div className="absolute -top-6 left-0 bg-indigo-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow pointer-events-none z-20 whitespace-nowrap">
+          <span className="absolute -top-6 left-0 bg-indigo-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow pointer-events-none z-20 whitespace-nowrap">
             {field.replace(/([A-Z])/g, ' $1').toUpperCase()}
-          </div>
+          </span>
         </>
       )}
 
