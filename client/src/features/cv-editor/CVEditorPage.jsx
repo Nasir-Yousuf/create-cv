@@ -98,6 +98,7 @@ export const CVEditorPage = () => {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [pendingExportType, setPendingExportType] = useState('pdf');
   const [pendingExportAction, setPendingExportAction] = useState(null);
+  const [mobileExportSheetOpen, setMobileExportSheetOpen] = useState(false);
 
   // Zoom preset values
   const zoomPresets = [
@@ -1493,16 +1494,92 @@ export const CVEditorPage = () => {
             </span>
           </button>
 
-          {/* 5. Export Tab */}
+          {/* 5. Export Tab (Opens Mobile Choice Sheet) */}
           <button
             type="button"
-            onClick={handleExportPDF}
+            onClick={() => setMobileExportSheetOpen(true)}
             className="flex flex-col items-center justify-center flex-1 py-1 text-blue-600 dark:text-blue-400 transition-all cursor-pointer"
           >
             <Download className="w-5 h-5 mb-0.5" />
             <span className="text-[10px] font-bold">Export</span>
           </button>
         </nav>
+
+        {/* Mobile Export Choice Bottom Sheet */}
+        {mobileExportSheetOpen && (
+          <div
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end md:hidden animate-fade-in"
+            onClick={() => setMobileExportSheetOpen(false)}
+          >
+            <div
+              className="w-full bg-white dark:bg-slate-900 rounded-t-3xl p-5 shadow-2xl border-t border-slate-200 dark:border-slate-800 space-y-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-12 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-2" />
+              <div className="text-center pb-2">
+                <h4 className="font-bold text-slate-900 dark:text-white text-base">
+                  Export Document
+                </h4>
+                <p className="text-xs text-slate-500">
+                  Select your desired download format:
+                </p>
+              </div>
+
+              {/* PDF Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileExportSheetOpen(false);
+                  handleExportPDF();
+                }}
+                className="w-full p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all flex items-center gap-3 text-left cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                  <Download className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-bold text-sm text-emerald-950 dark:text-emerald-200">
+                    Download PDF Document
+                  </div>
+                  <div className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                    High-res vector print format • BDJobs & global standard
+                  </div>
+                </div>
+              </button>
+
+              {/* Word DOCX Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileExportSheetOpen(false);
+                  handleExportDOCX();
+                }}
+                className="w-full p-3.5 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all flex items-center gap-3 text-left cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-bold text-sm text-blue-950 dark:text-blue-200">
+                    Download Word Document (.docx)
+                  </div>
+                  <div className="text-[11px] text-blue-700 dark:text-blue-400">
+                    Microsoft Word editable doc • All BD & executive sections
+                  </div>
+                </div>
+              </button>
+
+              {/* Cancel Button */}
+              <button
+                type="button"
+                onClick={() => setMobileExportSheetOpen(false)}
+                className="w-full py-2.5 rounded-xl text-center text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
       {/* AI Assistant Generator Modal */}
       <AIAssistantModal

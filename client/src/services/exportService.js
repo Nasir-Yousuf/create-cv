@@ -13,6 +13,10 @@ import {
   HeadingLevel,
   AlignmentType,
   BorderStyle,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
 } from 'docx';
 
 // Helper to safely trigger mobile-friendly download
@@ -245,34 +249,44 @@ export const exportService = {
     return null;
   },
 
-  // Client-Side Genuine DOCX Document Export
+  // Client-Side Genuine Microsoft Word (.docx) Document Export
   async exportDOCX(cvData) {
-    const filename = `${(cvData?.personalInfo?.fullName || cvData?.title || 'Resume').replace(/\s+/g, '_')}.docx`;
+    const rawName = (cvData?.personalInfo?.fullName || cvData?.title || 'Resume').trim();
+    const cleanName = rawName.replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_') || 'Resume';
+    const filename = `${cleanName}.docx`;
 
     try {
       const {
         personalInfo = {},
+        personalDetails = {},
         experience = [],
         education = [],
         skills = [],
+        projects = [],
+        certifications = [],
+        languages = [],
+        references = [],
+        declaration = {},
         design = {},
       } = cvData || {};
 
-      const primaryHex = (design?.primaryColor || '#2563EB').replace('#', '');
-      const grayHex = '64748B';
+      const primaryHex = (design?.primaryColor || '#1E40AF').replace('#', '');
+      const darkTextHex = '1E293B';
+      const grayHex = '475569';
+      const lightGrayHex = '64748B';
 
       const paragraphs = [];
 
-      // Name & Title
+      // 1. HEADER: FULL NAME
       paragraphs.push(
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          spacing: { after: 100 },
+          spacing: { before: 0, after: 80 },
           children: [
             new TextRun({
-              text: personalInfo.fullName || 'Professional Resume',
+              text: personalInfo.fullName || 'CURRICULUM VITAE',
               bold: true,
-              size: 36,
+              size: 52, // 26pt
               color: primaryHex,
               font: 'Calibri',
             }),
@@ -280,16 +294,17 @@ export const exportService = {
         })
       );
 
+      // Job Title / Headline
       if (personalInfo.jobTitle) {
         paragraphs.push(
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { after: 120 },
+            spacing: { before: 0, after: 100 },
             children: [
               new TextRun({
-                text: personalInfo.jobTitle,
-                size: 24,
+                text: personalInfo.jobTitle.toUpperCase(),
                 bold: true,
+                size: 26, // 13pt
                 color: grayHex,
                 font: 'Calibri',
               }),
@@ -298,23 +313,24 @@ export const exportService = {
         );
       }
 
-      // Contact Line
-      const contactInfo = [
-        personalInfo.email,
+      // Contact Line: Email, Phone, Location, LinkedIn, Website
+      const contactItems = [
         personalInfo.phone,
-        personalInfo.location,
+        personalInfo.email,
+        personalInfo.location || personalInfo.address,
         personalInfo.linkedin,
+        personalInfo.website,
       ].filter(Boolean);
 
-      if (contactInfo.length > 0) {
+      if (contactItems.length > 0) {
         paragraphs.push(
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { after: 200 },
+            spacing: { before: 0, after: 220 },
             children: [
               new TextRun({
-                text: contactInfo.join('  •  '),
-                size: 18,
+                text: contactItems.join('   •   '),
+                size: 19, // 9.5pt
                 color: grayHex,
                 font: 'Calibri',
               }),
@@ -323,10 +339,11 @@ export const exportService = {
         );
       }
 
-      const createHeading = (text) =>
+      // Section Heading Builder
+      const createHeading = (title) =>
         new Paragraph({
           heading: HeadingLevel.HEADING_2,
-          spacing: { before: 200, after: 100 },
+          spacing: { before: 240, after: 120 },
           border: {
             bottom: {
               color: primaryHex,
@@ -337,25 +354,26 @@ export const exportService = {
           },
           children: [
             new TextRun({
-              text: text.toUpperCase(),
+              text: title.toUpperCase(),
               bold: true,
-              size: 22,
+              size: 24, // 12pt
               color: primaryHex,
               font: 'Calibri',
             }),
           ],
         });
 
-      // Summary
+      // 2. CAREER OBJECTIVE / SUMMARY
       if (personalInfo.summary) {
-        paragraphs.push(createHeading('Professional Summary'));
+        paragraphs.push(createHeading('Career Objective & Summary'));
         paragraphs.push(
           new Paragraph({
-            spacing: { after: 150 },
+            spacing: { after: 180, line: 280 },
             children: [
               new TextRun({
                 text: personalInfo.summary,
-                size: 20,
+                size: 21, // 10.5pt
+                color: darkTextHex,
                 font: 'Calibri',
               }),
             ],
@@ -363,38 +381,52 @@ export const exportService = {
         );
       }
 
-      // Experience
+      // 3. WORK EXPERIENCE
       if (experience && experience.length > 0) {
-        paragraphs.push(createHeading('Work Experience'));
+        paragraphs.push(createHeading('Professional Work Experience'));
+
         experience.forEach((exp) => {
+          const dateRange = [
+            exp.startDate,
+            exp.current ? 'Present' : exp.endDate,
+          ].filter(Boolean).join(' – ');
+
+          // Line 1: Job Title & Date
           paragraphs.push(
             new Paragraph({
-              spacing: { before: 100, after: 40 },
+              spacing: { before: 120, after: 40 },
               children: [
                 new TextRun({
-                  text: exp.jobTitle || 'Job Title',
+                  text: exp.jobTitle || 'Role / Position',
                   bold: true,
-                  size: 22,
+                  size: 22, // 11pt
+                  color: darkTextHex,
                   font: 'Calibri',
                 }),
-                new TextRun({
-                  text: `   |   ${exp.startDate || ''} – ${exp.current ? 'Present' : exp.endDate || ''}`,
-                  bold: true,
-                  size: 18,
-                  color: grayHex,
-                  font: 'Calibri',
-                }),
+                ...(dateRange
+                  ? [
+                      new TextRun({
+                        text: `   |   ${dateRange}`,
+                        bold: true,
+                        size: 19,
+                        color: lightGrayHex,
+                        font: 'Calibri',
+                      }),
+                    ]
+                  : []),
               ],
             })
           );
 
-          if (exp.company || exp.location) {
+          // Line 2: Company & Location
+          const companyLocation = [exp.company, exp.location].filter(Boolean).join(' • ');
+          if (companyLocation) {
             paragraphs.push(
               new Paragraph({
                 spacing: { after: 60 },
                 children: [
                   new TextRun({
-                    text: [exp.company, exp.location].filter(Boolean).join(' • '),
+                    text: companyLocation,
                     italics: true,
                     size: 20,
                     color: grayHex,
@@ -405,14 +437,259 @@ export const exportService = {
             );
           }
 
+          // Line 3: Description / Bullet points
           if (exp.description) {
+            const lines = exp.description.split('\n').map((l) => l.trim()).filter(Boolean);
+            lines.forEach((line) => {
+              const cleanLine = line.replace(/^[•\-\*]\s*/, '');
+              paragraphs.push(
+                new Paragraph({
+                  bullet: { level: 0 },
+                  spacing: { after: 40, line: 260 },
+                  children: [
+                    new TextRun({
+                      text: cleanLine,
+                      size: 20,
+                      color: darkTextHex,
+                      font: 'Calibri',
+                    }),
+                  ],
+                })
+              );
+            });
+          }
+        });
+      }
+
+      // 4. EDUCATION & QUALIFICATIONS
+      if (education && education.length > 0) {
+        paragraphs.push(createHeading('Academic Qualifications'));
+
+        education.forEach((edu) => {
+          const dateRange = [edu.startDate, edu.endDate].filter(Boolean).join(' – ');
+
+          // Line 1: Degree & Dates
+          paragraphs.push(
+            new Paragraph({
+              spacing: { before: 120, after: 40 },
+              children: [
+                new TextRun({
+                  text: edu.degree || 'Degree / Examination',
+                  bold: true,
+                  size: 22,
+                  color: darkTextHex,
+                  font: 'Calibri',
+                }),
+                ...(dateRange
+                  ? [
+                      new TextRun({
+                        text: `   |   ${dateRange}`,
+                        bold: true,
+                        size: 19,
+                        color: lightGrayHex,
+                        font: 'Calibri',
+                      }),
+                    ]
+                  : []),
+              ],
+            })
+          );
+
+          // Line 2: Institution & Field
+          const eduDetails = [
+            edu.institution,
+            edu.fieldOfStudy,
+            edu.gpa ? `Result: ${edu.gpa}` : null,
+          ].filter(Boolean).join(' • ');
+
+          if (eduDetails) {
+            paragraphs.push(
+              new Paragraph({
+                spacing: { after: 60 },
+                children: [
+                  new TextRun({
+                    text: eduDetails,
+                    italics: true,
+                    size: 20,
+                    color: grayHex,
+                    font: 'Calibri',
+                  }),
+                ],
+              })
+            );
+          }
+        });
+      }
+
+      // 5. SKILLS & COMPETENCIES
+      if (skills && skills.length > 0) {
+        paragraphs.push(createHeading('Technical & Core Competencies'));
+        const skillList = skills
+          .map((s) => (typeof s === 'string' ? s : s.name))
+          .filter(Boolean);
+
+        if (skillList.length > 0) {
+          paragraphs.push(
+            new Paragraph({
+              spacing: { after: 160, line: 280 },
+              children: [
+                new TextRun({
+                  text: skillList.join('   •   '),
+                  bold: true,
+                  size: 21,
+                  color: darkTextHex,
+                  font: 'Calibri',
+                }),
+              ],
+            })
+          );
+        }
+      }
+
+      // 6. PERSONAL DETAILS (Bangladeshi Recruiter Format)
+      const bdFields = [
+        { label: "Father's Name", value: personalDetails.fatherName },
+        { label: "Mother's Name", value: personalDetails.motherName },
+        { label: 'Date of Birth', value: personalDetails.dateOfBirth },
+        { label: 'Gender', value: personalDetails.gender },
+        { label: 'Marital Status', value: personalDetails.maritalStatus },
+        { label: 'Nationality', value: personalDetails.nationality || 'Bangladeshi' },
+        { label: 'Religion', value: personalDetails.religion },
+        { label: 'National ID (NID)', value: personalDetails.nid || personalDetails.nationalId },
+        { label: 'Blood Group', value: personalDetails.bloodGroup },
+        { label: 'Present Address', value: personalDetails.presentAddress },
+        { label: 'Permanent Address', value: personalDetails.permanentAddress },
+      ].filter((f) => Boolean(f.value));
+
+      if (bdFields.length > 0) {
+        paragraphs.push(createHeading('Personal Details'));
+
+        const tableRows = bdFields.map(
+          (field) =>
+            new TableRow({
+              children: [
+                new TableCell({
+                  width: { size: 35, type: WidthType.PERCENTAGE },
+                  borders: {
+                    top: { style: BorderStyle.NONE },
+                    bottom: { style: BorderStyle.NONE },
+                    left: { style: BorderStyle.NONE },
+                    right: { style: BorderStyle.NONE },
+                  },
+                  children: [
+                    new Paragraph({
+                      spacing: { before: 20, after: 20 },
+                      children: [
+                        new TextRun({
+                          text: `${field.label}:`,
+                          bold: true,
+                          size: 20,
+                          color: grayHex,
+                          font: 'Calibri',
+                        }),
+                      ],
+                    }),
+                  ],
+                }),
+                new TableCell({
+                  width: { size: 65, type: WidthType.PERCENTAGE },
+                  borders: {
+                    top: { style: BorderStyle.NONE },
+                    bottom: { style: BorderStyle.NONE },
+                    left: { style: BorderStyle.NONE },
+                    right: { style: BorderStyle.NONE },
+                  },
+                  children: [
+                    new Paragraph({
+                      spacing: { before: 20, after: 20 },
+                      children: [
+                        new TextRun({
+                          text: String(field.value),
+                          size: 20,
+                          color: darkTextHex,
+                          font: 'Calibri',
+                        }),
+                      ],
+                    }),
+                  ],
+                }),
+              ],
+            })
+        );
+
+        paragraphs.push(
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.NONE },
+              bottom: { style: BorderStyle.NONE },
+              left: { style: BorderStyle.NONE },
+              right: { style: BorderStyle.NONE },
+              insideHorizontal: { style: BorderStyle.NONE },
+              insideVertical: { style: BorderStyle.NONE },
+            },
+            rows: tableRows,
+          })
+        );
+      }
+
+      // 7. PROJECTS & PORTFOLIO
+      if (projects && projects.length > 0) {
+        paragraphs.push(createHeading('Projects & Key Works'));
+
+        projects.forEach((proj) => {
+          paragraphs.push(
+            new Paragraph({
+              spacing: { before: 100, after: 40 },
+              children: [
+                new TextRun({
+                  text: proj.name || proj.title || 'Project Name',
+                  bold: true,
+                  size: 22,
+                  color: darkTextHex,
+                  font: 'Calibri',
+                }),
+                ...(proj.technologies
+                  ? [
+                      new TextRun({
+                        text: `   [${proj.technologies}]`,
+                        italics: true,
+                        size: 19,
+                        color: lightGrayHex,
+                        font: 'Calibri',
+                      }),
+                    ]
+                  : []),
+              ],
+            })
+          );
+
+          if (proj.description) {
+            paragraphs.push(
+              new Paragraph({
+                spacing: { after: 60, line: 260 },
+                children: [
+                  new TextRun({
+                    text: proj.description,
+                    size: 20,
+                    color: darkTextHex,
+                    font: 'Calibri',
+                  }),
+                ],
+              })
+            );
+          }
+
+          if (proj.link) {
             paragraphs.push(
               new Paragraph({
                 spacing: { after: 80 },
                 children: [
                   new TextRun({
-                    text: exp.description,
-                    size: 20,
+                    text: `Project URL: ${proj.link}`,
+                    italics: true,
+                    size: 18,
+                    color: primaryHex,
                     font: 'Calibri',
                   }),
                 ],
@@ -422,40 +699,99 @@ export const exportService = {
         });
       }
 
-      // Education
-      if (education && education.length > 0) {
-        paragraphs.push(createHeading('Education & Qualifications'));
-        education.forEach((edu) => {
+      // 8. CERTIFICATIONS
+      if (certifications && certifications.length > 0) {
+        paragraphs.push(createHeading('Certifications & Licenses'));
+
+        certifications.forEach((cert) => {
+          const certInfo = [cert.issuer, cert.date || cert.year].filter(Boolean).join(' • ');
           paragraphs.push(
             new Paragraph({
-              spacing: { before: 100, after: 40 },
+              bullet: { level: 0 },
+              spacing: { after: 40 },
               children: [
                 new TextRun({
-                  text: edu.degree || 'Degree',
+                  text: cert.name || cert.title || 'Certification',
                   bold: true,
-                  size: 22,
+                  size: 20,
+                  color: darkTextHex,
                   font: 'Calibri',
                 }),
+                ...(certInfo
+                  ? [
+                      new TextRun({
+                        text: ` (${certInfo})`,
+                        italics: true,
+                        size: 19,
+                        color: lightGrayHex,
+                        font: 'Calibri',
+                      }),
+                    ]
+                  : []),
+              ],
+            })
+          );
+        });
+      }
+
+      // 9. LANGUAGES
+      if (languages && languages.length > 0) {
+        paragraphs.push(createHeading('Languages'));
+        const langItems = languages.map((lang) => {
+          if (typeof lang === 'string') return lang;
+          return `${lang.language || lang.name || ''} ${lang.proficiency ? `(${lang.proficiency})` : ''}`.trim();
+        }).filter(Boolean);
+
+        paragraphs.push(
+          new Paragraph({
+            spacing: { after: 140 },
+            children: [
+              new TextRun({
+                text: langItems.join('   •   '),
+                size: 20,
+                color: darkTextHex,
+                font: 'Calibri',
+              }),
+            ],
+          })
+        );
+      }
+
+      // 10. REFERENCES
+      if (references && references.length > 0) {
+        paragraphs.push(createHeading('References'));
+
+        references.forEach((ref) => {
+          paragraphs.push(
+            new Paragraph({
+              spacing: { before: 80, after: 20 },
+              children: [
                 new TextRun({
-                  text: `   |   ${edu.startDate || ''} – ${edu.endDate || ''}`,
+                  text: ref.name || 'Reference Person',
                   bold: true,
-                  size: 18,
-                  color: grayHex,
+                  size: 21,
+                  color: darkTextHex,
                   font: 'Calibri',
                 }),
               ],
             })
           );
 
-          if (edu.institution) {
+          const refDetails = [
+            ref.designation,
+            ref.company,
+            ref.phone ? `Phone: ${ref.phone}` : null,
+            ref.email ? `Email: ${ref.email}` : null,
+          ].filter(Boolean).join('   |   ');
+
+          if (refDetails) {
             paragraphs.push(
               new Paragraph({
                 spacing: { after: 60 },
                 children: [
                   new TextRun({
-                    text: edu.institution,
-                    italics: true,
-                    size: 20,
+                    text: refDetails,
+                    size: 19,
                     color: grayHex,
                     font: 'Calibri',
                   }),
@@ -466,34 +802,53 @@ export const exportService = {
         });
       }
 
-      // Skills
-      if (skills && skills.length > 0) {
-        paragraphs.push(createHeading('Skills & Competencies'));
-        const skillList = skills.map((s) => (typeof s === 'string' ? s : s.name)).filter(Boolean);
-        paragraphs.push(
-          new Paragraph({
-            spacing: { after: 150 },
-            children: [
-              new TextRun({
-                text: skillList.join('   •   '),
-                size: 20,
-                font: 'Calibri',
-              }),
-            ],
-          })
-        );
-      }
+      // 11. DECLARATION
+      paragraphs.push(createHeading('Declaration'));
+      paragraphs.push(
+        new Paragraph({
+          spacing: { after: 180, line: 260 },
+          children: [
+            new TextRun({
+              text:
+                declaration?.text ||
+                'I hereby declare that all the information provided above is true and correct to the best of my knowledge and belief.',
+              italics: true,
+              size: 20,
+              color: darkTextHex,
+              font: 'Calibri',
+            }),
+          ],
+        })
+      );
 
+      // Signature / Name at bottom right
+      paragraphs.push(
+        new Paragraph({
+          alignment: AlignmentType.RIGHT,
+          spacing: { before: 180, after: 80 },
+          children: [
+            new TextRun({
+              text: personalInfo.fullName || 'Authorized Signature',
+              bold: true,
+              size: 21,
+              color: primaryHex,
+              font: 'Calibri',
+            }),
+          ],
+        })
+      );
+
+      // Create doc with 0.6 inch margins
       const doc = new Document({
         sections: [
           {
             properties: {
               page: {
                 margin: {
-                  top: 720,
-                  bottom: 720,
-                  left: 720,
-                  right: 720,
+                  top: 864, // 0.6 inch (864 dxa)
+                  bottom: 864,
+                  left: 864,
+                  right: 864,
                 },
               },
             },
@@ -503,8 +858,12 @@ export const exportService = {
       });
 
       const docxBlob = await Packer.toBlob(doc);
-      triggerDownload(docxBlob, filename);
-      return docxBlob;
+      const fileBlob = new Blob([docxBlob], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      });
+
+      triggerDownload(fileBlob, filename);
+      return fileBlob;
     } catch (clientDocxErr) {
       console.warn('Client-side DOCX export error, trying backend fallback:', clientDocxErr);
     }
