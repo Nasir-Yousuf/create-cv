@@ -374,12 +374,27 @@ export const TemplateGalleryPage = () => {
             </div>
 
             {/* Scrollable Document Canvas */}
-            <div className="flex-1 overflow-y-auto bg-slate-100 dark:bg-slate-950 p-6 flex justify-center items-start">
-              <div className="shadow-2xl rounded origin-top bg-white">
-                <RenderCVTemplate
-                  cvData={getCardCVData(previewTemplate)}
-                  scale={0.85}
-                />
+            <div className="flex-1 overflow-auto bg-slate-100 dark:bg-slate-950 p-2 sm:p-6 flex justify-center items-start">
+              <div
+                className="shrink-0 origin-top shadow-2xl rounded bg-white my-2"
+                style={{
+                  width: `${Math.round(794 * Math.min(0.85, Math.max(0.38, ((typeof window !== 'undefined' ? window.innerWidth : 400) - 32) / 794)))}px`,
+                  minHeight: `${Math.round(1123 * Math.min(0.85, Math.max(0.38, ((typeof window !== 'undefined' ? window.innerWidth : 400) - 32) / 794)))}px`,
+                }}
+              >
+                <div
+                  style={{
+                    width: '794px',
+                    minHeight: '1123px',
+                    transform: `scale(${Math.min(0.85, Math.max(0.38, ((typeof window !== 'undefined' ? window.innerWidth : 400) - 32) / 794))})`,
+                    transformOrigin: 'top left',
+                  }}
+                >
+                  <RenderCVTemplate
+                    cvData={getCardCVData(previewTemplate)}
+                    scale={1}
+                  />
+                </div>
               </div>
             </div>
 

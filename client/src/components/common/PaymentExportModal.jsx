@@ -152,7 +152,7 @@ export const PaymentExportModal = ({
     }
   };
 
-  // Apply Coupon Code (e.g. UDOY26)
+  // Apply Coupon Code (Private VIP Promo)
   const handleApplyCoupon = async (e) => {
     e.preventDefault();
     if (!couponCode.trim()) {
@@ -171,7 +171,7 @@ export const PaymentExportModal = ({
       });
 
       if (res.unlocked) {
-        setStatusMessage({ text: 'Coupon UDOY26 applied! Lifetime download unlocked 🎉', type: 'success' });
+        setStatusMessage({ text: 'Coupon applied successfully! Lifetime download unlocked 🎉', type: 'success' });
         setTimeout(() => {
           onSuccess && onSuccess();
           onClose();
@@ -179,7 +179,7 @@ export const PaymentExportModal = ({
       }
     } catch (err) {
       setStatusMessage({
-        text: err.response?.data?.message || 'Invalid coupon code. Try UDOY26 or pay 10 Tk via bKash.',
+        text: err.response?.data?.message || 'Invalid coupon code. Please verify your code or pay 10 Tk via bKash.',
         type: 'error',
       });
     } finally {
@@ -310,7 +310,7 @@ export const PaymentExportModal = ({
               }`}
             >
               <Tag className="w-3.5 h-3.5 text-blue-600" />
-              <span>2. Coupon Code (UDOY26)</span>
+              <span>2. Promo / Coupon Code</span>
             </button>
           </div>
 
@@ -453,7 +453,7 @@ export const PaymentExportModal = ({
                   Instant Download Promo Code
                 </div>
                 <p className="text-[11px] leading-relaxed">
-                  Enter authorized promo code <strong>UDOY26</strong> to immediately unlock 100% free PDF and Word downloads without waiting for approval.
+                  Enter your private authorization promo code to immediately unlock instant PDF and Word downloads without waiting for approval.
                 </p>
               </div>
 
@@ -467,16 +467,9 @@ export const PaymentExportModal = ({
                     required
                     value={couponCode}
                     onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    placeholder="e.g. UDOY26"
-                    className="w-full text-sm font-mono tracking-wider uppercase bg-white dark:bg-slate-800 border-2 border-blue-500 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-white focus:outline-none"
+                    placeholder="Enter your coupon code"
+                    className="w-full text-sm font-mono tracking-wider uppercase bg-white dark:bg-slate-800 border-2 border-blue-500 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-white focus:outline-none placeholder:normal-case placeholder:font-sans placeholder:tracking-normal placeholder:text-slate-400"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setCouponCode('UDOY26')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/60 px-2 py-1 rounded-md hover:bg-blue-100 cursor-pointer"
-                  >
-                    Use UDOY26
-                  </button>
                 </div>
               </div>
 

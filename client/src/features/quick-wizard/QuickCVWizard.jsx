@@ -1217,61 +1217,80 @@ export const QuickCVWizard = () => {
 
       {/* 4. Fullscreen Preview Modal */}
       {fullscreenPreview && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full max-h-[92vh] overflow-hidden flex flex-col shadow-2xl">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-slate-900 dark:text-white text-base">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-fade-in select-none">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full max-h-[96vh] sm:max-h-[92vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800">
+            {/* Header: Title + Close */}
+            <div className="p-3 sm:p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+              <div className="min-w-0 pr-2">
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base truncate">
                   {fullscreenPreview.name}
                 </h3>
-                <span className="text-xs text-slate-500">{fullscreenPreview.category}</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{fullscreenPreview.category}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleDownloadPDF(fullscreenPreview)}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 shadow"
+              <button
+                type="button"
+                onClick={() => setFullscreenPreview(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Canvas Body: Responsive Scaled A4 Document */}
+            <div className="flex-1 overflow-auto p-2 sm:p-6 bg-slate-100 dark:bg-slate-950 flex justify-center items-start">
+              <div
+                className="shrink-0 origin-top shadow-2xl rounded bg-white my-2"
+                style={{
+                  width: `${Math.round(794 * Math.min(0.85, Math.max(0.38, ((typeof window !== 'undefined' ? window.innerWidth : 400) - 32) / 794)))}px`,
+                  minHeight: `${Math.round(1123 * Math.min(0.85, Math.max(0.38, ((typeof window !== 'undefined' ? window.innerWidth : 400) - 32) / 794)))}px`,
+                }}
+              >
+                <div
+                  style={{
+                    width: '794px',
+                    minHeight: '1123px',
+                    transform: `scale(${Math.min(0.85, Math.max(0.38, ((typeof window !== 'undefined' ? window.innerWidth : 400) - 32) / 794))})`,
+                    transformOrigin: 'top left',
+                  }}
                 >
-                  <Download className="w-3.5 h-3.5" /> Download PDF
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDownloadDOCX(fullscreenPreview)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5"
-                >
-                  <FileText className="w-3.5 h-3.5" /> Download Word
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleCustomize(fullscreenPreview.id)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5"
-                >
-                  <Sliders className="w-3.5 h-3.5" /> Open in Editor
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFullscreenPreview(null)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                  <RenderCVTemplate
+                    cvData={{
+                      ...cvData,
+                      templateId: fullscreenPreview.id,
+                      design: {
+                        ...cvData.design,
+                        primaryColor: fullscreenPreview.thumbnailColor || cvData.design?.primaryColor,
+                      },
+                    }}
+                    scale={1}
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 bg-slate-100 dark:bg-slate-950 flex justify-center">
-              <div className="w-[794px] shadow-2xl bg-white">
-                <RenderCVTemplate
-                  cvData={{
-                    ...cvData,
-                    templateId: fullscreenPreview.id,
-                    design: {
-                      ...cvData.design,
-                      primaryColor: fullscreenPreview.thumbnailColor || cvData.design?.primaryColor,
-                    },
-                  }}
-                  scale={1}
-                />
-              </div>
+            {/* Mobile-Friendly Sticky Bottom Action Bar */}
+            <div className="p-3 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleDownloadPDF(fullscreenPreview)}
+                className="px-3.5 py-2.5 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow transition-all cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" /> <span>Download PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownloadDOCX(fullscreenPreview)}
+                className="px-3.5 py-2.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5" /> <span>Download Word</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCustomize(fullscreenPreview.id)}
+                className="col-span-2 sm:col-span-1 px-4 py-2.5 sm:py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow transition-all cursor-pointer"
+              >
+                <Sliders className="w-3.5 h-3.5" /> <span>Open in Editor</span>
+              </button>
             </div>
           </div>
         </div>

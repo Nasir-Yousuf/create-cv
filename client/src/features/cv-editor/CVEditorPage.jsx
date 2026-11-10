@@ -64,6 +64,7 @@ import {
   Minimize2,
   Save,
   Share2,
+  Eye,
 } from 'lucide-react';
 
 export const CVEditorPage = () => {
@@ -86,8 +87,12 @@ export const CVEditorPage = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [aiModalOpen, setAiModalOpen] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isRightDockOpen, setIsRightDockOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 1024
+  );
+  const [isRightDockOpen, setIsRightDockOpen] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 1024
+  );
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [activeActionDock, setActiveActionDock] = useState('edit');
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -106,6 +111,15 @@ export const CVEditorPage = () => {
 
   // Auto-fit canvas calculation
   const handleFitZoom = () => {
+    const isMobileScreen = typeof window !== 'undefined' && window.innerWidth < 768;
+    if (isMobileScreen) {
+      const availableWidth = Math.max(300, window.innerWidth - 24);
+      const targetPaperWidth = devicePreview === 'mobile' ? 400 : 794;
+      const optimalScale = Math.min(1.0, Math.max(0.35, Math.floor((availableWidth / targetPaperWidth) * 100) / 100));
+      dispatch(setPreviewScale(optimalScale));
+      return;
+    }
+
     const containerWidth =
       canvasScrollContainerRef.current?.clientWidth ||
       (window.innerWidth - (isSidebarOpen ? 370 : 70) - (isRightDockOpen ? 90 : 28));
@@ -342,11 +356,11 @@ export const CVEditorPage = () => {
       {/* -----------------------------------------------------------------------
           1. FULL-WIDTH APPLICATION TOP BAR (100% Window Width)
       ------------------------------------------------------------------------ */}
-      <header className="h-14 w-full bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between shrink-0 z-30 select-none">
-        {/* Left Group: Traffic Lights 🔴🟡🟢, Chevrons & Brand Logo */}
-        <div className="flex items-center gap-4">
-          {/* 3 macOS Window Controls */}
-          <div className="flex items-center gap-2">
+      <header className="h-14 w-full bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 px-3 sm:px-6 flex items-center justify-between shrink-0 z-30 select-none">
+        {/* Left Group: Chevrons & Brand Logo */}
+        <div className="flex items-center gap-2 sm:gap-4">
+          {/* 3 macOS Window Controls (Desktop Only) */}
+          <div className="hidden sm:flex items-center gap-2">
             <button
               type="button"
               onClick={() => navigate('/')}
@@ -367,8 +381,18 @@ export const CVEditorPage = () => {
             />
           </div>
 
-          {/* Back / Forward History Chevrons */}
-          <div className="flex items-center text-slate-400 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 rounded-md border border-slate-200/60 dark:border-slate-700/60">
+          {/* Back to Home Chevron (Mobile Only) */}
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="sm:hidden p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            title="Back to Home"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+
+          {/* Back / Forward History Chevrons (Desktop Only) */}
+          <div className="hidden sm:flex items-center text-slate-400 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 rounded-md border border-slate-200/60 dark:border-slate-700/60">
             <button
               type="button"
               onClick={() => navigate(-1)}
@@ -393,7 +417,7 @@ export const CVEditorPage = () => {
             className="flex items-center gap-2 cursor-pointer group"
           >
             {/* Purple squircle icon with folded ribbon/origami 'M' */}
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-600 via-purple-600 to-indigo-500 flex items-center justify-center text-white shadow-sm shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-600 via-purple-600 to-indigo-500 flex items-center justify-center text-white shadow-sm shadow-indigo-500/20 group-hover:scale-105 transition-transform shrink-0">
               <svg
                 className="w-4 h-4 fill-current"
                 viewBox="0 0 24 24"
@@ -401,14 +425,14 @@ export const CVEditorPage = () => {
                 <path d="M4 4h4.5l3.5 5 3.5-5H20v16h-4.5v-8.5L12 12l-3.5-4.5V20H4V4z" />
               </svg>
             </div>
-            <span className="font-bold text-base tracking-tight text-slate-800 dark:text-white">
+            <span className="font-bold text-sm sm:text-base tracking-tight text-slate-800 dark:text-white truncate">
               ResumeCraft
             </span>
           </div>
         </div>
 
-          {/* Center Group: Segmented Navigation Pills */}
-          <nav className="hidden md:flex items-center gap-1.5">
+        {/* Center Group: Segmented Navigation Pills */}
+        <nav className="hidden md:flex items-center gap-1.5">
             {/* Templates Pill */}
             <button
               type="button"
@@ -460,13 +484,23 @@ export const CVEditorPage = () => {
             </button>
           </nav>
 
-          {/* Right Group: Theme Toggle & User Avatar */}
-          <div className="flex items-center gap-3">
+          {/* Right Group: Mobile Export, Theme Toggle & User Avatar */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Quick Export on Mobile */}
+            <button
+              type="button"
+              onClick={handleExportPDF}
+              className="flex sm:hidden items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm active:scale-95 transition-all cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export</span>
+            </button>
+
             {/* Theme Toggle (Moon/Sun) */}
             <button
               type="button"
               onClick={() => dispatch(toggleDarkMode())}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               title="Toggle theme"
             >
               {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
@@ -475,7 +509,7 @@ export const CVEditorPage = () => {
             {/* User Avatar from reference image */}
             <div
               onClick={() => navigate('/dashboard')}
-              className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer shadow-sm hover:ring-2 hover:ring-blue-500/50 transition-all"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer shadow-sm hover:ring-2 hover:ring-blue-500/50 transition-all shrink-0"
               title={user?.name || 'User Profile'}
             >
               <img
@@ -495,9 +529,9 @@ export const CVEditorPage = () => {
         ------------------------------------------------------------------------ */}
         <div className="flex-1 flex overflow-hidden relative">
           {/* ===================================================================
-              A. TIER 1: FAR-LEFT SLIM ICON STRIP (~68px)
+              A. TIER 1: FAR-LEFT SLIM ICON STRIP (~68px) (Desktop Only)
           ==================================================================== */}
-          <aside className="w-[68px] bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 flex flex-col items-center py-4 justify-between shrink-0 select-none z-20">
+          <aside className="hidden md:flex w-[68px] bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 flex-col items-center py-4 justify-between shrink-0 select-none z-20">
             {/* Top Navigation Icons */}
             <div className="flex flex-col items-center gap-5 w-full px-2">
               {/* Templates */}
@@ -586,10 +620,29 @@ export const CVEditorPage = () => {
           </aside>
 
           {/* ===================================================================
-              B. TIER 2: SECONDARY PANEL (~300px - Matching Reference Image)
+              B. TIER 2: SECONDARY PANEL (~310px Desktop / Full-screen Sheet on Mobile)
           ==================================================================== */}
           {isSidebarOpen && (
-            <aside className="w-[310px] bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 flex flex-col h-full shrink-0 z-10 transition-all select-none">
+            <aside className="fixed inset-0 z-40 bg-white dark:bg-slate-900 md:relative md:w-[310px] md:z-10 border-r border-slate-100 dark:border-slate-800 flex flex-col h-full shrink-0 transition-all select-none overflow-hidden">
+              {/* Mobile Drawer Top Header with Done Button */}
+              <div className="flex md:hidden items-center justify-between p-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 shrink-0">
+                <span className="font-bold text-sm text-slate-800 dark:text-white capitalize">
+                  {activeSidebarTab === 'sections'
+                    ? 'Edit CV Content'
+                    : activeSidebarTab === 'templates'
+                    ? 'Choose Template'
+                    : activeSidebarTab === 'design'
+                    ? 'Design & Styling'
+                    : 'Document Settings'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-bold active:scale-95 shadow cursor-pointer"
+                >
+                  Done ✕
+                </button>
+              </div>
               {/* --- 1. TEMPLATES VIEW (Exact 3-Column Grid in Reference Image) --- */}
               {activeSidebarTab === 'templates' && (
                 <div className="flex flex-col h-full overflow-hidden">
@@ -978,11 +1031,11 @@ export const CVEditorPage = () => {
             <div className="h-12 px-4 flex items-center justify-between shrink-0 z-10 select-none">
               {/* Left Group: Undo / Redo + Zoom Dropdown */}
               <div className="flex items-center gap-2">
-                {/* Left Sidebar Toggle Button */}
+                {/* Left Sidebar Toggle Button (Desktop Only) */}
                 <button
                   type="button"
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className={`p-1.5 rounded-xl border transition-all text-xs font-semibold cursor-pointer ${
+                  className={`hidden md:flex p-1.5 rounded-xl border transition-all text-xs font-semibold cursor-pointer ${
                     isSidebarOpen
                       ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400'
                       : 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600'
@@ -1096,11 +1149,11 @@ export const CVEditorPage = () => {
 
               {/* Right Group: Save Changes, Export Dropdown, and Action Dock Toggle */}
               <div className="flex items-center gap-2">
-                {/* Right Actions Dock Toggle Button */}
+                {/* Right Actions Dock Toggle Button (Desktop Only) */}
                 <button
                   type="button"
                   onClick={() => setIsRightDockOpen(!isRightDockOpen)}
-                  className={`p-1.5 rounded-xl border transition-all text-xs font-semibold cursor-pointer ${
+                  className={`hidden md:flex p-1.5 rounded-xl border transition-all text-xs font-semibold cursor-pointer ${
                     isRightDockOpen
                       ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400'
                       : 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600'
@@ -1121,7 +1174,8 @@ export const CVEditorPage = () => {
                       isAutosaving ? 'animate-spin text-amber-500' : 'text-emerald-500'
                     }`}
                   />
-                  <span>{isAutosaving ? 'Saving...' : 'Save Changes'}</span>
+                  <span className="hidden sm:inline">{isAutosaving ? 'Saving...' : 'Save Changes'}</span>
+                  <span className="sm:hidden">{isAutosaving ? '...' : 'Save'}</span>
                 </button>
 
                 {/* [📥 Export ▾] Blue/Indigo Pill Button from Reference Image */}
@@ -1211,7 +1265,7 @@ export const CVEditorPage = () => {
             {/* -----------------------------------------------------------------
                 BOTTOM PAGE NAVIGATOR (< 1 / 1 >)
             ------------------------------------------------------------------ */}
-            <div className="h-10 flex items-center justify-center shrink-0 z-10 pointer-events-none pb-2">
+            <div className="h-10 flex items-center justify-center shrink-0 z-10 pointer-events-none pb-16 md:pb-2">
               <div className="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 shadow-sm rounded-full px-3 py-1 flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300 pointer-events-auto">
                 <button
                   type="button"
@@ -1234,10 +1288,10 @@ export const CVEditorPage = () => {
             </div>
 
             {/* ===============================================================
-                D. FAR-RIGHT FLOATING ACTION DOCK (Exact Match to Reference Image)
+                D. FAR-RIGHT FLOATING ACTION DOCK (Exact Match to Reference Image - Desktop Only)
             ================================================================ */}
             {isRightDockOpen && (
-              <div className="absolute right-4 sm:right-6 top-1/2 -translate-y-1/2 z-20 animate-fade-in">
+              <div className="hidden md:block absolute right-4 sm:right-6 top-1/2 -translate-y-1/2 z-20 animate-fade-in">
                 <div className="bg-white dark:bg-slate-800 shadow-xl border border-slate-200/80 dark:border-slate-700 rounded-2xl py-3 px-2 flex flex-col items-center gap-3.5 relative">
                   {/* Minimize dock button */}
                   <button
@@ -1340,6 +1394,91 @@ export const CVEditorPage = () => {
           </main>
         </div>
 
+        {/* ===================================================================
+            MOBILE BOTTOM NAVIGATION BAR (Native Mobile Experience for Smartphones)
+        ==================================================================== */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 z-30 flex items-center justify-around px-2 select-none shadow-lg">
+          {/* 1. Templates Tab */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveSidebarTab('templates');
+              setIsSidebarOpen(true);
+            }}
+            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
+              isSidebarOpen && activeSidebarTab === 'templates'
+                ? 'text-blue-600 dark:text-blue-400 font-bold'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <LayoutGrid className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px]">Templates</span>
+          </button>
+
+          {/* 2. Design Tab */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveSidebarTab('design');
+              setIsSidebarOpen(true);
+            }}
+            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
+              isSidebarOpen && activeSidebarTab === 'design'
+                ? 'text-blue-600 dark:text-blue-400 font-bold'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Palette className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px]">Design</span>
+          </button>
+
+          {/* 3. Edit Sections Tab (Center Floating Action Badge) */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveSidebarTab('sections');
+              setIsSidebarOpen(true);
+            }}
+            className="flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer"
+          >
+            <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/30 -mt-4 mb-0.5 active:scale-95 transition-transform">
+              <Edit3 className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">Edit</span>
+          </button>
+
+          {/* 4. Fit / Zoom Tab */}
+          <button
+            type="button"
+            onClick={() => {
+              if (previewScale < 0.6) {
+                dispatch(setPreviewScale(0.85));
+              } else if (previewScale < 0.9) {
+                dispatch(setPreviewScale(1.0));
+              } else {
+                handleFitZoom();
+              }
+            }}
+            className="flex flex-col items-center justify-center flex-1 py-1 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer"
+            title="Toggle Zoom / Fit"
+          >
+            <Eye className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px] font-medium">
+              {Math.round(previewScale * 100)}%
+            </span>
+          </button>
+
+          {/* 5. Export Tab */}
+          <button
+            type="button"
+            onClick={handleExportPDF}
+            className="flex flex-col items-center justify-center flex-1 py-1 text-blue-600 dark:text-blue-400 transition-all cursor-pointer"
+          >
+            <Download className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px] font-bold">Export</span>
+          </button>
+        </nav>
+
       {/* AI Assistant Generator Modal */}
       <AIAssistantModal
         isOpen={aiModalOpen}
@@ -1352,7 +1491,7 @@ export const CVEditorPage = () => {
         onClose={() => setPhotoModalOpen(false)}
       />
 
-      {/* Payment & Export Authorization Modal (bKash 10 Tk / Coupon UDOY26) */}
+      {/* Payment & Export Authorization Modal (bKash 10 Tk / VIP Coupon) */}
       <PaymentExportModal
         isOpen={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}

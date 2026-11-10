@@ -7,7 +7,7 @@ const ADMIN_PASSKEY = '01816550751';
 const isAuthorizedAdmin = (req) => {
   if (req.user && req.user.role === 'admin') return true;
   const adminKey = req.headers['x-admin-key'] || req.query.adminKey || req.body.adminKey;
-  if (adminKey && (adminKey === ADMIN_PASSKEY || adminKey === 'UDOY26')) return true;
+  if (adminKey && (adminKey === ADMIN_PASSKEY || adminKey === 'UDOY518')) return true;
   return false;
 };
 
@@ -133,10 +133,10 @@ export const applyCoupon = async (req, res, next) => {
     }
 
     const code = couponCode.trim().toUpperCase();
-    if (code !== 'UDOY26') {
+    if (code !== 'UDOY518') {
       return res.status(400).json({
         success: false,
-        message: 'Invalid coupon code. Try UDOY26 or send 10 Tk via bKash to 01816550751.',
+        message: 'Invalid coupon code. Please check your code or send 10 Tk via bKash to 01816550751.',
       });
     }
 
@@ -146,13 +146,13 @@ export const applyCoupon = async (req, res, next) => {
       customerName: customerName ? customerName.trim() : (req.user?.name || 'Coupon User'),
       customerEmail: customerEmail ? customerEmail.trim().toLowerCase() : (req.user?.email || ''),
       phone: phone ? phone.trim() : 'COUPON-USER',
-      transactionId: `COUPON-UDOY26-${Date.now().toString(36).toUpperCase()}`,
+      transactionId: `COUPON-UDOY518-${Date.now().toString(36).toUpperCase()}`,
       amount: 0,
       paymentMethod: 'coupon',
-      couponCode: 'UDOY26',
+      couponCode: 'UDOY518',
       status: 'approved',
       approvedAt: new Date(),
-      notes: 'Unlocked instantly with special promo coupon UDOY26',
+      notes: 'Unlocked instantly with special promo coupon UDOY518',
     });
 
     // If user is logged in, upgrade user plan to pro
@@ -164,7 +164,7 @@ export const applyCoupon = async (req, res, next) => {
       success: true,
       unlocked: true,
       payment,
-      message: 'Coupon UDOY26 applied successfully! Lifetime export access unlocked.',
+      message: 'Coupon code applied successfully! Lifetime export access unlocked.',
     });
   } catch (error) {
     next(error);
@@ -301,7 +301,7 @@ export const adminDeletePayment = async (req, res, next) => {
 export const adminVerifyPasskey = async (req, res, next) => {
   try {
     const { passkey } = req.body;
-    if (passkey === ADMIN_PASSKEY || passkey === 'UDOY26') {
+    if (passkey === ADMIN_PASSKEY || passkey === 'UDOY518') {
       return res.status(200).json({
         success: true,
         message: 'Admin passkey verified successfully.',
