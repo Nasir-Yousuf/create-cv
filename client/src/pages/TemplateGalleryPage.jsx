@@ -272,6 +272,7 @@ export const TemplateGalleryPage = () => {
                   title="Click to view full preview"
                 >
                   <div
+                    id={`gallery-preview-sheet-${tpl.id}`}
                     className="w-[794px] origin-top pointer-events-none select-none transition-transform duration-300 group-hover/preview:scale-[0.35]"
                     style={{ transform: 'scale(0.33)' }}
                   >
@@ -381,6 +382,7 @@ export const TemplateGalleryPage = () => {
                 }}
               >
                 <div
+                  id="modal-preview-sheet"
                   style={{
                     width: '794px',
                     minHeight: '1123px',

@@ -1658,6 +1658,7 @@ export const QuickCVWizard = () => {
                 }}
               >
                 <div
+                  id="modal-preview-sheet"
                   style={{
                     width: "794px",
                     minHeight: "1123px",

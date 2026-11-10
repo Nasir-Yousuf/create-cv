@@ -1,6 +1,10 @@
 import api from './api';
-import html2pdf from 'html2pdf.js';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { saveAs } from 'file-saver';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { RenderCVTemplate } from '../templates';
 import {
   Document,
   Packer,
@@ -36,67 +40,182 @@ export const exportService = {
   async exportPDF(cvData, customHtml = '', elementId = 'cv-export-sheet') {
     const filename = `${(cvData?.personalInfo?.fullName || cvData?.title || 'Resume').replace(/\s+/g, '_')}.pdf`;
 
-    // 1. Try Client-Side High-Res HTML to PDF
+    // 1. Try Client-Side High-Res HTML to Canvas to jsPDF
+    let exportContainer = null;
+    let tempRoot = null;
+
     try {
-      let targetEl = null;
+      // Find the template sheet element to export
+      let sheetEl = null;
 
+      // Check specific element ID if provided
       if (elementId) {
-        targetEl = document.getElementById(elementId);
-      }
-      if (!targetEl) {
-        targetEl = document.getElementById('cv-export-sheet');
-      }
-      if (!targetEl && customHtml) {
-        const tempContainer = document.createElement('div');
-        tempContainer.innerHTML = customHtml;
-        targetEl = tempContainer.firstElementChild || tempContainer;
-      }
-
-      if (targetEl) {
-        // Clone element to remove scale transforms so capturing is unscaled 794px A4
-        const clone = targetEl.cloneNode(true);
-        clone.style.transform = 'none';
-        clone.style.webkitTransform = 'none';
-        clone.style.transformOrigin = 'top left';
-        clone.style.width = '794px';
-        clone.style.minHeight = '1123px';
-        clone.style.position = 'fixed';
-        clone.style.left = '-9999px';
-        clone.style.top = '0';
-        clone.style.zIndex = '-9999';
-        clone.style.opacity = '1';
-        clone.style.visibility = 'visible';
-        clone.style.background = '#ffffff';
-
-        document.body.appendChild(clone);
-
-        const opt = {
-          margin: 0,
-          filename: filename,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            windowWidth: 794,
-          },
-          jsPDF: {
-            unit: 'mm',
-            format: 'a4',
-            orientation: 'portrait',
-          },
-        };
-
-        const pdfBlob = await html2pdf().set(opt).from(clone).outputPdf('blob');
-        clone.remove();
-
-        if (pdfBlob && pdfBlob.size > 1000) {
-          triggerDownload(pdfBlob, filename);
-          return pdfBlob;
+        const el = document.getElementById(elementId);
+        if (el) {
+          sheetEl = el.querySelector('#cv-export-sheet') || el;
         }
+      }
+
+      // Check template-specific ID if cvData has templateId
+      if (!sheetEl && cvData?.templateId) {
+        const cardEl =
+          document.getElementById(`preview-sheet-${cvData.templateId}`) ||
+          document.getElementById(`gallery-preview-sheet-${cvData.templateId}`);
+        if (cardEl) {
+          sheetEl = cardEl.querySelector('#cv-export-sheet') || cardEl;
+        }
+      }
+
+      // Check fullscreen modal preview sheet
+      if (!sheetEl) {
+        const modalEl = document.getElementById('modal-preview-sheet');
+        if (modalEl) {
+          sheetEl = modalEl.querySelector('#cv-export-sheet') || modalEl;
+        }
+      }
+
+      // Check generic fallback
+      if (!sheetEl) {
+        sheetEl = document.getElementById('cv-export-sheet');
+      }
+
+      // Create an isolated, off-screen export container at (0, 0) with z-index behind root
+      exportContainer = document.createElement('div');
+      exportContainer.id = 'active-pdf-export-stage';
+      exportContainer.style.cssText = `
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 794px;
+        min-height: 1123px;
+        z-index: -99999;
+        background: #ffffff;
+        opacity: 1;
+        visibility: visible;
+        pointer-events: none;
+        overflow: visible;
+        margin: 0;
+        padding: 0;
+      `;
+      document.body.appendChild(exportContainer);
+
+      let captureTarget = null;
+
+      if (sheetEl) {
+        // Clone the existing rendered DOM sheet so all current input/DOM states are preserved
+        captureTarget = sheetEl.cloneNode(true);
+        captureTarget.style.transform = 'none';
+        captureTarget.style.webkitTransform = 'none';
+        captureTarget.style.width = '794px';
+        captureTarget.style.minHeight = '1123px';
+        captureTarget.style.height = 'auto';
+        captureTarget.style.maxHeight = 'none';
+        captureTarget.style.margin = '0';
+        captureTarget.style.padding = '0';
+        captureTarget.style.boxShadow = 'none';
+        captureTarget.style.borderRadius = '0';
+        captureTarget.style.overflow = 'visible';
+        exportContainer.appendChild(captureTarget);
+      } else if (customHtml) {
+        // If customHtml is provided, inject it
+        exportContainer.innerHTML = customHtml;
+        captureTarget = exportContainer.firstElementChild || exportContainer;
+      } else {
+        // Dynamic React render fallback directly using RenderCVTemplate
+        tempRoot = ReactDOM.createRoot(exportContainer);
+        tempRoot.render(
+          React.createElement(RenderCVTemplate, {
+            cvData: cvData,
+            scale: 1,
+          })
+        );
+        captureTarget = exportContainer;
+      }
+
+      // Wait for fonts to finish loading
+      if (document.fonts && document.fonts.ready) {
+        try {
+          await document.fonts.ready;
+        } catch (e) {
+          // ignore font loading error
+        }
+      }
+
+      // Wait for all images inside the export container to load
+      const images = exportContainer.querySelectorAll('img');
+      if (images.length > 0) {
+        await Promise.all(
+          Array.from(images).map((img) => {
+            if (img.complete) return Promise.resolve();
+            return new Promise((resolve) => {
+              img.onload = resolve;
+              img.onerror = resolve;
+              setTimeout(resolve, 800); // 800ms safety timeout
+            });
+          })
+        );
+      }
+
+      // Allow a brief tick for DOM layout calculation
+      await new Promise((r) => setTimeout(r, 100));
+
+      // Capture with html2canvas at 2x crisp print scale (1588 x 2246)
+      const canvas = await html2canvas(captureTarget, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        width: 794,
+        windowWidth: 1200,
+        scrollX: 0,
+        scrollY: 0,
+      });
+
+      if (canvas && canvas.width > 0 && canvas.height > 0) {
+        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4',
+          compress: true,
+        });
+
+        const pdfWidth = 210; // A4 width in mm
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        const pageHeight = 297; // A4 height in mm
+        let heightLeft = pdfHeight;
+        let position = 0;
+
+        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight, undefined, 'FAST');
+        heightLeft -= pageHeight;
+
+        while (heightLeft > 5) {
+          position = position - pageHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight, undefined, 'FAST');
+          heightLeft -= pageHeight;
+        }
+
+        // Save PDF directly to mobile or desktop device
+        pdf.save(filename);
+
+        // Also return the blob
+        const pdfBlob = pdf.output('blob');
+        return pdfBlob;
       }
     } catch (clientErr) {
       console.warn('Client-side PDF generation error, trying fallback:', clientErr);
+    } finally {
+      if (tempRoot) {
+        try {
+          tempRoot.unmount();
+        } catch (e) {}
+      }
+      if (exportContainer && exportContainer.parentNode) {
+        exportContainer.remove();
+      }
     }
 
     // 2. Fallback to Backend Server Export if available
