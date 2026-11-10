@@ -23,6 +23,7 @@ import {
   DANIEL_CARTER_CV,
 } from "@shared/constants/cvDefaults.js";
 import { RenderCVTemplate } from "../../templates";
+import { showToast } from "../../store/uiSlice";
 import exportService from "../../services/exportService";
 import paymentService from "../../services/paymentService";
 import PaymentExportModal from "../../components/common/PaymentExportModal";
@@ -49,6 +50,7 @@ import {
   Award,
   Layers,
   ArrowRight,
+  ArrowDown,
   Edit3,
 } from "lucide-react";
 import Button from "../../components/common/Button";
@@ -250,6 +252,7 @@ export const QuickCVWizard = () => {
     typeof window !== "undefined" ? window.innerWidth : 1024,
   );
   const fileInputRef = useRef(null);
+  const generatedSectionRef = useRef(null);
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -590,6 +593,23 @@ export const QuickCVWizard = () => {
     const cvToLoad = getTemplateCVData(tmpl);
     dispatch(setCVData(cvToLoad));
     dispatch(setTemplateId(templateId));
+    navigate("/builder");
+  };
+
+  // Scroll smoothly to generated CV showcase
+  const handleGenerateCV = () => {
+    if (generatedSectionRef.current) {
+      generatedSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    dispatch(
+      showToast({
+        message: "✨ All 50+ templates updated with your details! Select any design below to preview or download.",
+        type: "success",
+      })
+    );
+  };
+
+  const handleOpenInEditor = () => {
     navigate("/builder");
   };
 
@@ -1414,11 +1434,52 @@ export const QuickCVWizard = () => {
               </div>
             )}
           </div>
+
+          {/* Bottom Call-to-Action Bar: Generate CV & Preview / Open Editor */}
+          <div className="pt-6 sm:pt-8 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="space-y-1 text-center sm:text-left">
+              <div className="flex items-center justify-center sm:justify-start gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                  Done filling in your information?
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Click below to preview your CV live across 50+ templates, or jump straight to the interactive editor.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={handleGenerateCV}
+                className="group px-6 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 active:scale-95 text-white font-extrabold text-xs sm:text-sm shadow-xl shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300 animate-spin" style={{ animationDuration: '3s' }} />
+                <span>Generate & Preview CVs Below</span>
+                <ArrowDown className="w-4 h-4 group-hover:translate-y-1 transition-transform" />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenInEditor}
+                className="px-5 py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-800 dark:text-slate-200 font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Sliders className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span>Open in Full Editor</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* 3. Real-Time Multi-Template Showcase: "Your Generated CVs" */}
-      <div className="space-y-6">
+      <div
+        id="generated-cvs-showcase"
+        ref={generatedSectionRef}
+        className="space-y-6 scroll-mt-20"
+      >
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
           <div>
             <div className="flex items-center gap-2">
