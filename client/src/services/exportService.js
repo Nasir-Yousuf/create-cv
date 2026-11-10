@@ -228,44 +228,50 @@ const extractCleanTemplateHtml = (cvData, elementId) => {
     sheetEl = document.getElementById('cv-export-sheet');
   }
 
-  if (!sheetEl) return '';
+  let rawHtml = '';
 
-  const clone = sheetEl.cloneNode(true);
-  clone.style.transform = 'none';
-  clone.style.webkitTransform = 'none';
-  clone.style.margin = '0';
-  clone.style.boxShadow = 'none';
-  clone.style.borderRadius = '0';
-  clone.style.overflow = 'visible';
+  if (sheetEl) {
+    const clone = sheetEl.cloneNode(true);
+    clone.style.transform = 'none';
+    clone.style.webkitTransform = 'none';
+    clone.style.margin = '0';
+    clone.style.boxShadow = 'none';
+    clone.style.borderRadius = '0';
+    clone.style.overflow = 'visible';
+    clone.style.width = cvData?.design?.pageSize === 'Letter' ? '8.5in' : '210mm';
+    clone.style.minHeight = cvData?.design?.pageSize === 'Letter' ? '11in' : '297mm';
 
-  // Remove editor UI artifacts
-  const pips = clone.querySelectorAll('.cv-editor-pip, .cv-placeholder, [class*="ring-"], .no-print');
-  pips.forEach((p) => p.remove());
+    // Remove editor UI artifacts
+    const pips = clone.querySelectorAll('.cv-editor-pip, .cv-placeholder, [class*="ring-"], .no-print');
+    pips.forEach((p) => p.remove());
 
-  // Remove photo placeholder dashed box if no photo
-  if (!cvData?.personalInfo?.photo) {
-    const cameraBoxes = clone.querySelectorAll('.cv-photo-placeholder');
-    cameraBoxes.forEach((b) => b.remove());
+    // Remove photo placeholder dashed box if no photo
+    if (!cvData?.personalInfo?.photo) {
+      const cameraBoxes = clone.querySelectorAll('.cv-photo-placeholder');
+      cameraBoxes.forEach((b) => b.remove());
+    }
+
+    // SANITIZER: Eliminate any truncate or clipping overflow that could squish or cut text
+    const truncateEls = clone.querySelectorAll('.truncate, [class*="truncate"]');
+    truncateEls.forEach((el) => {
+      el.classList.remove('truncate');
+      el.style.overflow = 'visible';
+      el.style.textOverflow = 'clip';
+      el.style.whiteSpace = 'normal';
+      el.style.wordBreak = 'break-word';
+    });
+
+    const allNodes = clone.querySelectorAll('*');
+    allNodes.forEach((node) => {
+      if (node.style && node.style.overflow === 'hidden' && !node.classList.contains('rounded-full')) {
+        node.style.overflow = 'visible';
+      }
+    });
+
+    rawHtml = clone.outerHTML;
   }
 
-  // SANITIZER: Eliminate any truncate or clipping overflow that could squish or cut text
-  const truncateEls = clone.querySelectorAll('.truncate, [class*="truncate"]');
-  truncateEls.forEach((el) => {
-    el.classList.remove('truncate');
-    el.style.overflow = 'visible';
-    el.style.textOverflow = 'clip';
-    el.style.whiteSpace = 'normal';
-    el.style.wordBreak = 'break-word';
-  });
-
-  const allNodes = clone.querySelectorAll('*');
-  allNodes.forEach((node) => {
-    if (node.style && node.style.overflow === 'hidden' && !node.classList.contains('rounded-full')) {
-      node.style.overflow = 'visible';
-    }
-  });
-
-  return clone.outerHTML;
+  return rawHtml;
 };
 
 export const exportService = {
@@ -499,6 +505,75 @@ export const exportService = {
     const { blob } = await this.generatePDFBlob(cvData, customHtml, elementId, onProgress);
     triggerDownload(blob, filename);
     return blob;
+  },
+
+  /**
+   * Native High-Fidelity Vector Print & PDF Engine (Browser-Native Save as PDF).
+   * Generates 100% genuine vector text, preserving crisp fonts and CSS page breaks.
+   */
+  async printDocument(cvData, customHtml = '', elementId = 'cv-export-sheet') {
+    const cleanHtml = customHtml || extractCleanTemplateHtml(cvData, elementId);
+    const isLetter = cvData?.design?.pageSize === 'Letter';
+    const pageSize = isLetter ? 'letter' : 'A4';
+    const fontFamily = cvData?.design?.fontFamily || 'Inter';
+
+    const printIframe = document.createElement('iframe');
+    printIframe.style.position = 'fixed';
+    printIframe.style.right = '0';
+    printIframe.style.bottom = '0';
+    printIframe.style.width = '0';
+    printIframe.style.height = '0';
+    printIframe.style.border = '0';
+    printIframe.id = 'cv-native-print-frame';
+    document.body.appendChild(printIframe);
+
+    const doc = printIframe.contentWindow.document;
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <title>${cvData?.personalInfo?.fullName || 'Resume'}</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+          @page { size: ${pageSize}; margin: 0; }
+          *, *::before, *::after { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          html, body { margin: 0; padding: 0; background: #ffffff; font-family: '${fontFamily}', sans-serif; -webkit-font-smoothing: antialiased; }
+          .resume-sheet-a4 { width: 210mm !important; min-height: 297mm !important; box-sizing: border-box !important; margin: 0 auto !important; box-shadow: none !important; border: none !important; }
+          .resume-sheet-letter { width: 8.5in !important; min-height: 11in !important; box-sizing: border-box !important; margin: 0 auto !important; box-shadow: none !important; border: none !important; }
+          .resume-sheet-a4 .md\\:grid-cols-12, .resume-sheet-letter .md\\:grid-cols-12, .grid-cols-12 { display: grid !important; grid-template-columns: repeat(12, minmax(0, 1fr)) !important; }
+          .resume-sheet-a4 .md\\:col-span-4, .resume-sheet-letter .md\\:col-span-4, .col-span-4 { grid-column: span 4 / span 4 !important; }
+          .resume-sheet-a4 .md\\:col-span-8, .resume-sheet-letter .md\\:col-span-8, .col-span-8 { grid-column: span 8 / span 8 !important; }
+          .resume-sheet-a4 .sm\\:grid-cols-2, .resume-sheet-letter .sm\\:grid-cols-2 { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          .avoid-break, [class*="space-y-"] > div, [class*="space-y-"] > section, tr, li, .break-inside-avoid { break-inside: avoid !important; page-break-inside: avoid !important; }
+          h1, h2, h3, h4, h5, h6 { break-after: avoid !important; page-break-after: avoid !important; }
+          .truncate, [class*="truncate"] { overflow: visible !important; text-overflow: clip !important; white-space: normal !important; word-break: break-word !important; }
+          .no-print, .ring-2, [class*="ring-"], .cv-editor-pip, .cv-placeholder, .cv-photo-placeholder { display: none !important; }
+        </style>
+      </head>
+      <body>
+        ${cleanHtml}
+      </body>
+      </html>
+    `);
+    doc.close();
+
+    await new Promise((r) => setTimeout(r, 600));
+    try {
+      if (printIframe.contentWindow.document.fonts) {
+        await printIframe.contentWindow.document.fonts.ready;
+      }
+    } catch (e) {}
+
+    printIframe.contentWindow.focus();
+    printIframe.contentWindow.print();
+    setTimeout(() => {
+      if (printIframe.parentNode) printIframe.remove();
+    }, 15000);
   },
 
   /**

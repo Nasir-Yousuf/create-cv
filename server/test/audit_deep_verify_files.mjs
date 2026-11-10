@@ -9,6 +9,10 @@ async function verifyAllFiles() {
   console.log('DEEP VERIFICATION OF GENERATED PDF & DOCX FILES');
   console.log('====================================================\n');
 
+  if (!fs.existsSync(AUDIT_OUT_DIR)) {
+    fs.mkdirSync(AUDIT_OUT_DIR, { recursive: true });
+  }
+
   const files = fs.readdirSync(AUDIT_OUT_DIR);
   const pdfFiles = files.filter((f) => f.endsWith('.pdf'));
   const docxFiles = files.filter((f) => f.endsWith('.docx'));
