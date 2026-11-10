@@ -15,7 +15,7 @@ import {
   addSkill,
   removeSkill,
 } from '../../store/cvSlice';
-import { TEMPLATES_REGISTRY, TEMPLATE_CATEGORIES, INITIAL_CV_DATA } from '@shared/constants/cvDefaults.js';
+import { TEMPLATES_REGISTRY, TEMPLATE_CATEGORIES, INITIAL_CV_DATA, TAHMIDUR_RAHMAN_CV } from '@shared/constants/cvDefaults.js';
 import { RenderCVTemplate } from '../../templates';
 import exportService from '../../services/exportService';
 import paymentService from '../../services/paymentService';
@@ -447,12 +447,32 @@ export const QuickCVWizard = () => {
         <div className="space-y-8">
           {/* Section A: Photo & Key Personal Details */}
           <div>
-            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-4 flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 flex items-center justify-center text-xs">
-                1
-              </span>
-              Personal Information & Portrait Photo
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 flex items-center justify-center text-xs">
+                  1
+                </span>
+                Personal Information & Portrait Photo
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => dispatch(setCVData({ ...TAHMIDUR_RAHMAN_CV }))}
+                  className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300 transition-colors cursor-pointer"
+                  title="Fill with sample data to preview"
+                >
+                  Load Sample Data
+                </button>
+                <button
+                  type="button"
+                  onClick={() => dispatch(setCVData({ ...INITIAL_CV_DATA }))}
+                  className="text-xs font-medium px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
+                  title="Clear all fields"
+                >
+                  Clear Form
+                </button>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* Portrait Photo Uploader */}

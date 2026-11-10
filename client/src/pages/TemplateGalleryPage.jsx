@@ -26,6 +26,7 @@ import {
   TEMPLATE_CATEGORIES,
   INITIAL_CV_DATA,
   DANIEL_CARTER_CV,
+  TAHMIDUR_RAHMAN_CV,
 } from '@shared/constants/cvDefaults.js';
 
 export const TemplateGalleryPage = () => {
@@ -69,10 +70,6 @@ export const TemplateGalleryPage = () => {
   // Handle template selection and launch editor
   const handleSelectTemplate = (id) => {
     dispatch(setTemplateId(id));
-    // If selecting modern-blue and user data is blank, load Daniel Carter demo
-    if (id === 'modern-blue' && (!currentCV?.personalInfo?.fullName || currentCV?.personalInfo?.fullName === 'Tahmidur Rahman')) {
-      dispatch(setCVData({ ...DANIEL_CARTER_CV, templateId: id }));
-    }
     dispatch(
       showToast({
         message: `Template selected: ${TEMPLATES_REGISTRY.find((t) => t.id === id)?.name || id}`,
@@ -144,18 +141,18 @@ export const TemplateGalleryPage = () => {
     // If template is BDJobs standard, show BD data
     if (template.category === 'Bangladesh Standard' || template.id.startsWith('bd-')) {
       return {
-        ...INITIAL_CV_DATA,
+        ...TAHMIDUR_RAHMAN_CV,
         templateId: template.id,
         design: {
-          ...INITIAL_CV_DATA.design,
-          primaryColor: template.thumbnailColor || INITIAL_CV_DATA.design.primaryColor,
+          ...TAHMIDUR_RAHMAN_CV.design,
+          primaryColor: template.thumbnailColor || TAHMIDUR_RAHMAN_CV.design.primaryColor,
         },
       };
     }
 
     // Default to Daniel Carter or current CV data
     const baseData =
-      currentCV?.personalInfo?.fullName && currentCV.personalInfo.fullName !== 'Tahmidur Rahman'
+      currentCV?.personalInfo?.fullName
         ? currentCV
         : DANIEL_CARTER_CV;
 

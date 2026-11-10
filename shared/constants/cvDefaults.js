@@ -98,24 +98,22 @@ export const DANIEL_CARTER_CV = {
   certifications: []
 };
 
-export const INITIAL_CV_DATA = {
-  title: "Daniel Carter - Professional Resume",
-  templateId: "modern-blue",
+export const TAHMIDUR_RAHMAN_CV = {
+  title: "Tahmidur Rahman - Professional Resume",
+  templateId: "bd-corporate-standard",
   personalInfo: {
-    fullName: "Daniel Carter",
-    jobTitle: "Senior Software Engineer",
-    email: "daniel.carter@example.com",
-    phone: "+1 (555) 123-4567",
-    location: "San Francisco, CA",
-    website: "https://danielcarter.dev",
-    linkedin: "linkedin.com/in/danielcarter",
-    github: "github.com/danielcarter",
+    fullName: "Tahmidur Rahman Dipto",
+    jobTitle: "Senior Software Engineer / Project Coordinator",
+    email: "tahmid.rahman@email.com",
+    phone: "+880 1712-345678",
+    location: "Gulshan-2, Dhaka, Bangladesh",
+    website: "https://tahmidrahman.dev",
+    linkedin: "linkedin.com/in/tahmidrahman",
+    github: "github.com/tahmidrahman",
     photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80",
-    photoStyle: "circle",
-    summary: "Passionate Senior Software Engineer with 5+ years of experience in building scalable web applications. Skilled in modern technologies and delivering innovative solutions that make an impact."
+    photoStyle: "portrait",
+    summary: "Detail-oriented IT Professional with strong problem-solving skills and a solid academic background in Computer Science & Engineering. Experienced in architecting RESTful APIs, cloud containerization, and modern CI/CD delivery pipelines."
   },
-
-  // Personal details expected by Bangladesh corporate recruiters, banks, and BDJobs
   personalDetails: {
     fatherName: "Md. Abdur Rahman",
     motherName: "Begum Rokeya Sultana",
@@ -128,6 +126,171 @@ export const INITIAL_CV_DATA = {
     bloodGroup: "B+",
     permanentAddress: "Vill: Shantinagar, P.O: Shantinagar, Upazila: Mirpur, Dist: Kushtia, Bangladesh",
     presentAddress: "House 42, Road 11, Block D, Banani, Dhaka-1213, Bangladesh",
+  },
+  design: {
+    primaryColor: "#059669",
+    accentColor: "#0284c7",
+    textColor: "#1e293b",
+    backgroundColor: "#ffffff",
+    fontFamily: "Inter",
+    fontSize: "medium",
+    lineSpacing: "normal",
+    sectionSpacing: "normal",
+    margins: "normal",
+    pageSize: "A4",
+    showPhoto: true,
+    photoSize: "md",
+    photoPosition: "right",
+    columnRatio: "33/67",
+    textAlignment: "left",
+    sectionOrder: [
+      "summary",
+      "experience",
+      "education",
+      "skills",
+      "projects",
+      "certifications",
+      "personalDetails",
+      "languages",
+      "references",
+      "declaration"
+    ]
+  },
+  experience: [
+    {
+      id: "exp-1",
+      jobTitle: "Senior Software Engineer",
+      company: "TechCorp Bangladesh Ltd.",
+      location: "Gulshan, Dhaka",
+      startDate: "2021",
+      endDate: "Present",
+      current: true,
+      description: "Lead development of cloud-based fintech applications and mentor junior developers.",
+      highlights: [
+        "Lead development of cloud-based applications",
+        "Mentor junior developers",
+        "Improve system performance by 40%"
+      ]
+    },
+    {
+      id: "exp-2",
+      jobTitle: "Software Engineer",
+      company: "InnovateLabs Ltd.",
+      location: "Banani, Dhaka",
+      startDate: "2019",
+      endDate: "2021",
+      current: false,
+      description: "Developed responsive web applications and automated CI/CD pipelines.",
+      highlights: [
+        "Developed responsive web applications",
+        "Collaborated with cross-functional teams",
+        "Implemented CI/CD pipelines"
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-1",
+      institution: "University of Dhaka",
+      degree: "Bachelor of Science in CSE",
+      fieldOfStudy: "Computer Science & Engineering",
+      location: "Dhaka, Bangladesh",
+      startDate: "2015",
+      endDate: "2019",
+      grade: "CGPA 3.85 out of 4.00",
+      description: "Graduated with Honors. Dean's Honor List."
+    }
+  ],
+  skills: [
+    { id: "skill-1", name: "React" },
+    { id: "skill-2", name: "Next.js" },
+    { id: "skill-3", name: "TypeScript" },
+    { id: "skill-4", name: "Node.js" },
+    { id: "skill-5", name: "Python" },
+    { id: "skill-6", name: "AWS" },
+    { id: "skill-7", name: "UI/UX Design" },
+    { id: "skill-8", name: "Project Management" }
+  ],
+  projects: [
+    {
+      id: "proj-1",
+      title: "ShadhinPay - Digital Micro-Merchant Payment App",
+      link: "https://shadhinpay.example.com",
+      github: "https://github.com/tahmid/shadhinpay",
+      startDate: "2023-01",
+      endDate: "2023-09",
+      description: "Built QR-based mobile financial merchant payment platform with SMS verification and automated ledger.",
+      technologies: ["React Native", "Node.js", "PostgreSQL", "Tailwind CSS"]
+    }
+  ],
+  certifications: [
+    {
+      id: "cert-1",
+      name: "AWS Certified Solutions Architect",
+      issuer: "Amazon Web Services",
+      date: "2023",
+      link: ""
+    },
+    {
+      id: "cert-2",
+      name: "Professional Scrum Master (PSM I)",
+      issuer: "Scrum.org",
+      date: "2022",
+      link: ""
+    }
+  ],
+  languages: [
+    { id: "lang-1", name: "English", language: "English", proficiency: "Fluent" },
+    { id: "lang-2", name: "Bengali", language: "Bengali", proficiency: "Native" }
+  ],
+  references: [
+    {
+      id: "ref-1",
+      name: "Dr. Md. Saiful Islam",
+      designation: "Professor & Chairman, Dept. of CSE",
+      company: "University of Dhaka",
+      phone: "+880 1819-000000",
+      email: "saiful.cse@du.ac.bd"
+    }
+  ],
+  declaration: {
+    text: "I hereby declare that all the information provided above is true and correct to the best of my knowledge and belief.",
+    date: new Date().toLocaleDateString('en-GB'),
+    signedBy: "Tahmidur Rahman"
+  },
+  customSections: []
+};
+
+export const INITIAL_CV_DATA = {
+  title: "Untitled Resume",
+  templateId: "bd-corporate-standard",
+  personalInfo: {
+    fullName: "",
+    jobTitle: "",
+    email: "",
+    phone: "",
+    location: "",
+    website: "",
+    linkedin: "",
+    github: "",
+    photo: null,
+    photoStyle: "portrait",
+    summary: ""
+  },
+
+  // Personal details expected by Bangladesh corporate recruiters, banks, and BDJobs
+  personalDetails: {
+    fatherName: "",
+    motherName: "",
+    dob: "",
+    gender: "Male",
+    maritalStatus: "Single",
+    nationality: "Bangladeshi",
+    nid: "",
+    religion: "Islam",
+    bloodGroup: "B+",
+    permanentAddress: "",
+    presentAddress: "",
   },
 
   design: {
@@ -160,125 +323,18 @@ export const INITIAL_CV_DATA = {
     ]
   },
 
-  experience: [
-    {
-      id: "exp-1",
-      jobTitle: "Senior Software Engineer",
-      company: "TechCorp Inc.",
-      location: "San Francisco, CA",
-      startDate: "2021",
-      endDate: "Present",
-      current: true,
-      description: "Lead development of cloud-based applications and mentor engineers.",
-      highlights: [
-        "Lead development of cloud-based applications",
-        "Mentor junior developers",
-        "Improve system performance by 40%"
-      ]
-    },
-    {
-      id: "exp-2",
-      jobTitle: "Software Engineer",
-      company: "InnovateLabs",
-      location: "New York, NY",
-      startDate: "2019",
-      endDate: "2021",
-      current: false,
-      description: "Developed responsive web applications and automated CI/CD pipelines.",
-      highlights: [
-        "Developed responsive web applications",
-        "Collaborated with cross-functional teams",
-        "Implemented CI/CD pipelines"
-      ]
-    }
-  ],
-
-  education: [
-    {
-      id: "edu-1",
-      institution: "University of California",
-      degree: "Bachelor of Science in Computer Science",
-      fieldOfStudy: "Computer Science",
-      location: "Berkeley, CA",
-      startDate: "2015",
-      endDate: "2019",
-      grade: "3.85 GPA",
-      description: "Graduated with Honors. Dean's Honor List."
-    }
-  ],
-
-  skills: [
-    { id: "skill-1", name: "React" },
-    { id: "skill-2", name: "Next.js" },
-    { id: "skill-3", name: "TypeScript" },
-    { id: "skill-4", name: "Node.js" },
-    { id: "skill-5", name: "Python" },
-    { id: "skill-6", name: "AWS" },
-    { id: "skill-7", name: "UI/UX Design" },
-    { id: "skill-8", name: "Project Management" }
-  ],
-
-  projects: [
-    {
-      id: "proj-1",
-      title: "ShadhinPay - Digital Micro-Merchant Payment App",
-      link: "https://shadhinpay.example.com",
-      github: "https://github.com/tahmid/shadhinpay",
-      startDate: "2023-01",
-      endDate: "2023-09",
-      description: "Built QR-based mobile financial merchant payment platform with SMS verification and automated ledger.",
-      technologies: ["React Native", "Node.js", "PostgreSQL", "Tailwind CSS"]
-    }
-  ],
-
-  certifications: [
-    {
-      id: "cert-1",
-      name: "AWS Certified Solutions Architect",
-      issuer: "Amazon Web Services",
-      date: "2023",
-      link: ""
-    },
-    {
-      id: "cert-2",
-      name: "Professional Scrum Master (PSM I)",
-      issuer: "Scrum.org",
-      date: "2022",
-      link: ""
-    }
-  ],
-
-  languages: [
-    { id: "lang-1", name: "English", language: "English", proficiency: "Native" },
-    { id: "lang-2", name: "Spanish", language: "Spanish", proficiency: "Fluent" },
-    { id: "lang-3", name: "French", language: "French", proficiency: "Intermediate" }
-  ],
-
-  references: [
-    {
-      id: "ref-1",
-      name: "Dr. Md. Saiful Islam",
-      designation: "Professor & Chairman, Dept. of CSE",
-      company: "University of Dhaka",
-      phone: "+880 1819-000000",
-      email: "saiful.cse@du.ac.bd"
-    },
-    {
-      id: "ref-2",
-      name: "Tanvir Ahmed Chowdhury",
-      designation: "Chief Technology Officer",
-      company: "Brain Station 23 Ltd.",
-      phone: "+880 1711-000000",
-      email: "tanvir@brainstation-23.com"
-    }
-  ],
-
+  experience: [],
+  education: [],
+  skills: [],
+  projects: [],
+  certifications: [],
+  languages: [],
+  references: [],
   declaration: {
     text: "I hereby declare that all the information provided above is true and correct to the best of my knowledge and belief.",
     date: new Date().toLocaleDateString('en-GB'),
-    signedBy: "Tahmidur Rahman"
+    signedBy: ""
   },
-
   customSections: []
 };
 

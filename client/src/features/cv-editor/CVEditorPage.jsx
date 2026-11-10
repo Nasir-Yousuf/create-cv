@@ -28,7 +28,7 @@ import AIAssistantModal from '../../components/common/AIAssistantModal';
 import WhatsAppSupportButton from '../../components/common/WhatsAppSupportButton';
 import PaymentExportModal from '../../components/common/PaymentExportModal';
 import paymentService from '../../services/paymentService';
-import { TEMPLATES_REGISTRY, DANIEL_CARTER_CV, INITIAL_CV_DATA } from '@shared/constants/cvDefaults.js';
+import { TEMPLATES_REGISTRY, DANIEL_CARTER_CV, TAHMIDUR_RAHMAN_CV, INITIAL_CV_DATA } from '@shared/constants/cvDefaults.js';
 import {
   Undo2,
   Redo2,
@@ -106,12 +106,13 @@ export const CVEditorPage = () => {
 
   // Auto-fit canvas calculation
   const handleFitZoom = () => {
-    const leftWidth = isSidebarOpen ? 370 : 70;
-    const rightMargin = isRightDockOpen ? 90 : 28;
-    const availableWidth = window.innerWidth - leftWidth - rightMargin;
+    const containerWidth =
+      canvasScrollContainerRef.current?.clientWidth ||
+      (window.innerWidth - (isSidebarOpen ? 370 : 70) - (isRightDockOpen ? 90 : 28));
+    const availableWidth = Math.max(300, containerWidth - 48);
     const targetPaperWidth = devicePreview === 'mobile' ? 400 : devicePreview === 'tablet' ? 680 : 800;
-    const optimalScale = Math.min(1.0, Math.max(0.38, (availableWidth - 32) / targetPaperWidth));
-    dispatch(setPreviewScale(Math.round(optimalScale * 100) / 100));
+    const optimalScale = Math.min(1.0, Math.max(0.35, Math.floor((availableWidth / targetPaperWidth) * 100) / 100));
+    dispatch(setPreviewScale(optimalScale));
   };
 
   const handleOpenAI = (mode = 'summary') => {
@@ -304,10 +305,6 @@ export const CVEditorPage = () => {
 
   const handleSelectTemplate = (tmplId) => {
     dispatch(setTemplateId(tmplId));
-    // If selecting modern-blue and user data is blank, populate Daniel Carter sample
-    if (tmplId === 'modern-blue' && (!currentCV?.personalInfo?.fullName || currentCV?.personalInfo?.fullName === 'Tahmidur Rahman')) {
-      dispatch(setCVData({ ...DANIEL_CARTER_CV, templateId: tmplId }));
-    }
     dispatch(
       showToast({
         message: `Template applied: ${TEMPLATES_REGISTRY.find((t) => t.id === tmplId)?.name || tmplId}`,
@@ -900,7 +897,7 @@ export const CVEditorPage = () => {
                         <button
                           type="button"
                           onClick={() => {
-                            dispatch(setCVData({ ...INITIAL_CV_DATA }));
+                            dispatch(setCVData({ ...TAHMIDUR_RAHMAN_CV }));
                             dispatch(
                               showToast({
                                 message: 'Loaded Bangladeshi Corporate recruiter demo profile!',
@@ -912,6 +909,22 @@ export const CVEditorPage = () => {
                         >
                           <span>Load BD Recruiter (Tahmidur)</span>
                           <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            dispatch(setCVData({ ...INITIAL_CV_DATA }));
+                            dispatch(
+                              showToast({
+                                message: 'Started fresh with a clean blank document!',
+                                type: 'info',
+                              })
+                            );
+                          }}
+                          className="w-full py-2 px-3 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 flex items-center justify-between"
+                        >
+                          <span>Start Blank Resume</span>
+                          <RefreshCw className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -1161,9 +1174,9 @@ export const CVEditorPage = () => {
               ref={canvasScrollContainerRef}
               className="flex-1 overflow-auto p-4 sm:p-6 md:p-8 relative select-text"
             >
-              <div className="min-w-fit w-full flex justify-center py-2">
+              <div className="w-fit min-w-full flex justify-center py-4 px-2">
                 <div
-                  className="m-auto my-0 transition-all duration-150"
+                  className="shrink-0 transition-all duration-150"
                   style={{
                     width: `${Math.round((devicePreview === 'mobile' ? 400 : devicePreview === 'tablet' ? 680 : 794) * previewScale)}px`,
                     minHeight: `${Math.round(1123 * previewScale)}px`,

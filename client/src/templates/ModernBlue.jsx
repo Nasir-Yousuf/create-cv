@@ -68,11 +68,18 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
           className="relative group cursor-pointer shrink-0"
           title="Click to change photo"
         >
-          <img
-            src={displayPhoto}
-            alt={personalInfo.fullName || 'Daniel Carter'}
-            className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-2 border-slate-100 shadow-sm group-hover:opacity-90 group-hover:scale-105 transition-all duration-200"
-          />
+          {personalInfo?.photo ? (
+            <img
+              src={personalInfo.photo}
+              alt={personalInfo.fullName || 'User Profile Photo'}
+              className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-2 border-slate-100 shadow-sm group-hover:opacity-90 group-hover:scale-105 transition-all duration-200"
+            />
+          ) : (
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 group-hover:border-blue-400 group-hover:text-blue-500 transition-all">
+              <Camera className="w-6 h-6 mb-1 opacity-70" />
+              <span className="text-[10px] font-medium">Add Photo</span>
+            </div>
+          )}
           <div className="absolute inset-0 rounded-full bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-medium backdrop-blur-[1px]">
             <Camera className="w-4 h-4 mr-1" /> Edit
           </div>
@@ -85,7 +92,7 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
               section="personalInfo"
               field="fullName"
               tag="h1"
-              value={personalInfo.fullName || 'Daniel Carter'}
+              value={personalInfo.fullName || ''}
               onSave={(val) => dispatch(updatePersonalInfo({ fullName: val }))}
               placeholder="Daniel Carter"
               className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-slate-900 block"
@@ -94,7 +101,7 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
               section="personalInfo"
               field="jobTitle"
               tag="p"
-              value={personalInfo.jobTitle || 'Senior Software Engineer'}
+              value={personalInfo.jobTitle || ''}
               onSave={(val) => dispatch(updatePersonalInfo({ jobTitle: val }))}
               placeholder="Senior Software Engineer"
               className="text-base sm:text-lg font-medium text-blue-600 block mt-0.5"
@@ -109,7 +116,7 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
               <EditableElement
                 section="personalInfo"
                 field="email"
-                value={personalInfo.email || 'daniel.carter@example.com'}
+                value={personalInfo.email || ''}
                 onSave={(val) => dispatch(updatePersonalInfo({ email: val }))}
                 placeholder="daniel.carter@example.com"
                 className="hover:text-blue-600 truncate"
@@ -122,7 +129,7 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
               <EditableElement
                 section="personalInfo"
                 field="phone"
-                value={personalInfo.phone || '+1 (555) 123-4567'}
+                value={personalInfo.phone || ''}
                 onSave={(val) => dispatch(updatePersonalInfo({ phone: val }))}
                 placeholder="+1 (555) 123-4567"
                 className="hover:text-blue-600"
@@ -135,7 +142,7 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
               <EditableElement
                 section="personalInfo"
                 field="location"
-                value={personalInfo.location || 'San Francisco, CA'}
+                value={personalInfo.location || ''}
                 onSave={(val) => dispatch(updatePersonalInfo({ location: val }))}
                 placeholder="San Francisco, CA"
                 className="hover:text-blue-600"
@@ -148,7 +155,7 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
               <EditableElement
                 section="personalInfo"
                 field="linkedin"
-                value={personalInfo.linkedin || 'linkedin.com/in/danielcarter'}
+                value={personalInfo.linkedin || ''}
                 onSave={(val) => dispatch(updatePersonalInfo({ linkedin: val }))}
                 placeholder="linkedin.com/in/danielcarter"
                 className="hover:text-blue-600 truncate"
