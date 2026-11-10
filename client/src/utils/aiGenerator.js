@@ -1,6 +1,6 @@
 /**
  * Smart Client AI Generator for Bios, Career Objectives, and Resume Enhancements
- * Works with backend Gemini API, and provides instant fallback algorithms for 100% uptime.
+ * Works with backend AI Assistant, and provides instant fallback algorithms for 100% uptime.
  */
 
 export const PRESET_ROLES = [

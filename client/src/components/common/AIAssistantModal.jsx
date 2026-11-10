@@ -132,8 +132,8 @@ export const AIAssistantModal = ({ isOpen: propIsOpen, onClose: propOnClose, ini
             <div>
               <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <span>ResumeCraft AI Assistant</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                  Gemini Powered
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                  AI Assistant
                 </span>
               </h2>
               <p className="text-[11px] text-slate-500">

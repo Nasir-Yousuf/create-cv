@@ -209,9 +209,9 @@ export const DashboardPage = ({ onOpenAuth }) => {
             </p>
           </div>
           <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Gemini AI Assistant</span>
-            <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
-              Active <Sparkles className="w-4 h-4 text-indigo-500" />
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">AI Assistant</span>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+              Active <Sparkles className="w-4 h-4 text-blue-500" />
             </p>
           </div>
           <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
