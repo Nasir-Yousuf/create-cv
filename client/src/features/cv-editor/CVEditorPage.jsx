@@ -24,6 +24,8 @@ import { RenderCVTemplate } from '../../templates';
 import SortableSectionList from './components/SortableSectionList';
 import SectionFormEditor from './components/SectionFormEditor';
 import PhotoUploadCropModal from './components/PhotoUploadCropModal';
+import AIAssistantModal from '../../components/common/AIAssistantModal';
+import WhatsAppSupportButton from '../../components/common/WhatsAppSupportButton';
 import { TEMPLATES_REGISTRY, DANIEL_CARTER_CV, INITIAL_CV_DATA } from '@shared/constants/cvDefaults.js';
 import {
   Undo2,
@@ -81,6 +83,7 @@ export const CVEditorPage = () => {
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [activeActionDock, setActiveActionDock] = useState('edit');
@@ -103,6 +106,11 @@ export const CVEditorPage = () => {
     const targetPaperWidth = devicePreview === 'mobile' ? 400 : devicePreview === 'tablet' ? 650 : 820;
     const optimalScale = Math.min(1.0, Math.max(0.45, (availableWidth - 40) / targetPaperWidth));
     dispatch(setPreviewScale(Math.round(optimalScale * 100) / 100));
+  };
+
+  const handleOpenAI = (mode = 'summary') => {
+    setAiModalOpen(true);
+    dispatch(openAIModal({ mode }));
   };
 
   useEffect(() => {
@@ -400,8 +408,8 @@ export const CVEditorPage = () => {
             {/* AI Assistant Pill */}
             <button
               type="button"
-              onClick={() => dispatch(openAIModal({ mode: 'generate' }))}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all hover:bg-slate-100 dark:hover:bg-slate-800"
+              onClick={() => handleOpenAI('summary')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
               <span>AI Assistant</span>
@@ -531,8 +539,8 @@ export const CVEditorPage = () => {
             <div className="w-full px-2">
               <button
                 type="button"
-                onClick={() => dispatch(openAIModal({ mode: 'generate' }))}
-                className="flex flex-col items-center gap-1 w-full py-2 text-slate-500 hover:text-amber-500 transition-colors group"
+                onClick={() => handleOpenAI('summary')}
+                className="flex flex-col items-center gap-1 w-full py-2 text-slate-500 hover:text-amber-500 transition-colors group cursor-pointer"
                 title="Upgrade to Pro"
               >
                 <Crown className="w-5 h-5 text-amber-500 group-hover:scale-110 transition-transform" />
@@ -672,7 +680,7 @@ export const CVEditorPage = () => {
                         </p>
                         <button
                           type="button"
-                          onClick={() => dispatch(openAIModal({ mode: 'generate' }))}
+                          onClick={() => handleOpenAI('generate')}
                           className="mt-2.5 w-full py-2 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-semibold shadow-sm hover:shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                         >
                           <span>Generate with AI</span>
@@ -1246,6 +1254,12 @@ export const CVEditorPage = () => {
             </div>
           </main>
         </div>
+
+      {/* AI Assistant Generator Modal */}
+      <AIAssistantModal
+        isOpen={aiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+      />
 
       {/* Profile Photo Upload & Crop Modal */}
       <PhotoUploadCropModal

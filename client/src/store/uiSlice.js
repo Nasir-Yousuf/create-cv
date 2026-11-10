@@ -57,13 +57,16 @@ export const uiSlice = createSlice({
     openAIModal: (state, action) => {
       state.aiModal = {
         isOpen: true,
-        mode: action.payload.mode || 'generate',
-        contextData: action.payload.contextData || null,
+        mode: action?.payload?.mode || 'generate',
+        contextData: action?.payload?.contextData || null,
       };
     },
     closeAIModal: (state) => {
-      state.aiModal.isOpen = false;
-      state.aiModal.contextData = null;
+      state.aiModal = {
+        isOpen: false,
+        mode: 'generate',
+        contextData: null,
+      };
     },
     openExportModal: (state, action) => {
       state.exportModal = {

@@ -19,12 +19,15 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
-export const AIAssistantModal = () => {
+export const AIAssistantModal = ({ isOpen: propIsOpen, onClose: propOnClose, initialMode }) => {
   const dispatch = useDispatch();
-  const { isOpen, mode, contextData } = useSelector((state) => state.ui.aiModal || {});
+  const reduxAI = useSelector((state) => state.ui.aiModal || {});
   const { currentCV } = useSelector((state) => state.cv);
 
-  const [activeTab, setActiveTab] = useState(mode || 'summary'); // 'summary' | 'bullet' | 'generate' | 'ats'
+  const isModalOpen = propIsOpen !== undefined ? propIsOpen : reduxAI.isOpen;
+  const currentMode = initialMode || reduxAI.mode || 'summary';
+
+  const [activeTab, setActiveTab] = useState(currentMode || 'summary');
   const [roleInput, setRoleInput] = useState(currentCV?.personalInfo?.jobTitle || '');
   const [generatedOptions, setGeneratedOptions] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -32,9 +35,23 @@ export const AIAssistantModal = () => {
   const [enhancedBullet, setEnhancedBullet] = useState('');
   const [rawBioPrompt, setRawBioPrompt] = useState('');
 
-  if (!isOpen) return null;
+  React.useEffect(() => {
+    if (isModalOpen) {
+      if (currentMode === 'generate') setActiveTab('generate');
+      else if (currentMode === 'bullet' || currentMode === 'experience') setActiveTab('bullet');
+      else if (currentMode === 'ats') setActiveTab('ats');
+      else setActiveTab('summary');
+
+      if (currentCV?.personalInfo?.jobTitle) {
+        setRoleInput(currentCV.personalInfo.jobTitle);
+      }
+    }
+  }, [isModalOpen, currentMode, currentCV?.personalInfo?.jobTitle]);
+
+  if (!isModalOpen) return null;
 
   const handleClose = () => {
+    if (propOnClose) propOnClose();
     dispatch(closeAIModal());
   };
 
@@ -372,3 +389,4 @@ export const AIAssistantModal = () => {
 };
 
 export default AIAssistantModal;
+

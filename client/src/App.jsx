@@ -5,6 +5,7 @@ import Footer from './components/layout/Footer';
 import Toast from './components/common/Toast';
 import AuthModal from './components/auth/AuthModal';
 import AIAssistantModal from './components/common/AIAssistantModal';
+import WhatsAppSupportButton from './components/common/WhatsAppSupportButton';
 import LandingPage from './pages/LandingPage';
 import TemplateGalleryPage from './pages/TemplateGalleryPage';
 import DashboardPage from './pages/DashboardPage';
@@ -26,6 +27,7 @@ export const App = () => {
   return (
     <div className={`flex flex-col min-h-screen ${isEditorPage ? 'h-screen overflow-hidden' : 'bg-slate-50 dark:bg-slate-950'} text-slate-900 dark:text-slate-100`}>
       <Toast />
+      <WhatsAppSupportButton />
       <AIAssistantModal />
       {!isEditorPage && <Navbar onOpenAuth={handleOpenAuth} />}
 
