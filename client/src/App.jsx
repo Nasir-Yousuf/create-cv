@@ -10,10 +10,12 @@ import LandingPage from './pages/LandingPage';
 import TemplateGalleryPage from './pages/TemplateGalleryPage';
 import DashboardPage from './pages/DashboardPage';
 import CVEditorPage from './features/cv-editor/CVEditorPage';
+import AdminPaymentsPage from './pages/AdminPaymentsPage';
 
 export const App = () => {
   const location = useLocation();
   const isEditorPage = location.pathname === '/builder';
+  const isAdminPage = location.pathname.startsWith('/admin');
   const [authModal, setAuthModal] = useState({ isOpen: false, mode: 'login' });
 
   const handleOpenAuth = (mode = 'login') => {
@@ -29,7 +31,7 @@ export const App = () => {
       <Toast />
       <WhatsAppSupportButton />
       <AIAssistantModal />
-      {!isEditorPage && <Navbar onOpenAuth={handleOpenAuth} />}
+      {!isEditorPage && !isAdminPage && <Navbar onOpenAuth={handleOpenAuth} />}
 
       <main className="flex-1">
         <Routes>
@@ -37,11 +39,12 @@ export const App = () => {
           <Route path="/templates" element={<TemplateGalleryPage />} />
           <Route path="/dashboard" element={<DashboardPage onOpenAuth={handleOpenAuth} />} />
           <Route path="/builder" element={<CVEditorPage />} />
+          <Route path="/admin" element={<AdminPaymentsPage />} />
           <Route path="/pricing" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
         </Routes>
       </main>
 
-      {!isEditorPage && <Footer />}
+      {!isEditorPage && !isAdminPage && <Footer />}
 
       <AuthModal
         isOpen={authModal.isOpen}

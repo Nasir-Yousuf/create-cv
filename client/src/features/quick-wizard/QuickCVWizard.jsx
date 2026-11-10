@@ -18,6 +18,8 @@ import {
 import { TEMPLATES_REGISTRY, TEMPLATE_CATEGORIES, INITIAL_CV_DATA } from '@shared/constants/cvDefaults.js';
 import { RenderCVTemplate } from '../../templates';
 import exportService from '../../services/exportService';
+import paymentService from '../../services/paymentService';
+import PaymentExportModal from '../../components/common/PaymentExportModal';
 import { generateSmartBio, enhanceBulletPoint, PRESET_ROLES } from '../../utils/aiGenerator';
 import {
   Sparkles,
@@ -189,6 +191,7 @@ export const QuickCVWizard = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const cvData = useSelector((state) => state.cv.currentCV || state.cv.present || {});
+  const { user } = useSelector((state) => state.auth);
 
   const [activeCategory, setActiveCategory] = useState('All');
   const [downloadingTemplateId, setDownloadingTemplateId] = useState(null);
@@ -197,6 +200,9 @@ export const QuickCVWizard = () => {
   const [showBDDetails, setShowBDDetails] = useState(true);
   const [fullscreenPreview, setFullscreenPreview] = useState(null);
   const [newSkillInput, setNewSkillInput] = useState('');
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [pendingExportType, setPendingExportType] = useState('pdf');
+  const [pendingExportTemplate, setPendingExportTemplate] = useState(null);
   const fileInputRef = useRef(null);
 
   const personalInfo = cvData.personalInfo || {};
@@ -247,8 +253,8 @@ export const QuickCVWizard = () => {
     }
   };
 
-  // One-click PDF download for specific template card
-  const handleDownloadPDF = async (template) => {
+  // Execute One-click PDF download
+  const executeDownloadPDF = async (template) => {
     try {
       setDownloadingTemplateId(template.id);
       setDownloadType('pdf');
@@ -289,8 +295,19 @@ export const QuickCVWizard = () => {
     }
   };
 
-  // One-click DOCX download for specific template card
-  const handleDownloadDOCX = async (template) => {
+  // PDF download with bKash 10 Tk / Coupon Check
+  const handleDownloadPDF = async (template) => {
+    if (!paymentService.isExportUnlocked(user)) {
+      setPendingExportTemplate(template);
+      setPendingExportType('pdf');
+      setPaymentModalOpen(true);
+      return;
+    }
+    executeDownloadPDF(template);
+  };
+
+  // Execute One-click DOCX download
+  const executeDownloadDOCX = async (template) => {
     try {
       setDownloadingTemplateId(template.id);
       setDownloadType('docx');
@@ -321,6 +338,17 @@ export const QuickCVWizard = () => {
       setDownloadingTemplateId(null);
       setDownloadType(null);
     }
+  };
+
+  // DOCX download with bKash 10 Tk / Coupon Check
+  const handleDownloadDOCX = async (template) => {
+    if (!paymentService.isExportUnlocked(user)) {
+      setPendingExportTemplate(template);
+      setPendingExportType('docx');
+      setPaymentModalOpen(true);
+      return;
+    }
+    executeDownloadDOCX(template);
   };
 
   // Open full editor with selected template
@@ -1228,6 +1256,22 @@ export const QuickCVWizard = () => {
           </div>
         </div>
       )}
+
+      {/* Payment & Export Authorization Modal */}
+      <PaymentExportModal
+        isOpen={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        exportType={pendingExportType}
+        onSuccess={() => {
+          if (pendingExportTemplate) {
+            if (pendingExportType === 'docx') {
+              executeDownloadDOCX(pendingExportTemplate);
+            } else {
+              executeDownloadPDF(pendingExportTemplate);
+            }
+          }
+        }}
+      />
     </div>
   );
 };

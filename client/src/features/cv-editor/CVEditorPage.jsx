@@ -26,6 +26,8 @@ import SectionFormEditor from './components/SectionFormEditor';
 import PhotoUploadCropModal from './components/PhotoUploadCropModal';
 import AIAssistantModal from '../../components/common/AIAssistantModal';
 import WhatsAppSupportButton from '../../components/common/WhatsAppSupportButton';
+import PaymentExportModal from '../../components/common/PaymentExportModal';
+import paymentService from '../../services/paymentService';
 import { TEMPLATES_REGISTRY, DANIEL_CARTER_CV, INITIAL_CV_DATA } from '@shared/constants/cvDefaults.js';
 import {
   Undo2,
@@ -88,6 +90,9 @@ export const CVEditorPage = () => {
   const [isRightDockOpen, setIsRightDockOpen] = useState(true);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [activeActionDock, setActiveActionDock] = useState('edit');
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [pendingExportType, setPendingExportType] = useState('pdf');
+  const [pendingExportAction, setPendingExportAction] = useState(null);
 
   // Zoom preset values
   const zoomPresets = [
@@ -183,8 +188,8 @@ export const CVEditorPage = () => {
     }
   };
 
-  // Export PDF with Puppeteer binary stream
-  const handleExportPDF = async () => {
+  // Core PDF Export execution
+  const executeExportPDF = async () => {
     try {
       setIsExporting(true);
       setExportDropdownOpen(false);
@@ -222,8 +227,19 @@ export const CVEditorPage = () => {
     }
   };
 
-  // Export DOCX
-  const handleExportDOCX = async () => {
+  // Export PDF with bKash 10 Tk / Coupon Check
+  const handleExportPDF = async () => {
+    if (!paymentService.isExportUnlocked(user)) {
+      setPendingExportType('pdf');
+      setPendingExportAction(() => () => executeExportPDF());
+      setPaymentModalOpen(true);
+      return;
+    }
+    executeExportPDF();
+  };
+
+  // Core DOCX Export execution
+  const executeExportDOCX = async () => {
     try {
       setIsExporting(true);
       setExportDropdownOpen(false);
@@ -261,6 +277,17 @@ export const CVEditorPage = () => {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  // Export DOCX with bKash 10 Tk / Coupon Check
+  const handleExportDOCX = async () => {
+    if (!paymentService.isExportUnlocked(user)) {
+      setPendingExportType('docx');
+      setPendingExportAction(() => () => executeExportDOCX());
+      setPaymentModalOpen(true);
+      return;
+    }
+    executeExportDOCX();
   };
 
   // Filter templates
@@ -1310,6 +1337,16 @@ export const CVEditorPage = () => {
       <PhotoUploadCropModal
         isOpen={photoModalOpen}
         onClose={() => setPhotoModalOpen(false)}
+      />
+
+      {/* Payment & Export Authorization Modal (bKash 10 Tk / Coupon UDOY26) */}
+      <PaymentExportModal
+        isOpen={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        exportType={pendingExportType}
+        onSuccess={() => {
+          if (pendingExportAction) pendingExportAction();
+        }}
       />
     </div>
   );

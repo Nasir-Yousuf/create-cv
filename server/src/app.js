@@ -8,6 +8,7 @@ import authRoutes from './routes/authRoutes.js';
 import cvRoutes from './routes/cvRoutes.js';
 import templateRoutes from './routes/templateRoutes.js';
 import exportRoutes from './routes/exportRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
 
 const app = express();
@@ -63,6 +64,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/cvs', cvRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/payment', paymentRoutes);
 
 // 404 Handler for undefined routes
 app.use('/api/*', (req, res) => {

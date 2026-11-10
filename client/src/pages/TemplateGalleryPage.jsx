@@ -4,6 +4,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { setTemplateId, setCVData } from '../store/cvSlice';
 import { showToast } from '../store/uiSlice';
 import exportService from '../services/exportService';
+import paymentService from '../services/paymentService';
+import PaymentExportModal from '../components/common/PaymentExportModal';
 import { RenderCVTemplate } from '../templates';
 import {
   Search,
@@ -31,12 +33,15 @@ export const TemplateGalleryPage = () => {
   const dispatch = useDispatch();
 
   const { currentCV } = useSelector((state) => state.cv);
+  const { user } = useSelector((state) => state.auth);
 
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [previewTemplate, setPreviewTemplate] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
   const [favorites, setFavorites] = useState(['modern-blue', 'bd-corporate-standard']);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [pendingExportTemplate, setPendingExportTemplate] = useState(null);
 
   const toggleFavorite = (id) => {
     setFavorites((prev) =>
@@ -77,8 +82,8 @@ export const TemplateGalleryPage = () => {
     navigate('/builder');
   };
 
-  // Instant PDF Download
-  const handleDownloadPDF = async (template) => {
+  // Execute Instant PDF Download
+  const executeDownloadPDF = async (template) => {
     try {
       setDownloadingId(template.id);
       dispatch(
@@ -89,6 +94,11 @@ export const TemplateGalleryPage = () => {
       );
       const cvToExport = getCardCVData(template);
       const blob = await exportService.exportPDF(cvToExport);
+      if (blob?.type === 'application/json') {
+        const text = await blob.text();
+        const json = JSON.parse(text);
+        throw new Error(json.message || 'Export error');
+      }
       const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
@@ -99,6 +109,7 @@ export const TemplateGalleryPage = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 10000);
       dispatch(
         showToast({
           message: 'PDF downloaded successfully!',
@@ -116,6 +127,16 @@ export const TemplateGalleryPage = () => {
     } finally {
       setDownloadingId(null);
     }
+  };
+
+  // Instant PDF Download with Payment / Coupon Check
+  const handleDownloadPDF = async (template) => {
+    if (!paymentService.isExportUnlocked(user)) {
+      setPendingExportTemplate(template);
+      setPaymentModalOpen(true);
+      return;
+    }
+    executeDownloadPDF(template);
   };
 
   // Get realistic CV Data for template preview card
@@ -390,6 +411,18 @@ export const TemplateGalleryPage = () => {
           </div>
         </div>
       )}
+
+      {/* Payment & Export Authorization Modal */}
+      <PaymentExportModal
+        isOpen={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        exportType="pdf"
+        onSuccess={() => {
+          if (pendingExportTemplate) {
+            executeDownloadPDF(pendingExportTemplate);
+          }
+        }}
+      />
     </div>
   );
 };

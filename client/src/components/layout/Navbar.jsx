@@ -41,6 +41,7 @@ export const Navbar = ({ onOpenAuth }) => {
     { name: 'Editor', href: '/builder', icon: Edit3 },
     { name: 'AI Assistant', isAction: true, action: () => dispatch(openAIModal({ mode: 'summary' })), icon: Sparkles },
     { name: 'My Documents', href: '/dashboard', icon: FileText },
+    ...(user?.role === 'admin' ? [{ name: 'Admin', href: '/admin', icon: LayoutDashboard }] : []),
   ];
 
   return (
