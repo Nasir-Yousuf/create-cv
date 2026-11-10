@@ -15,12 +15,15 @@ export const ModernMinimal = ({ cvData, onOpenPhotoModal }) => {
 
   const {
     personalInfo = {},
+    personalDetails = {},
     experience = [],
     education = [],
     skills = [],
     projects = [],
     certifications = [],
     languages = [],
+    references = [],
+    declaration = {},
     customSections = [],
     design = {},
   } = cvData;

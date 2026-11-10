@@ -347,3 +347,4 @@ export const AppleClean = ({ cvData, onOpenPhotoModal }) => {
 };
 
 export default AppleClean;
+

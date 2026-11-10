@@ -134,3 +134,4 @@ export const enhanceBulletPoint = (text, role = '') => {
   const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
   return `${prefix}${clean.charAt(0).toLowerCase() + clean.slice(1)} resulting in significant performance gains and enhanced team productivity.`;
 };
+

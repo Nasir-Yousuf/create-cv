@@ -1,6 +1,6 @@
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { updateDesign, updatePersonalInfo } from '../../../store/cvSlice';
+import { updateDesign, updatePersonalInfo, setTemplateId } from '../../../store/cvSlice';
 import {
   Bold,
   Italic,
@@ -20,12 +20,14 @@ import {
   Circle,
   Square,
   Layers,
+  Layout,
 } from 'lucide-react';
-import { FONT_OPTIONS, COLOR_PALETTES } from '@shared/constants/cvDefaults.js';
+import { FONT_OPTIONS, COLOR_PALETTES, TEMPLATES_REGISTRY } from '@shared/constants/cvDefaults.js';
 
 export const EditorInspector = ({ onOpenPhotoModal }) => {
   const dispatch = useDispatch();
-  const { design, personalInfo } = useSelector((state) => state.cv.currentCV);
+  const currentCV = useSelector((state) => state.cv.currentCV);
+  const { design = {}, personalInfo = {}, templateId } = currentCV || {};
   const { activeSection, activeField } = useSelector((state) => state.ui);
 
   const primaryColor = design?.primaryColor || '#4f46e5';
@@ -45,6 +47,30 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
       </div>
 
       <div className="p-4 space-y-6 flex-1">
+        {/* Template Switcher */}
+        <div className="space-y-2 pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-between">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <Layout className="w-3.5 h-3.5 text-emerald-600" />
+              Active Template
+            </label>
+            <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded">
+              30+ Available
+            </span>
+          </div>
+          <select
+            value={templateId || 'bd-corporate-standard'}
+            onChange={(e) => dispatch(setTemplateId(e.target.value))}
+            className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            {TEMPLATES_REGISTRY.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} ({t.category})
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* 1. Quick Formatting Toolbar (Matches screenshot 1 & 2) */}
         <div className="space-y-3">
           <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -219,8 +245,9 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
           {personalInfo.photo ? (
             <div className="space-y-3">
               {/* Photo Shape */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {[
+                  { id: 'portrait', label: 'Portrait (35×45mm)', icon: Square },
                   { id: 'circle', label: 'Circle', icon: Circle },
                   { id: 'rounded', label: 'Rounded', icon: Square },
                   { id: 'square', label: 'Square', icon: Square },
@@ -229,13 +256,13 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
                     key={s.id}
                     type="button"
                     onClick={() => dispatch(updatePersonalInfo({ photoStyle: s.id }))}
-                    className={`p-2 rounded-xl border text-xs font-medium flex items-center justify-center gap-1 ${
+                    className={`p-2 rounded-xl border text-xs font-medium flex items-center justify-center gap-1.5 ${
                       personalInfo.photoStyle === s.id
-                        ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 font-bold'
+                        ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 font-bold'
                         : 'border-slate-200 dark:border-slate-800'
                     }`}
                   >
-                    <s.icon className="w-3 h-3" /> {s.label}
+                    <s.icon className="w-3.5 h-3.5" /> {s.label}
                   </button>
                 ))}
               </div>

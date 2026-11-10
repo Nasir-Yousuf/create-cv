@@ -252,3 +252,4 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
 };
 
 export default LinearDark;
+

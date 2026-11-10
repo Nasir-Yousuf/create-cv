@@ -71,22 +71,24 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
 
           {/* Contact Details */}
           <div className="text-[11px] text-slate-600 space-y-0.5 pt-1">
-            <p className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
               <EditableElement
                 section="personalInfo"
                 field="location"
+                tag="span"
                 value={personalInfo.location}
                 onSave={(val) => dispatch(updatePersonalInfo({ location: val }))}
                 placeholder="Present Address: House, Road, Area, Dhaka"
                 className="inline"
               />
-            </p>
-            <p className="flex items-center gap-1.5">
+            </div>
+            <div className="flex items-center gap-1.5">
               <Phone className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
               <EditableElement
                 section="personalInfo"
                 field="phone"
+                tag="span"
                 value={personalInfo.phone}
                 onSave={(val) => dispatch(updatePersonalInfo({ phone: val }))}
                 placeholder="+880 17XX-XXXXXX"
@@ -97,17 +99,18 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
               <EditableElement
                 section="personalInfo"
                 field="email"
+                tag="span"
                 value={personalInfo.email}
                 onSave={(val) => dispatch(updatePersonalInfo({ email: val }))}
                 placeholder="your.email@gmail.com"
                 className="inline"
               />
-            </p>
+            </div>
             {personalInfo.linkedin && (
-              <p className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5">
                 <Linkedin className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
                 <span>linkedin.com/in/{personalInfo.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '')}</span>
-              </p>
+              </div>
             )}
           </div>
         </div>
@@ -348,3 +351,4 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
 };
 
 export default BangladeshStandard;
+
