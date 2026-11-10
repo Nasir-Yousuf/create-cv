@@ -25,6 +25,7 @@ pnpm-debug.log*
 uploads/
 temp/
 exports/
+*audit_output/
 
 # OS and Editor files
 .DS_Store

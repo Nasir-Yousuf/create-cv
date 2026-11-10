@@ -31,6 +31,7 @@ import AIAssistantModal from '../../components/common/AIAssistantModal';
 import WhatsAppSupportButton from '../../components/common/WhatsAppSupportButton';
 import PaymentExportModal from '../../components/common/PaymentExportModal';
 import ExportStatusModal from '../../components/common/ExportStatusModal';
+import PDFPreviewModal from '../../components/common/PDFPreviewModal';
 import paymentService from '../../services/paymentService';
 import { TEMPLATES_REGISTRY, DANIEL_CARTER_CV, TAHMIDUR_RAHMAN_CV, INITIAL_CV_DATA } from '@shared/constants/cvDefaults.js';
 import {
@@ -103,6 +104,8 @@ export const CVEditorPage = () => {
   const [pendingExportType, setPendingExportType] = useState('pdf');
   const [pendingExportAction, setPendingExportAction] = useState(null);
   const [mobileExportSheetOpen, setMobileExportSheetOpen] = useState(false);
+  const [pdfPreviewModalOpen, setPdfPreviewModalOpen] = useState(false);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState('');
 
   // Zoom preset values
   const zoomPresets = [
@@ -320,6 +323,58 @@ export const CVEditorPage = () => {
           error: {
             title: 'PDF Generation Interrupted',
             message: 'We were unable to render this template to PDF. Your CV edits and content are completely safe. You can try again or export as Word (.docx).',
+          },
+        })
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Generate & Preview actual PDF binary in modal
+  const handlePreviewPDF = async () => {
+    if (isExporting) return;
+    if (typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+    try {
+      setIsExporting(true);
+      setExportDropdownOpen(false);
+      dispatch(
+        openExportModal({
+          format: 'pdf',
+          stage: 'preparing',
+          progress: 20,
+          statusMessage: 'Generating verified PDF binary for preview...',
+        })
+      );
+
+      const result = await exportService.generatePDFBlob(currentCV, '', 'cv-export-sheet', (update) => {
+        if (typeof update === 'object') {
+          dispatch(
+            updateExportState({
+              stage: update.stage || 'rendering',
+              progress: update.progress || 50,
+              statusMessage: update.message || 'Processing...',
+            })
+          );
+        } else {
+          dispatch(updateExportState({ statusMessage: String(update) }));
+        }
+      });
+
+      dispatch(closeExportModal());
+      setPreviewPdfUrl(result.url);
+      setPdfPreviewModalOpen(true);
+    } catch (err) {
+      console.error('PDF preview error:', err);
+      dispatch(
+        updateExportState({
+          stage: 'error',
+          isGenerating: false,
+          error: {
+            title: 'PDF Generation Interrupted',
+            message: 'Unable to render the PDF binary for preview. You can try downloading directly or export as Word (.docx).',
           },
         })
       );
@@ -1288,7 +1343,18 @@ export const CVEditorPage = () => {
                   </button>
 
                   {exportDropdownOpen && (
-                    <div className="absolute right-0 mt-1.5 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1.5 z-30 animate-fade-in text-xs">
+                    <div className="absolute right-0 mt-1.5 w-52 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1.5 z-30 animate-fade-in text-xs">
+                      <button
+                        type="button"
+                        onClick={handlePreviewPDF}
+                        className="w-full px-3.5 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-white flex items-center gap-2 border-b border-slate-100 dark:border-slate-700/60"
+                      >
+                        <Eye className="w-4 h-4 text-emerald-500" />
+                        <div>
+                          <div className="font-semibold">Preview Generated PDF</div>
+                          <div className="text-[10px] text-slate-400">Inspect exact PDF binary</div>
+                        </div>
+                      </button>
                       <button
                         type="button"
                         onClick={handleExportPDF}
@@ -1595,6 +1661,28 @@ export const CVEditorPage = () => {
                 </p>
               </div>
 
+              {/* Preview PDF Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileExportSheetOpen(false);
+                  handlePreviewPDF();
+                }}
+                className="w-full p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center gap-3 text-left cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl bg-slate-800 dark:bg-slate-700 text-white flex items-center justify-center shrink-0 shadow-md">
+                  <Eye className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                    Preview Generated PDF
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Inspect exact binary document before saving
+                  </div>
+                </div>
+              </button>
+
               {/* PDF Option */}
               <button
                 type="button"
@@ -1679,6 +1767,19 @@ export const CVEditorPage = () => {
         onAlternativeExport={(altFormat) =>
           altFormat === 'docx' ? executeExportDOCX() : executeExportPDF()
         }
+      />
+
+      {/* Real Generated PDF Binary Preview Modal */}
+      <PDFPreviewModal
+        isOpen={pdfPreviewModalOpen}
+        onClose={() => setPdfPreviewModalOpen(false)}
+        pdfUrl={previewPdfUrl}
+        filename={`${(currentCV?.personalInfo?.fullName || 'Resume').replace(/\s+/g, '_')}.pdf`}
+        onDownload={() => {
+          setPdfPreviewModalOpen(false);
+          handleExportPDF();
+        }}
+        isDownloading={isExporting}
       />
     </div>
   );

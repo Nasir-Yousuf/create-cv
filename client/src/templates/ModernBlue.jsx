@@ -109,17 +109,18 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
           </div>
 
           {/* 2-Column Contact Strip */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 pt-1 text-[11px] text-slate-600">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 pt-1.5 text-[11px] text-slate-600 leading-normal">
             {personalInfo.email && (
               <div className="flex items-center gap-1.5 justify-center sm:justify-start">
                 <Mail className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                 <EditableElement
                   section="personalInfo"
                   field="email"
+                  tag="span"
                   value={personalInfo.email}
                   onSave={(val) => dispatch(updatePersonalInfo({ email: val }))}
                   placeholder="email@example.com"
-                  className="truncate inline hover:text-slate-900"
+                  className="inline break-words hover:text-slate-900 leading-normal"
                 />
               </div>
             )}
@@ -129,10 +130,11 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
                 <EditableElement
                   section="personalInfo"
                   field="phone"
+                  tag="span"
                   value={personalInfo.phone}
                   onSave={(val) => dispatch(updatePersonalInfo({ phone: val }))}
                   placeholder="+1 555-0199"
-                  className="truncate inline hover:text-slate-900"
+                  className="inline break-words hover:text-slate-900 leading-normal"
                 />
               </div>
             )}
@@ -142,10 +144,11 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
                 <EditableElement
                   section="personalInfo"
                   field="location"
+                  tag="span"
                   value={personalInfo.location}
                   onSave={(val) => dispatch(updatePersonalInfo({ location: val }))}
                   placeholder="City, Country"
-                  className="truncate inline hover:text-slate-900"
+                  className="inline break-words hover:text-slate-900 leading-normal"
                 />
               </div>
             )}
@@ -155,10 +158,11 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
                 <EditableElement
                   section="personalInfo"
                   field="website"
+                  tag="span"
                   value={personalInfo.website}
                   onSave={(val) => dispatch(updatePersonalInfo({ website: val }))}
                   placeholder="portfolio.com"
-                  className="truncate inline hover:text-slate-900"
+                  className="inline break-words hover:text-slate-900 leading-normal"
                 />
               </div>
             )}
@@ -168,10 +172,11 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
                 <EditableElement
                   section="personalInfo"
                   field="linkedin"
+                  tag="span"
                   value={personalInfo.linkedin}
                   onSave={(val) => dispatch(updatePersonalInfo({ linkedin: val }))}
                   placeholder="linkedin.com/in/username"
-                  className="truncate inline hover:text-slate-900"
+                  className="inline break-words hover:text-slate-900 leading-normal"
                 />
               </div>
             )}
@@ -181,10 +186,11 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
                 <EditableElement
                   section="personalInfo"
                   field="github"
+                  tag="span"
                   value={personalInfo.github}
                   onSave={(val) => dispatch(updatePersonalInfo({ github: val }))}
                   placeholder="github.com/username"
-                  className="truncate inline hover:text-slate-900"
+                  className="inline break-words hover:text-slate-900 leading-normal"
                 />
               </div>
             )}

@@ -136,7 +136,7 @@ export const EditableElement = ({
     );
   }
 
-  const Tag = tag;
+  const Tag = (tag === 'div' && (className.includes('inline') || className.includes('break-'))) ? 'span' : tag;
 
   return (
     <Tag

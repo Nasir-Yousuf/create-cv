@@ -139,6 +139,67 @@ const isCanvasNotBlank = (canvas) => {
 };
 
 /**
+ * Global Cache for Single-Source PDF Generation & Instant Reusable Downloads
+ */
+let cachedPdf = {
+  blob: null,
+  hash: null,
+  url: null,
+};
+
+/**
+ * Computes deterministic fingerprint of CV content and layout settings.
+ */
+export const computeCvHash = (cvData) => {
+  try {
+    const raw = JSON.stringify({
+      templateId: cvData?.templateId,
+      design: cvData?.design,
+      personalInfo: cvData?.personalInfo,
+      personalDetails: cvData?.personalDetails,
+      experience: cvData?.experience,
+      education: cvData?.education,
+      skills: cvData?.skills,
+      projects: cvData?.projects,
+      certifications: cvData?.certifications,
+      languages: cvData?.languages,
+      references: cvData?.references,
+      interests: cvData?.interests,
+      declaration: cvData?.declaration,
+      customSections: cvData?.customSections,
+    });
+    let hash = 0;
+    for (let i = 0; i < raw.length; i++) {
+      hash = ((hash << 5) - hash + raw.charCodeAt(i)) | 0;
+    }
+    return `${hash}_${raw.length}`;
+  } catch (e) {
+    return String(Date.now());
+  }
+};
+
+/**
+ * Invalidates the cached PDF binary when CV content changes.
+ */
+export const invalidatePdfCache = () => {
+  if (cachedPdf.url) {
+    try {
+      window.URL.revokeObjectURL(cachedPdf.url);
+    } catch (e) {}
+  }
+  cachedPdf = {
+    blob: null,
+    hash: null,
+    url: null,
+  };
+};
+
+/**
+ * Returns current cached PDF state.
+ */
+export const getCachedPdf = () => cachedPdf;
+
+/**
  * Extracts and prepares clean HTML for the target CV template.
  */
 const extractCleanTemplateHtml = (cvData, elementId) => {
@@ -173,7 +234,6 @@ const extractCleanTemplateHtml = (cvData, elementId) => {
   clone.style.transform = 'none';
   clone.style.webkitTransform = 'none';
   clone.style.margin = '0';
-  clone.style.padding = '0';
   clone.style.boxShadow = 'none';
   clone.style.borderRadius = '0';
   clone.style.overflow = 'visible';
@@ -188,31 +248,48 @@ const extractCleanTemplateHtml = (cvData, elementId) => {
     cameraBoxes.forEach((b) => b.remove());
   }
 
+  // SANITIZER: Eliminate any truncate or clipping overflow that could squish or cut text
+  const truncateEls = clone.querySelectorAll('.truncate, [class*="truncate"]');
+  truncateEls.forEach((el) => {
+    el.classList.remove('truncate');
+    el.style.overflow = 'visible';
+    el.style.textOverflow = 'clip';
+    el.style.whiteSpace = 'normal';
+    el.style.wordBreak = 'break-word';
+  });
+
+  const allNodes = clone.querySelectorAll('*');
+  allNodes.forEach((node) => {
+    if (node.style && node.style.overflow === 'hidden' && !node.classList.contains('rounded-full')) {
+      node.style.overflow = 'visible';
+    }
+  });
+
   return clone.outerHTML;
 };
 
 export const exportService = {
+  invalidatePdfCache,
+  getCachedPdf,
+
   /**
-   * PDF Export Pipeline:
-   * 1. Validate data
-   * 2. Extract clean DOM representation
-   * 3. Call backend Puppeteer service
-   * 4. Verify binary response
-   * 5. Fallback to client-side canvas render if server is unreachable
+   * Generates a validated PDF binary Blob, caching it for identical preview and download.
    */
-  async exportPDF(cvData, customHtml = '', elementId = 'cv-export-sheet', onProgress = null) {
-    const rawName = (cvData?.personalInfo?.fullName || cvData?.title || 'Resume').trim();
-    const cleanName = rawName.replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_') || 'Resume';
-    const filename = `${cleanName}.pdf`;
+  async generatePDFBlob(cvData, customHtml = '', elementId = 'cv-export-sheet', onProgress = null) {
+    const currentHash = computeCvHash(cvData);
+    if (cachedPdf.blob && cachedPdf.hash === currentHash && cachedPdf.url) {
+      notifyProgress(onProgress, 'ready', 100, 'Reusing verified PDF binary...');
+      return { blob: cachedPdf.blob, url: cachedPdf.url, fromCache: true };
+    }
 
-    notifyProgress(onProgress, 'preparing', 20, 'Preparing document & data...');
-
+    notifyProgress(onProgress, 'preparing', 20, 'Preparing document & layout data...');
     const cleanHtml = customHtml || extractCleanTemplateHtml(cvData, elementId);
+
+    let generatedBlob = null;
 
     // 1. PRIMARY STRATEGY: High-Fidelity Server-Side Puppeteer Engine
     try {
       notifyProgress(onProgress, 'rendering', 45, 'Rendering vector typography & layout...');
-
       notifyProgress(onProgress, 'generating', 75, 'Generating vector PDF document...');
 
       const response = await api.post(
@@ -237,9 +314,10 @@ export const exportService = {
         }
 
         if (response.data.size > 5000) {
-          notifyProgress(onProgress, 'ready', 100, 'Ready for download!');
-          triggerDownload(response.data, filename);
-          return response.data;
+          const head = await response.data.slice(0, 5).text();
+          if (head.startsWith('%PDF-')) {
+            generatedBlob = response.data;
+          }
         }
       }
     } catch (serverErr) {
@@ -247,147 +325,180 @@ export const exportService = {
     }
 
     // 2. SECONDARY RESILIENT FALLBACK: Client-Side Crisp jsPDF Engine
-    let stageContainer = null;
-    let tempRoot = null;
+    if (!generatedBlob) {
+      let stageContainer = null;
+      let tempRoot = null;
 
-    try {
-      notifyProgress(onProgress, 'rendering', 55, 'Rendering high-resolution document...');
+      try {
+        notifyProgress(onProgress, 'rendering', 55, 'Rendering high-resolution document...');
 
-      // Wait for fonts to be ready
-      if (document.fonts && document.fonts.ready) {
-        try {
-          await document.fonts.ready;
-        } catch (e) {}
-      }
+        // Wait for fonts to be ready
+        if (document.fonts && document.fonts.ready) {
+          try {
+            await document.fonts.ready;
+          } catch (e) {}
+        }
 
-      // Create an off-screen staging container at (0,0) with high z-index
-      stageContainer = document.createElement('div');
-      stageContainer.id = 'client-pdf-active-stage';
-      stageContainer.style.cssText = `
-        position: fixed;
-        left: 0;
-        top: 0;
-        width: 794px;
-        min-height: 1123px;
-        z-index: 99999;
-        background: #ffffff;
-        opacity: 0.99;
-        pointer-events: none;
-        overflow: visible;
-        margin: 0;
-        padding: 0;
-      `;
-      document.body.appendChild(stageContainer);
+        // Create an off-screen staging container at (0,0) with high z-index
+        stageContainer = document.createElement('div');
+        stageContainer.id = 'client-pdf-active-stage';
+        stageContainer.style.cssText = `
+          position: fixed;
+          left: 0;
+          top: 0;
+          width: 794px;
+          min-height: 1123px;
+          z-index: 99999;
+          background: #ffffff;
+          opacity: 0.99;
+          pointer-events: none;
+          overflow: visible;
+          margin: 0;
+          padding: 0;
+          font-family: ${cvData?.design?.fontFamily || 'Inter, -apple-system, sans-serif'};
+        `;
+        document.body.appendChild(stageContainer);
 
-      let captureEl = null;
+        let captureEl = null;
 
-      if (cleanHtml) {
-        stageContainer.innerHTML = cleanHtml;
-        captureEl = stageContainer.firstElementChild || stageContainer;
-      } else {
-        // Mount React Template directly
-        await new Promise((resolve) => {
-          tempRoot = ReactDOM.createRoot(stageContainer);
-          tempRoot.render(
-            React.createElement(RenderCVTemplate, {
-              cvData,
-              scale: 1,
+        if (cleanHtml) {
+          stageContainer.innerHTML = cleanHtml;
+          captureEl = stageContainer.firstElementChild || stageContainer;
+        } else {
+          // Mount React Template directly
+          await new Promise((resolve) => {
+            tempRoot = ReactDOM.createRoot(stageContainer);
+            tempRoot.render(
+              React.createElement(RenderCVTemplate, {
+                cvData,
+                scale: 1,
+              })
+            );
+            setTimeout(resolve, 350);
+          });
+          captureEl = stageContainer.querySelector('#cv-export-sheet') || stageContainer;
+        }
+
+        // Ensure images decode
+        const images = stageContainer.querySelectorAll('img');
+        if (images.length > 0) {
+          await Promise.all(
+            Array.from(images).map((img) => {
+              img.crossOrigin = 'anonymous';
+              if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
+              return new Promise((resolve) => {
+                img.onload = resolve;
+                img.onerror = resolve;
+                setTimeout(resolve, 1500);
+              });
             })
           );
-          setTimeout(resolve, 350);
+        }
+
+        await new Promise((r) => setTimeout(r, 100));
+
+        const canvas = await html2canvas(captureEl, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          width: 794,
+          windowWidth: 794,
+          scrollX: 0,
+          scrollY: 0,
         });
-        captureEl = stageContainer.querySelector('#cv-export-sheet') || stageContainer;
-      }
 
-      // Ensure images decode
-      const images = stageContainer.querySelectorAll('img');
-      if (images.length > 0) {
-        await Promise.all(
-          Array.from(images).map((img) => {
-            img.crossOrigin = 'anonymous';
-            if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
-            return new Promise((resolve) => {
-              img.onload = resolve;
-              img.onerror = resolve;
-              setTimeout(resolve, 1500);
-            });
-          })
-        );
-      }
+        // VALIDATE CANVAS IS NOT BLANK
+        if (!isCanvasNotBlank(canvas)) {
+          throw new Error('Client PDF rendering resulted in blank canvas.');
+        }
 
-      await new Promise((r) => setTimeout(r, 100));
+        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+        const isLetter = cvData?.design?.pageSize === 'Letter';
+        const pageWidth = isLetter ? 215.9 : 210;
+        const pageHeight = isLetter ? 279.4 : 297;
+        const format = isLetter ? 'letter' : 'a4';
 
-      const canvas = await html2canvas(captureEl, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        width: 794,
-        windowWidth: 794,
-        scrollX: 0,
-        scrollY: 0,
-      });
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format,
+          compress: true,
+        });
 
-      // VALIDATE CANVAS IS NOT BLANK
-      if (!isCanvasNotBlank(canvas)) {
-        throw new Error('Client PDF rendering resulted in blank canvas.');
-      }
+        const pdfHeight = (canvas.height * pageWidth) / canvas.width;
+        const singlePageThreshold = pageHeight * 1.15;
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.98);
-      const isLetter = cvData?.design?.pageSize === 'Letter';
-      const pageWidth = isLetter ? 215.9 : 210;
-      const pageHeight = isLetter ? 279.4 : 297;
-      const format = isLetter ? 'letter' : 'a4';
+        if (pdfHeight <= singlePageThreshold) {
+          pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, Math.min(pageHeight, pdfHeight), undefined, 'FAST');
+        } else {
+          let heightLeft = pdfHeight;
+          let position = 0;
 
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format,
-        compress: true,
-      });
-
-      const pdfHeight = (canvas.height * pageWidth) / canvas.width;
-      const singlePageThreshold = pageHeight * 1.15;
-
-      if (pdfHeight <= singlePageThreshold) {
-        pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, Math.min(pageHeight, pdfHeight), undefined, 'FAST');
-      } else {
-        let heightLeft = pdfHeight;
-        let position = 0;
-
-        pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, pdfHeight, undefined, 'FAST');
-        heightLeft -= pageHeight;
-
-        while (heightLeft > 15) {
-          position = position - pageHeight;
-          pdf.addPage();
           pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, pdfHeight, undefined, 'FAST');
           heightLeft -= pageHeight;
+
+          while (heightLeft > 15) {
+            position = position - pageHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, pdfHeight, undefined, 'FAST');
+            heightLeft -= pageHeight;
+          }
+        }
+
+        const pdfBlob = pdf.output('blob');
+        if (!pdfBlob || pdfBlob.size < 5000) {
+          throw new Error('Generated PDF blob is empty.');
+        }
+
+        generatedBlob = pdfBlob;
+      } catch (clientErr) {
+        console.error('All automated PDF export strategies failed:', clientErr);
+        throw clientErr;
+      } finally {
+        if (tempRoot) {
+          try {
+            tempRoot.unmount();
+          } catch (e) {}
+        }
+        if (stageContainer && stageContainer.parentNode) {
+          stageContainer.remove();
         }
       }
-
-      const pdfBlob = pdf.output('blob');
-      if (!pdfBlob || pdfBlob.size < 5000) {
-        throw new Error('Generated PDF blob is empty.');
-      }
-
-      notifyProgress(onProgress, 'ready', 100, 'Ready for download!');
-      triggerDownload(pdfBlob, filename);
-      return pdfBlob;
-    } catch (clientErr) {
-      console.error('All automated PDF export strategies failed:', clientErr);
-      throw clientErr;
-    } finally {
-      if (tempRoot) {
-        try {
-          tempRoot.unmount();
-        } catch (e) {}
-      }
-      if (stageContainer && stageContainer.parentNode) {
-        stageContainer.remove();
-      }
     }
+
+    // Cache the verified blob for instant preview & download reuse
+    if (cachedPdf.url) {
+      try {
+        window.URL.revokeObjectURL(cachedPdf.url);
+      } catch (e) {}
+    }
+    const blobUrl = window.URL.createObjectURL(generatedBlob);
+    cachedPdf = {
+      blob: generatedBlob,
+      hash: currentHash,
+      url: blobUrl,
+    };
+
+    notifyProgress(onProgress, 'ready', 100, 'PDF binary verified and ready!');
+    return { blob: generatedBlob, url: blobUrl, fromCache: false };
+  },
+
+  /**
+   * PDF Export Pipeline:
+   * 1. Validate data
+   * 2. Obtain verified PDF binary (from cache or newly rendered)
+   * 3. Download the exact same binary
+   */
+  async exportPDF(cvData, customHtml = '', elementId = 'cv-export-sheet', onProgress = null) {
+    const rawName = (cvData?.personalInfo?.fullName || cvData?.title || 'Resume').trim();
+    const cleanName = rawName.replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_') || 'Resume';
+    const filename = `${cleanName}.pdf`;
+
+    const { blob } = await this.generatePDFBlob(cvData, customHtml, elementId, onProgress);
+    triggerDownload(blob, filename);
+    return blob;
   },
 
   /**

@@ -222,7 +222,7 @@ const generateTemplateHtml = (cvData) => {
             <div>
               <h3 class="text-xs font-bold uppercase tracking-wider border-b border-white/30 pb-1 mb-2 text-white">Contact</h3>
               <p class="space-y-1">
-                ${contactList.map((c) => `<div class="truncate">${c}</div>`).join('')}
+                ${contactList.map((c) => `<div class="break-words">${c}</div>`).join('')}
               </p>
             </div>
 
@@ -632,7 +632,7 @@ export const generatePDF = async (cvData, renderedHtml = '') => {
 
     await page.setContent(fullHtml, {
       waitUntil: ['domcontentloaded', 'networkidle2'],
-      timeout: 25000,
+      timeout: 45000,
     });
 
     // Wait for fonts and all images to load with individual safety limits
@@ -674,6 +674,9 @@ export const generatePDF = async (cvData, renderedHtml = '') => {
         `PDF Generation failed validation: Document has insufficient content (text length: ${metrics.textLength}, height: ${metrics.height}px)`
       );
     }
+
+    // Ensure screen media type so print stylesheet doesn't distort element margins/padding
+    await page.emulateMediaType('screen');
 
     const pdfBuffer = await page.pdf({
       format: pageSize,
