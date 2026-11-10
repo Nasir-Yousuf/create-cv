@@ -30,7 +30,7 @@ export const CreativeCoral = ({ cvData, onOpenPhotoModal }) => {
   return (
     <div className="bg-white text-slate-800 text-xs min-h-full" style={{ fontFamily }}>
       {/* Top Banner with organic wave & portrait/circle avatar */}
-      <div className="bg-gradient-to-r from-rose-500 via-rose-400 to-amber-300 p-8 sm:p-10 text-white relative">
+      <div className="bg-gradient-to-r from-rose-500 via-rose-400 to-amber-300 p-6 sm:p-8 text-white relative">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
           {design?.showPhoto && (
             <div

@@ -86,21 +86,21 @@ export const OceanSplit = ({ cvData, onOpenPhotoModal }) => {
               </div>
             )}
             {personalInfo.website && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <Globe className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <span className="truncate">{personalInfo.website.replace(/^https?:\/\//, '')}</span>
+                <span className="break-all leading-normal">{personalInfo.website.replace(/^https?:\/\//, '')}</span>
               </div>
             )}
             {personalInfo.github && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <Github className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <span className="truncate">{personalInfo.github.replace(/^https?:\/\/(www\.)?github\.com\//, '')}</span>
+                <span className="break-all leading-normal">{personalInfo.github.replace(/^https?:\/\/(www\.)?github\.com\//, '')}</span>
               </div>
             )}
             {personalInfo.linkedin && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <Linkedin className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <span className="truncate">{personalInfo.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '')}</span>
+                <span className="break-all leading-normal">{personalInfo.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '')}</span>
               </div>
             )}
           </div>

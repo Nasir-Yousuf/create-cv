@@ -41,7 +41,7 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
   return (
     <div className="bg-white text-slate-900 transition-all text-xs" style={{ fontFamily }}>
       {/* 1. Linear Obsidian Dark Top Header */}
-      <div className="bg-slate-950 text-white p-8 sm:p-10 border-b-2 border-indigo-500/50">
+      <div className="bg-slate-950 text-white p-6 sm:p-8 border-b-2 border-indigo-500/50">
         <div className="flex flex-col sm:flex-row justify-between items-start gap-6">
           <div className="space-y-2 flex-1">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-950/80 border border-indigo-800 text-[10px] font-mono text-indigo-300">

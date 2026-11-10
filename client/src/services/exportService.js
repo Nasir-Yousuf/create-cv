@@ -121,15 +121,29 @@ export const exportService = {
         captureTarget.style.overflow = 'visible';
         captureTarget.style.boxSizing = 'border-box';
 
-        // Remove any editor selection pips, focus rings, or badges from the export clone
+        // 1. Remove rounded outer container clipping and overflow-hidden from root
+        captureTarget.classList.remove('overflow-hidden', 'rounded-sm', 'rounded-md', 'rounded-lg');
+
+        // 2. Remove any editor selection pips, focus rings, or badges from the export clone
         const rings = captureTarget.querySelectorAll('.ring-2, [class*="ring-indigo"]');
         rings.forEach((r) =>
           r.classList.remove('ring-2', 'ring-indigo-500', 'ring-offset-1', 'bg-indigo-50/30')
         );
         const pips = captureTarget.querySelectorAll(
-          'span.rounded-full.bg-indigo-600, div.bg-indigo-600, span.bg-indigo-600'
+          'span.rounded-full.bg-indigo-600, div.bg-indigo-600, span.bg-indigo-600, .group\\/editable > span'
         );
         pips.forEach((p) => p.remove());
+
+        // 3. Remove hover outlines from editable elements
+        const hoverOutlines = captureTarget.querySelectorAll('[class*="hover:outline"]');
+        hoverOutlines.forEach((el) => {
+          el.classList.remove(
+            'hover:outline-dashed',
+            'hover:outline-1',
+            'hover:outline-indigo-400/80',
+            'hover:bg-indigo-50/10'
+          );
+        });
 
         exportContainer.appendChild(captureTarget);
       } else if (customHtml) {
@@ -146,6 +160,30 @@ export const exportService = {
           })
         );
         captureTarget = exportContainer;
+      }
+
+      // Allow a brief tick for DOM layout calculation
+      await new Promise((r) => setTimeout(r, 100));
+
+      // Global cleanup on captureTarget across all templates:
+      // Remove .truncate and tight overflow so font descenders are never clipped
+      if (captureTarget) {
+        captureTarget.classList.remove('overflow-hidden');
+        const truncates = captureTarget.querySelectorAll('.truncate');
+        truncates.forEach((el) => {
+          el.classList.remove('truncate');
+          el.style.overflow = 'visible';
+          el.style.textOverflow = 'clip';
+          el.style.whiteSpace = 'normal';
+          el.style.wordBreak = 'break-word';
+          el.style.lineHeight = 'normal';
+        });
+
+        const scrollables = captureTarget.querySelectorAll('.overflow-x-auto, .overflow-y-auto');
+        scrollables.forEach((el) => {
+          el.classList.remove('overflow-x-auto', 'overflow-y-auto');
+          el.style.overflow = 'visible';
+        });
       }
 
       // Wait for fonts to finish loading
@@ -176,7 +214,7 @@ export const exportService = {
         );
       }
 
-      // Allow a brief tick for DOM layout calculation
+      // Allow final tick for layout stabilization
       await new Promise((r) => setTimeout(r, 100));
 
       // Capture with html2canvas at 2x crisp print scale (1588 x 2246)
@@ -196,32 +234,39 @@ export const exportService = {
       if (canvas && canvas.width > 0 && canvas.height > 0) {
         const imgData = canvas.toDataURL('image/jpeg', 0.98);
 
+        const isLetter = cvData?.design?.pageSize === 'Letter';
+        const pageWidth = isLetter ? 215.9 : 210; // mm
+        const pageHeight = isLetter ? 279.4 : 297; // mm
+        const format = isLetter ? 'letter' : 'a4';
+
         const pdf = new jsPDF({
           orientation: 'portrait',
           unit: 'mm',
-          format: 'a4',
+          format,
           compress: true,
         });
 
-        const pdfWidth = 210; // A4 width in mm
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-        const pageHeight = 297; // A4 height in mm
+        const pdfHeight = (canvas.height * pageWidth) / canvas.width;
+        // Allow up to 18% height tolerance (up to ~350mm) to cleanly fit 1 page
+        // without awkward page cuts through headers or sections
+        const singlePageThreshold = pageHeight * 1.18;
 
-        if (pdfHeight <= 298.5) {
-          // Standard single A4 page fit
-          pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, 297, undefined, 'FAST');
+        if (pdfHeight <= singlePageThreshold) {
+          // Standard single page fit: renders entire document cleanly on 1 page
+          const renderHeight = pdfHeight >= pageHeight * 0.94 ? pageHeight : pdfHeight;
+          pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, renderHeight, undefined, 'FAST');
         } else {
-          // Multi-page document
+          // Truly multi-page document
           let heightLeft = pdfHeight;
           let position = 0;
 
-          pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight, undefined, 'FAST');
+          pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, pdfHeight, undefined, 'FAST');
           heightLeft -= pageHeight;
 
-          while (heightLeft > 5) {
+          while (heightLeft > 25) {
             position = position - pageHeight;
             pdf.addPage();
-            pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight, undefined, 'FAST');
+            pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, pdfHeight, undefined, 'FAST');
             heightLeft -= pageHeight;
           }
         }

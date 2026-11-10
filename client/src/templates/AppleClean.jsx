@@ -43,7 +43,7 @@ export const AppleClean = ({ cvData, onOpenPhotoModal }) => {
 
   return (
     <div
-      className="p-8 sm:p-12 bg-white text-slate-900 transition-all text-xs leading-relaxed selection:bg-slate-200"
+      className="p-6 sm:p-8 md:p-10 bg-white text-slate-900 transition-all text-xs leading-normal selection:bg-slate-200"
       style={{ fontFamily, color: textColor }}
     >
       {/* 1. Apple-Style Minimal Header */}

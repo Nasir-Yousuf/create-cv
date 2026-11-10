@@ -32,7 +32,7 @@ export const ExecutiveSlate = ({ cvData, onOpenPhotoModal }) => {
   return (
     <div className="bg-white text-slate-800 transition-all text-xs" style={{ fontFamily }}>
       {/* Executive Dark Header */}
-      <div className="bg-slate-900 text-white p-8 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-6">
+      <div className="bg-slate-900 text-white p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
         <div className="space-y-2 text-center sm:text-left flex-1">
           <span className="text-[11px] font-semibold tracking-widest text-slate-400 uppercase">
             Curriculum Vitae

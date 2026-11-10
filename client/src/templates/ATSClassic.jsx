@@ -17,7 +17,7 @@ export const ATSClassic = ({ cvData }) => {
   const fontFamily = design?.fontFamily || 'Merriweather';
 
   return (
-    <div className="p-8 sm:p-12 bg-white text-black text-xs leading-normal" style={{ fontFamily }}>
+    <div className="p-6 sm:p-8 md:p-10 bg-white text-black text-xs leading-normal" style={{ fontFamily }}>
       {/* Header */}
       <div className="text-center pb-4 border-b border-black">
         <h1 className="text-2xl sm:text-3xl font-bold uppercase tracking-widest text-black">
