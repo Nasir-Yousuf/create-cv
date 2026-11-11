@@ -111,24 +111,17 @@ const isCanvasNotBlank = (canvas) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return false;
 
-    // Sample 50 points across the canvas
-    const sampleWidth = canvas.width;
-    const sampleHeight = canvas.height;
-    const stepX = Math.floor(sampleWidth / 10);
-    const stepY = Math.floor(sampleHeight / 10);
-
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    // Prime pixel stride (13px = 52 bytes) avoids missing thin dark text on white backgrounds
+    const byteStride = 13 * 4;
     let nonWhiteCount = 0;
 
-    for (let x = stepX; x < sampleWidth; x += stepX) {
-      for (let y = stepY; y < sampleHeight; y += stepY) {
-        const pixel = ctx.getImageData(x, y, 1, 1).data;
-        // Check if not pure white (255, 255, 255) and not fully transparent (alpha 0)
-        const isNotWhite = pixel[0] < 245 || pixel[1] < 245 || pixel[2] < 245;
-        const isNotTransparent = pixel[3] > 10;
-        if (isNotWhite && isNotTransparent) {
-          nonWhiteCount++;
-          if (nonWhiteCount > 3) return true;
-        }
+    for (let i = 0; i < data.length; i += byteStride) {
+      const isNotWhite = data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245;
+      const isNotTransparent = data[i + 3] > 10;
+      if (isNotWhite && isNotTransparent) {
+        nonWhiteCount++;
+        if (nonWhiteCount > 3) return true;
       }
     }
     return nonWhiteCount > 0;
@@ -263,7 +256,12 @@ const extractCleanTemplateHtml = (cvData, elementId) => {
 
     const allNodes = clone.querySelectorAll('*');
     allNodes.forEach((node) => {
-      if (node.style && node.style.overflow === 'hidden' && !node.classList.contains('rounded-full')) {
+      if (
+        node.style &&
+        node.style.overflow === 'hidden' &&
+        !node.classList.contains('rounded-full') &&
+        !node.classList.contains('cv-photo-frame')
+      ) {
         node.style.overflow = 'visible';
       }
     });
@@ -272,6 +270,168 @@ const extractCleanTemplateHtml = (cvData, elementId) => {
   }
 
   return rawHtml;
+};
+
+/**
+ * Pre-renders object-fit: cover / contain images onto matched offscreen canvases so
+ * html2canvas (which ignores CSS object-fit) preserves exact aspect ratios without stretching.
+ */
+const parseObjectPositionFactor = (token) => {
+  if (!token) return 0.5;
+  if (token === 'left' || token === 'top') return 0;
+  if (token === 'right' || token === 'bottom') return 1;
+  if (token === 'center') return 0.5;
+  if (token.endsWith('%')) {
+    const pct = parseFloat(token);
+    return Number.isFinite(pct) ? Math.min(1, Math.max(0, pct / 100)) : 0.5;
+  }
+  return 0.5;
+};
+
+const cropImageElementToDataUrl = (sourceImg, targetW, targetH, objectFit, xFactor, yFactor) => {
+  const nw = sourceImg.naturalWidth;
+  const nh = sourceImg.naturalHeight;
+  if (!nw || !nh || targetW <= 0 || targetH <= 0) return null;
+
+  const scale = 2;
+  const cw = Math.max(1, Math.round(targetW * scale));
+  const ch = Math.max(1, Math.round(targetH * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = cw;
+  canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  const imgRatio = nw / nh;
+  const boxRatio = targetW / targetH;
+
+  if (objectFit === 'contain') {
+    let dw = cw;
+    let dh = ch;
+    if (imgRatio > boxRatio) {
+      dh = cw / imgRatio;
+    } else {
+      dw = ch * imgRatio;
+    }
+    const dx = (cw - dw) * xFactor;
+    const dy = (ch - dh) * yFactor;
+    ctx.drawImage(sourceImg, 0, 0, nw, nh, dx, dy, dw, dh);
+  } else {
+    let sx = 0;
+    let sy = 0;
+    let sw = nw;
+    let sh = nh;
+    if (imgRatio > boxRatio) {
+      sw = nh * boxRatio;
+      sx = (nw - sw) * xFactor;
+    } else {
+      sh = nw / boxRatio;
+      sy = (nh - sh) * yFactor;
+    }
+    ctx.drawImage(sourceImg, sx, sy, sw, sh, 0, 0, cw, ch);
+  }
+
+  return canvas.toDataURL('image/png');
+};
+
+const prepareImagesForCanvas = async (container) => {
+  if (!container) return;
+  const imgs = Array.from(container.querySelectorAll('img'));
+  await Promise.all(
+    imgs.map(async (img) => {
+      try {
+        if (!img.src || !img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) return;
+        const rect = img.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+
+        const cs = window.getComputedStyle(img);
+        const objectFit = cs.objectFit;
+        if (objectFit !== 'cover' && objectFit !== 'contain') return;
+
+        const imgRatio = img.naturalWidth / img.naturalHeight;
+        const boxRatio = rect.width / rect.height;
+        if (Math.abs(imgRatio - boxRatio) <= 0.015) return;
+
+        const posParts = (cs.objectPosition || '50% 50%').trim().split(/\s+/);
+        const xFactor = parseObjectPositionFactor(posParts[0]);
+        const yFactor = parseObjectPositionFactor(posParts[1] || posParts[0]);
+
+        let croppedDataUrl = null;
+        try {
+          croppedDataUrl = cropImageElementToDataUrl(img, rect.width, rect.height, objectFit, xFactor, yFactor);
+        } catch (taintErr) {
+          // Retry with explicit CORS request for external hosts supporting Access-Control-Allow-Origin
+          croppedDataUrl = await new Promise((resolve) => {
+            const corsImg = new Image();
+            corsImg.crossOrigin = 'anonymous';
+            const timer = setTimeout(() => resolve(null), 2500);
+            corsImg.onload = () => {
+              clearTimeout(timer);
+              try {
+                resolve(cropImageElementToDataUrl(corsImg, rect.width, rect.height, objectFit, xFactor, yFactor));
+              } catch (e) {
+                resolve(null);
+              }
+            };
+            corsImg.onerror = () => {
+              clearTimeout(timer);
+              resolve(null);
+            };
+            corsImg.src = img.src;
+          });
+        }
+
+        if (croppedDataUrl) {
+          await new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+            img.src = croppedDataUrl;
+            img.style.objectFit = 'fill';
+            if (img.complete) resolve();
+          });
+        } else if (objectFit === 'cover' && img.parentElement) {
+          // Pure geometric DOM cover fallback if cross-origin canvas export is blocked
+          const scale = Math.max(rect.width / img.naturalWidth, rect.height / img.naturalHeight);
+          const drawW = img.naturalWidth * scale;
+          const drawH = img.naturalHeight * scale;
+          const offsetX = (rect.width - drawW) * xFactor;
+          const offsetY = (rect.height - drawH) * yFactor;
+
+          const wrapper = document.createElement('div');
+          wrapper.style.cssText = `
+            position: relative;
+            overflow: hidden;
+            width: ${rect.width}px;
+            height: ${rect.height}px;
+            border-radius: ${cs.borderRadius};
+            border: ${cs.border};
+            box-shadow: ${cs.boxShadow};
+            flex-shrink: 0;
+            box-sizing: border-box;
+          `;
+          wrapper.className = img.className;
+          img.parentNode.insertBefore(wrapper, img);
+          img.className = '';
+          img.style.cssText = `
+            position: absolute;
+            width: ${drawW}px;
+            height: ${drawH}px;
+            max-width: none;
+            max-height: none;
+            left: ${offsetX}px;
+            top: ${offsetY}px;
+            object-fit: fill;
+            display: block;
+          `;
+          wrapper.appendChild(img);
+        }
+      } catch (e) {
+        // Ignore unexpected image errors and let capture proceed
+      }
+    })
+  );
 };
 
 export const exportService = {
@@ -345,6 +505,10 @@ export const exportService = {
           } catch (e) {}
         }
 
+        const isLetterStage = cvData?.design?.pageSize === 'Letter';
+        const stageWidth = isLetterStage ? 816 : 794;
+        const stageMinHeight = isLetterStage ? 1056 : 1123;
+
         // Create an off-screen staging container at (0,0) with high z-index
         stageContainer = document.createElement('div');
         stageContainer.id = 'client-pdf-active-stage';
@@ -352,8 +516,8 @@ export const exportService = {
           position: fixed;
           left: 0;
           top: 0;
-          width: 794px;
-          min-height: 1123px;
+          width: ${stageWidth}px;
+          min-height: ${stageMinHeight}px;
           z-index: 99999;
           background: #ffffff;
           opacity: 0.99;
@@ -390,7 +554,6 @@ export const exportService = {
         if (images.length > 0) {
           await Promise.all(
             Array.from(images).map((img) => {
-              img.crossOrigin = 'anonymous';
               if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
               return new Promise((resolve) => {
                 img.onload = resolve;
@@ -401,19 +564,37 @@ export const exportService = {
           );
         }
 
-        await new Promise((r) => setTimeout(r, 100));
+        // Pre-crop object-fit: cover/contain images for crisp aspect-ratio fidelity in html2canvas
+        await prepareImagesForCanvas(captureEl);
+        await new Promise((r) => setTimeout(r, 80));
 
-        const canvas = await html2canvas(captureEl, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#ffffff',
-          logging: false,
-          width: 794,
-          windowWidth: 794,
-          scrollX: 0,
-          scrollY: 0,
-        });
+        // Fix Tailwind Preflight `img { display: block }` breaking html2canvas FontMetrics baseline calculation
+        const baselineFixStyle = document.createElement('style');
+        baselineFixStyle.id = 'cv-html2canvas-baseline-fix';
+        baselineFixStyle.textContent = `
+          body > div[style*="visibility"][style*="nowrap"] > img {
+            display: inline-block !important;
+            vertical-align: baseline !important;
+          }
+        `;
+        document.head.appendChild(baselineFixStyle);
+
+        let canvas;
+        try {
+          canvas = await html2canvas(captureEl, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+            width: stageWidth,
+            windowWidth: stageWidth,
+            scrollX: 0,
+            scrollY: 0,
+          });
+        } finally {
+          if (baselineFixStyle.parentNode) baselineFixStyle.remove();
+        }
 
         // VALIDATE CANVAS IS NOT BLANK
         if (!isCanvasNotBlank(canvas)) {
@@ -553,6 +734,12 @@ export const exportService = {
           h1, h2, h3, h4, h5, h6 { break-after: avoid !important; page-break-after: avoid !important; }
           .truncate, [class*="truncate"] { overflow: visible !important; text-overflow: clip !important; white-space: normal !important; word-break: break-word !important; }
           .no-print, .ring-2, [class*="ring-"], .cv-editor-pip, .cv-placeholder, .cv-photo-placeholder { display: none !important; }
+          .cv-icon-row { display: flex !important; align-items: center !important; min-width: 0; }
+          .cv-icon-row > svg, .cv-icon-svg { flex-shrink: 0 !important; display: block !important; vertical-align: middle !important; }
+          .cv-badge { display: inline-flex !important; align-items: center !important; justify-content: center !important; text-align: center !important; line-height: 1.25 !important; vertical-align: middle !important; max-width: 100%; box-sizing: border-box; }
+          .cv-photo-frame { overflow: hidden !important; flex-shrink: 0 !important; position: relative; }
+          .cv-photo-circle { border-radius: 9999px !important; aspect-ratio: 1 / 1 !important; }
+          .cv-photo-img { width: 100% !important; height: 100% !important; object-fit: cover !important; object-position: center !important; display: block !important; flex-shrink: 0 !important; }
         </style>
       </head>
       <body>

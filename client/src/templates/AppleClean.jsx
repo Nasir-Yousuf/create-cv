@@ -1,4 +1,5 @@
 import React from 'react';
+import './shared/cvElements.css';
 import { useDispatch } from 'react-redux';
 import {
   updatePersonalInfo,
@@ -75,67 +76,67 @@ export const AppleClean = ({ cvData, onOpenPhotoModal }) => {
           {/* Minimalist Contact Row */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-2 text-[11px] text-slate-500">
             {personalInfo.email && (
-              <span className="flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5 text-slate-400" />
+              <span className="cv-icon-row gap-1.5">
+                <Mail className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                 <EditableElement
                   section="personalInfo"
                   field="email"
                   value={personalInfo.email}
                   onSave={(val) => dispatch(updatePersonalInfo({ email: val }))}
                   placeholder="email@example.com"
-                  className="inline hover:text-slate-900"
+                  className="inline min-w-0 break-words hover:text-slate-900"
                 />
               </span>
             )}
             {personalInfo.phone && (
-              <span className="flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 text-slate-400" />
+              <span className="cv-icon-row gap-1.5">
+                <Phone className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                 <EditableElement
                   section="personalInfo"
                   field="phone"
                   value={personalInfo.phone}
                   onSave={(val) => dispatch(updatePersonalInfo({ phone: val }))}
                   placeholder="+880 17XX-XXXXXX"
-                  className="inline hover:text-slate-900"
+                  className="inline min-w-0 break-words hover:text-slate-900"
                 />
               </span>
             )}
             {personalInfo.location && (
-              <span className="flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              <span className="cv-icon-row gap-1.5">
+                <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                 <EditableElement
                   section="personalInfo"
                   field="location"
                   value={personalInfo.location}
                   onSave={(val) => dispatch(updatePersonalInfo({ location: val }))}
                   placeholder="City, Country"
-                  className="inline hover:text-slate-900"
+                  className="inline min-w-0 break-words hover:text-slate-900"
                 />
               </span>
             )}
             {personalInfo.linkedin && (
-              <span className="flex items-center gap-1.5">
-                <Linkedin className="w-3.5 h-3.5 text-slate-400" />
+              <span className="cv-icon-row gap-1.5">
+                <Linkedin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                 <EditableElement
                   section="personalInfo"
                   field="linkedin"
                   value={personalInfo.linkedin}
                   onSave={(val) => dispatch(updatePersonalInfo({ linkedin: val }))}
                   placeholder="linkedin.com/in/username"
-                  className="inline hover:text-slate-900"
+                  className="inline min-w-0 break-words hover:text-slate-900"
                 />
               </span>
             )}
             {personalInfo.website && (
-              <span className="flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-slate-400" />
+              <span className="cv-icon-row gap-1.5">
+                <Globe className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                 <EditableElement
                   section="personalInfo"
                   field="website"
                   value={personalInfo.website}
                   onSave={(val) => dispatch(updatePersonalInfo({ website: val }))}
                   placeholder="website.com"
-                  className="inline hover:text-slate-900"
+                  className="inline min-w-0 break-words hover:text-slate-900"
                 />
               </span>
             )}
@@ -151,12 +152,12 @@ export const AppleClean = ({ cvData, onOpenPhotoModal }) => {
           >
             {personalInfo.photo ? (
               <div
-                className={`${photoSizeClass} overflow-hidden rounded-lg border border-slate-200/90 shadow-sm bg-slate-50 transition-all group-hover:border-slate-400`}
+                className={`${photoSizeClass} cv-photo-frame rounded-lg border border-slate-200/90 shadow-sm bg-slate-50 transition-all group-hover:border-slate-400`}
               >
                 <img
                   src={personalInfo.photo}
                   alt={personalInfo.fullName || 'Photo'}
-                  className="w-full h-full object-cover"
+                  className="cv-photo-img"
                 />
               </div>
             ) : (
@@ -365,7 +366,7 @@ export const AppleClean = ({ cvData, onOpenPhotoModal }) => {
             {skills.map((s, index) => (
               <span
                 key={s.id || index}
-                className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 text-[11px] font-medium border border-slate-200/60"
+                className="cv-badge px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 text-[11px] font-medium border border-slate-200/60"
               >
                 <EditableElement
                   section="skills"

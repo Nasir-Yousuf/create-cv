@@ -1,4 +1,5 @@
 import React from 'react';
+import './shared/cvElements.css';
 import { useDispatch } from 'react-redux';
 import {
   updatePersonalInfo,
@@ -54,7 +55,7 @@ export const CreativeCoral = ({ cvData, onOpenPhotoModal }) => {
                 <img
                   src={personalInfo.photo}
                   alt={personalInfo.fullName || 'Profile'}
-                  className={`${photoSizeClass} object-cover rounded-xl border-4 border-white shadow-xl`}
+                  className={`${photoSizeClass} shrink-0 object-cover object-center block rounded-xl border-4 border-white shadow-xl`}
                 />
               ) : (
                 <div className={`${photoSizeClass} border-2 border-dashed border-white/80 rounded-xl flex flex-col items-center justify-center text-white p-2 text-center print:hidden cv-photo-placeholder`}>
@@ -85,41 +86,41 @@ export const CreativeCoral = ({ cvData, onOpenPhotoModal }) => {
             />
             <div className="flex flex-wrap justify-center sm:justify-start gap-3 pt-2 text-xs text-white/90">
               {personalInfo.email && (
-                <span className="flex items-center gap-1">
-                  <Mail className="w-3.5 h-3.5" />
+                <span className="cv-icon-row gap-1.5">
+                  <Mail className="w-3.5 h-3.5 shrink-0" />
                   <EditableElement
                     section="personalInfo"
                     field="email"
                     value={personalInfo.email}
                     onSave={(val) => dispatch(updatePersonalInfo({ email: val }))}
                     placeholder="email@example.com"
-                    className="inline"
+                    className="inline min-w-0 break-words"
                   />
                 </span>
               )}
               {personalInfo.phone && (
-                <span className="flex items-center gap-1">
-                  <Phone className="w-3.5 h-3.5" />
+                <span className="cv-icon-row gap-1.5">
+                  <Phone className="w-3.5 h-3.5 shrink-0" />
                   <EditableElement
                     section="personalInfo"
                     field="phone"
                     value={personalInfo.phone}
                     onSave={(val) => dispatch(updatePersonalInfo({ phone: val }))}
                     placeholder="+1 555-0123"
-                    className="inline"
+                    className="inline min-w-0 break-words"
                   />
                 </span>
               )}
               {personalInfo.location && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5" />
+                <span className="cv-icon-row gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 shrink-0" />
                   <EditableElement
                     section="personalInfo"
                     field="location"
                     value={personalInfo.location}
                     onSave={(val) => dispatch(updatePersonalInfo({ location: val }))}
                     placeholder="City, Country"
-                    className="inline"
+                    className="inline min-w-0 break-words"
                   />
                 </span>
               )}
@@ -134,8 +135,8 @@ export const CreativeCoral = ({ cvData, onOpenPhotoModal }) => {
         <div className="md:col-span-2 space-y-6">
           {personalInfo.summary && (
             <section>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-rose-500 flex items-center gap-1.5 mb-2">
-                <Sparkles className="w-3.5 h-3.5" /> About Me
+              <h3 className="text-xs font-bold uppercase tracking-wider text-rose-500 cv-icon-row gap-1.5 mb-2">
+                <Sparkles className="w-3.5 h-3.5 shrink-0" /> <span>About Me</span>
               </h3>
               <EditableElement
                 section="personalInfo"
@@ -261,7 +262,7 @@ export const CreativeCoral = ({ cvData, onOpenPhotoModal }) => {
                     {proj.technologies && proj.technologies.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
                         {proj.technologies.map((t, idx) => (
-                          <span key={idx} className="px-1.5 py-0.5 bg-white text-rose-600 rounded text-[10px] font-medium border border-rose-200">
+                          <span key={idx} className="cv-badge px-1.5 py-0.5 bg-white text-rose-600 rounded text-[10px] font-medium border border-rose-200">
                             {t}
                           </span>
                         ))}
@@ -283,7 +284,7 @@ export const CreativeCoral = ({ cvData, onOpenPhotoModal }) => {
               </h3>
               <div className="flex flex-wrap gap-1.5">
                 {skills.map((s, index) => (
-                  <span key={s.id || index} className="px-2.5 py-1 bg-amber-50 text-amber-900 rounded-lg text-xs font-medium border border-amber-200">
+                  <span key={s.id || index} className="cv-badge px-2.5 py-1 bg-amber-50 text-amber-900 rounded-lg text-xs font-medium border border-amber-200">
                     <EditableElement
                       section="skills"
                       field="name"

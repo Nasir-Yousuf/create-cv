@@ -1,0 +1,47 @@
+/* Shared CV typography alignment, badge centering, and photo proportion rules.
+   Consistently bundled for Browser Preview, Client html2canvas PDF, and Server Puppeteer PDF. */
+
+.cv-icon-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.cv-icon-row > svg,
+.cv-icon-svg {
+  flex-shrink: 0;
+  display: block;
+  vertical-align: middle;
+}
+
+.cv-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.25;
+  vertical-align: middle;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.cv-photo-frame {
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.cv-photo-circle {
+  border-radius: 9999px;
+  aspect-ratio: 1 / 1;
+}
+
+.cv-photo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  flex-shrink: 0;
+}
+

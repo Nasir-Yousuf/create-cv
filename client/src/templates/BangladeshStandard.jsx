@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolvePhotoBoxClasses } from './shared/cvElements';
 import { useDispatch } from 'react-redux';
 import {
   updatePersonalInfo,
@@ -33,15 +34,29 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
   const textColor = design?.textColor || '#1e293b';
   const fontFamily = design?.fontFamily || 'Inter';
 
-  // Portrait Passport photo dimensions (35x45mm ratio, approx 110x140px)
-  const portraitPhotoClass =
-    design?.photoSize === 'sm'
-      ? 'w-24 h-32'
-      : design?.photoSize === 'lg'
-      ? 'w-36 h-48'
-      : design?.photoSize === 'xl'
-      ? 'w-40 h-52'
-      : 'w-28 h-36';
+  const isCirclePhoto = personalInfo?.photoStyle === 'circle';
+  const portraitPhotoClass = resolvePhotoBoxClasses({
+    photoSize: design?.photoSize,
+    photoStyle: isCirclePhoto ? 'circle' : personalInfo?.photoStyle === 'square' ? 'square' : personalInfo?.photoStyle === 'rounded' ? 'rounded' : 'portrait',
+    circleSizes: {
+      sm: 'w-24 h-24',
+      md: 'w-28 h-28',
+      lg: 'w-36 h-36',
+      xl: 'w-40 h-40',
+    },
+    portraitSizes: {
+      sm: 'w-24 h-32',
+      md: 'w-28 h-36',
+      lg: 'w-36 h-48',
+      xl: 'w-40 h-52',
+    },
+    squareSizes: {
+      sm: 'w-24 h-24',
+      md: 'w-28 h-28',
+      lg: 'w-36 h-36',
+      xl: 'w-40 h-40',
+    },
+  });
 
   return (
     <div
@@ -74,7 +89,7 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
 
           {/* Contact Details */}
           <div className="text-[11px] text-slate-600 space-y-0.5 pt-1">
-            <div className="flex items-center gap-1.5">
+            <div className="cv-icon-row gap-1.5">
               <MapPin className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
               <EditableElement
                 section="personalInfo"
@@ -83,36 +98,40 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
                 value={personalInfo.location}
                 onSave={(val) => dispatch(updatePersonalInfo({ location: val }))}
                 placeholder="Present Address: House, Road, Area, Dhaka"
-                className="inline"
+                className="inline min-w-0 break-words"
               />
             </div>
-            <div className="flex items-center gap-1.5">
-              <Phone className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
-              <EditableElement
-                section="personalInfo"
-                field="phone"
-                tag="span"
-                value={personalInfo.phone}
-                onSave={(val) => dispatch(updatePersonalInfo({ phone: val }))}
-                placeholder="+880 17XX-XXXXXX"
-                className="inline font-semibold"
-              />
+            <div className="cv-icon-row flex-wrap gap-1.5">
+              <span className="cv-icon-row gap-1.5">
+                <Phone className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
+                <EditableElement
+                  section="personalInfo"
+                  field="phone"
+                  tag="span"
+                  value={personalInfo.phone}
+                  onSave={(val) => dispatch(updatePersonalInfo({ phone: val }))}
+                  placeholder="+880 17XX-XXXXXX"
+                  className="inline font-semibold"
+                />
+              </span>
               <span className="mx-1">•</span>
-              <Mail className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
-              <EditableElement
-                section="personalInfo"
-                field="email"
-                tag="span"
-                value={personalInfo.email}
-                onSave={(val) => dispatch(updatePersonalInfo({ email: val }))}
-                placeholder="your.email@gmail.com"
-                className="inline"
-              />
+              <span className="cv-icon-row gap-1.5 min-w-0">
+                <Mail className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
+                <EditableElement
+                  section="personalInfo"
+                  field="email"
+                  tag="span"
+                  value={personalInfo.email}
+                  onSave={(val) => dispatch(updatePersonalInfo({ email: val }))}
+                  placeholder="your.email@gmail.com"
+                  className="inline min-w-0 break-words"
+                />
+              </span>
             </div>
             {personalInfo.linkedin && (
-              <div className="flex items-center gap-1.5">
+              <div className="cv-icon-row gap-1.5">
                 <Linkedin className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
-                <span>linkedin.com/in/{personalInfo.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '')}</span>
+                <span className="min-w-0 break-words">linkedin.com/in/{personalInfo.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '')}</span>
               </div>
             )}
           </div>
@@ -127,9 +146,9 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
           >
             {personalInfo.photo ? (
               <div
-                className={`${portraitPhotoClass} border-2 border-slate-300 shadow-sm overflow-hidden bg-slate-100 ${
+                className={`${portraitPhotoClass} border-2 border-slate-300 shadow-sm bg-slate-100 ${
                   personalInfo.photoStyle === 'circle'
-                    ? 'rounded-full w-28 h-28'
+                    ? 'rounded-full'
                     : personalInfo.photoStyle === 'rounded'
                     ? 'rounded-xl'
                     : 'rounded-none'
@@ -139,7 +158,7 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
                 <img
                   src={personalInfo.photo}
                   alt={personalInfo.fullName}
-                  className="w-full h-full object-cover"
+                  className="cv-photo-img"
                 />
               </div>
             ) : (

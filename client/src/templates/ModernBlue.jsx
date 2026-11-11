@@ -1,4 +1,5 @@
 import React from 'react';
+import './shared/cvElements.css';
 import { useDispatch } from 'react-redux';
 import {
   updatePersonalInfo,
@@ -70,7 +71,7 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
               <img
                 src={personalInfo.photo}
                 alt={personalInfo.fullName || 'User Profile Photo'}
-                className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-2 border-slate-100 shadow-sm group-hover:opacity-90 group-hover:scale-105 transition-all duration-200"
+                className="w-20 h-20 sm:w-24 sm:h-24 aspect-square shrink-0 rounded-full object-cover object-center block border-2 border-slate-100 shadow-sm group-hover:opacity-90 group-hover:scale-105 transition-all duration-200"
               />
             ) : (
               <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 group-hover:border-blue-400 group-hover:text-blue-500 transition-all print:hidden cv-photo-placeholder">
@@ -85,7 +86,7 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
         )}
 
         {/* Name, Title & Contact Grid */}
-        <div className="flex-1 text-center sm:text-left space-y-1.5">
+        <div className="flex-1 min-w-0 text-center sm:text-left space-y-1.5">
           <div>
             <EditableElement
               section="personalInfo"
@@ -111,7 +112,7 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
           {/* 2-Column Contact Strip */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 pt-1.5 text-[11px] text-slate-600 leading-normal">
             {personalInfo.email && (
-              <div className="flex items-center gap-1.5 justify-center sm:justify-start">
+              <div className="cv-icon-row gap-1.5 justify-center sm:justify-start min-w-0">
                 <Mail className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                 <EditableElement
                   section="personalInfo"
@@ -120,12 +121,12 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
                   value={personalInfo.email}
                   onSave={(val) => dispatch(updatePersonalInfo({ email: val }))}
                   placeholder="email@example.com"
-                  className="inline break-words hover:text-slate-900 leading-normal"
+                  className="inline min-w-0 break-words hover:text-slate-900 leading-normal"
                 />
               </div>
             )}
             {personalInfo.phone && (
-              <div className="flex items-center gap-1.5 justify-center sm:justify-start">
+              <div className="cv-icon-row gap-1.5 justify-center sm:justify-start min-w-0">
                 <Phone className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                 <EditableElement
                   section="personalInfo"
@@ -134,12 +135,12 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
                   value={personalInfo.phone}
                   onSave={(val) => dispatch(updatePersonalInfo({ phone: val }))}
                   placeholder="+1 555-0199"
-                  className="inline break-words hover:text-slate-900 leading-normal"
+                  className="inline min-w-0 break-words hover:text-slate-900 leading-normal"
                 />
               </div>
             )}
             {personalInfo.location && (
-              <div className="flex items-center gap-1.5 justify-center sm:justify-start">
+              <div className="cv-icon-row gap-1.5 justify-center sm:justify-start min-w-0">
                 <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                 <EditableElement
                   section="personalInfo"
@@ -148,12 +149,12 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
                   value={personalInfo.location}
                   onSave={(val) => dispatch(updatePersonalInfo({ location: val }))}
                   placeholder="City, Country"
-                  className="inline break-words hover:text-slate-900 leading-normal"
+                  className="inline min-w-0 break-words hover:text-slate-900 leading-normal"
                 />
               </div>
             )}
             {personalInfo.website && (
-              <div className="flex items-center gap-1.5 justify-center sm:justify-start">
+              <div className="cv-icon-row gap-1.5 justify-center sm:justify-start min-w-0">
                 <Globe className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                 <EditableElement
                   section="personalInfo"
@@ -162,12 +163,12 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
                   value={personalInfo.website}
                   onSave={(val) => dispatch(updatePersonalInfo({ website: val }))}
                   placeholder="portfolio.com"
-                  className="inline break-words hover:text-slate-900 leading-normal"
+                  className="inline min-w-0 break-words hover:text-slate-900 leading-normal"
                 />
               </div>
             )}
             {personalInfo.linkedin && (
-              <div className="flex items-center gap-1.5 justify-center sm:justify-start">
+              <div className="cv-icon-row gap-1.5 justify-center sm:justify-start min-w-0">
                 <Linkedin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                 <EditableElement
                   section="personalInfo"
@@ -176,12 +177,12 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
                   value={personalInfo.linkedin}
                   onSave={(val) => dispatch(updatePersonalInfo({ linkedin: val }))}
                   placeholder="linkedin.com/in/username"
-                  className="inline break-words hover:text-slate-900 leading-normal"
+                  className="inline min-w-0 break-words hover:text-slate-900 leading-normal"
                 />
               </div>
             )}
             {personalInfo.github && (
-              <div className="flex items-center gap-1.5 justify-center sm:justify-start">
+              <div className="cv-icon-row gap-1.5 justify-center sm:justify-start min-w-0">
                 <Github className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                 <EditableElement
                   section="personalInfo"
@@ -190,7 +191,7 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
                   value={personalInfo.github}
                   onSave={(val) => dispatch(updatePersonalInfo({ github: val }))}
                   placeholder="github.com/username"
-                  className="inline break-words hover:text-slate-900 leading-normal"
+                  className="inline min-w-0 break-words hover:text-slate-900 leading-normal"
                 />
               </div>
             )}
@@ -205,15 +206,15 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
           {/* Skills Section */}
           {skills && skills.length > 0 && (
             <section>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 flex items-center gap-1.5 border-b border-slate-100">
-                <Award className="w-3.5 h-3.5" style={{ color: primary }} />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 cv-icon-row gap-1.5 border-b border-slate-100">
+                <Award className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
                 <span>Skills</span>
               </h2>
               <div className="flex flex-wrap gap-1.5 pt-2">
                 {skills.map((skill, index) => (
                   <span
                     key={skill.id || index}
-                    className="text-xs font-semibold px-2.5 py-1 rounded-md text-white shadow-xs"
+                    className="cv-badge text-xs font-semibold px-2.5 py-1 rounded-md text-white shadow-xs"
                     style={{ backgroundColor: primary }}
                   >
                     <EditableElement
@@ -234,8 +235,8 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
           {/* Languages Section */}
           {languages && languages.length > 0 && (
             <section>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 flex items-center gap-1.5 border-b border-slate-100">
-                <LangIcon className="w-3.5 h-3.5" style={{ color: primary }} />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 cv-icon-row gap-1.5 border-b border-slate-100">
+                <LangIcon className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
                 <span>Languages</span>
               </h2>
               <div className="space-y-1 pt-2 text-xs text-slate-700">
@@ -262,15 +263,15 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
           {/* Interests Section */}
           {interests && interests.length > 0 && (
             <section>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 flex items-center gap-1.5 border-b border-slate-100">
-                <Heart className="w-3.5 h-3.5" style={{ color: primary }} />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 cv-icon-row gap-1.5 border-b border-slate-100">
+                <Heart className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
                 <span>Interests</span>
               </h2>
               <div className="flex flex-wrap gap-1.5 pt-2">
                 {interests.map((interest, idx) => (
                   <span
                     key={idx}
-                    className="bg-slate-50 text-slate-600 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-200"
+                    className="cv-badge bg-slate-50 text-slate-600 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-200"
                   >
                     {interest}
                   </span>
@@ -300,8 +301,8 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
           {/* Professional Summary */}
           {personalInfo.summary && (
             <section>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 flex items-center gap-1.5 border-b border-slate-100">
-                <User className="w-3.5 h-3.5" style={{ color: primary }} />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 cv-icon-row gap-1.5 border-b border-slate-100">
+                <User className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
                 <span>Professional Summary</span>
               </h2>
               <div className="pt-1.5">
@@ -321,8 +322,8 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
           {/* Work Experience */}
           {experience && experience.length > 0 && (
             <section>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 flex items-center gap-1.5 border-b border-slate-100">
-                <Briefcase className="w-3.5 h-3.5" style={{ color: primary }} />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 cv-icon-row gap-1.5 border-b border-slate-100">
+                <Briefcase className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
                 <span>Work Experience</span>
               </h2>
               <div className="space-y-3 pt-2">
@@ -417,8 +418,8 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
           {/* Education */}
           {education && education.length > 0 && (
             <section>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 flex items-center gap-1.5 border-b border-slate-100">
-                <GraduationCap className="w-3.5 h-3.5" style={{ color: primary }} />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 cv-icon-row gap-1.5 border-b border-slate-100">
+                <GraduationCap className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
                 <span>Education</span>
               </h2>
               <div className="space-y-2 pt-2">
@@ -463,8 +464,8 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
           {/* Projects */}
           {projects && projects.length > 0 && (
             <section>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 flex items-center gap-1.5 border-b border-slate-100">
-                <FolderGit2 className="w-3.5 h-3.5" style={{ color: primary }} />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 cv-icon-row gap-1.5 border-b border-slate-100">
+                <FolderGit2 className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
                 <span>Key Projects</span>
               </h2>
               <div className="space-y-2 pt-2 text-xs">
@@ -489,8 +490,8 @@ export const ModernBlue = ({ cvData, onOpenPhotoModal }) => {
           {/* References */}
           {references && references.length > 0 && (
             <section>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 flex items-center gap-1.5 border-b border-slate-100">
-                <Users className="w-3.5 h-3.5" style={{ color: primary }} />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1.5 cv-icon-row gap-1.5 border-b border-slate-100">
+                <Users className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
                 <span>References</span>
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">

@@ -629,7 +629,15 @@ export const generateTemplateHtml = (cvData) => {
         </div>
         ${
           personalInfo.photo && design.showPhoto !== false
-            ? `<img src="${personalInfo.photo}" class="w-24 h-32 object-cover border-2 rounded shadow-sm" style="border-color: ${primary}" />`
+            ? `<img src="${personalInfo.photo}" class="${
+                personalInfo.photoStyle === 'circle'
+                  ? 'w-24 h-24 aspect-square rounded-full'
+                  : personalInfo.photoStyle === 'square'
+                  ? 'w-24 h-24 aspect-square rounded-none'
+                  : personalInfo.photoStyle === 'rounded'
+                  ? 'w-24 h-32 rounded-xl'
+                  : 'w-24 h-32 rounded'
+              } shrink-0 object-cover object-center border-2 shadow-sm" style="border-color: ${primary}" />`
             : ''
         }
       </div>
@@ -710,7 +718,7 @@ export const generateTemplateHtml = (cvData) => {
                 ${skills
                   .map(
                     (s) => `
-                  <span class="px-2.5 py-1 rounded-md text-xs font-medium" style="background-color: ${primary}15; color: ${primary}">
+                  <span class="cv-badge px-2.5 py-1 rounded-md text-xs font-medium" style="background-color: ${primary}15; color: ${primary}">
                     ${typeof s === 'string' ? s : s.name}
                   </span>`
                   )
@@ -812,7 +820,8 @@ export const generatePDF = async (cvData, renderedHtml = '') => {
   const fontFamily = design?.fontFamily || 'Inter';
 
   // Determine body content: clean provided HTML or faithful template generator
-  let bodyContent = renderedHtml && renderedHtml.trim().length > 30
+  const hasRenderedHtml = Boolean(renderedHtml && renderedHtml.trim().length > 30);
+  let bodyContent = hasRenderedHtml
     ? renderedHtml
     : generateTemplateHtml(cvData);
 
@@ -823,8 +832,9 @@ export const generatePDF = async (cvData, renderedHtml = '') => {
     .replace(/<div class="[^"]*cv-photo-placeholder[^"]*"[^>]*>.*?<\/div>/gi, '');
 
   const compiledCss = getCompiledClientStyles();
+  const shouldIncludeTailwindCdn = !compiledCss || !hasRenderedHtml;
 
-  // Construct complete HTML document with Tailwind CDN + compiled styles + print CSS
+  // Construct complete HTML document with compiled styles + print CSS (+ CDN fallback if needed)
   const fullHtml = `
     <!DOCTYPE html>
     <html lang="en">
@@ -834,8 +844,9 @@ export const generatePDF = async (cvData, renderedHtml = '') => {
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-      
-      <script src="https://cdn.tailwindcss.com"></script>
+      ${
+        shouldIncludeTailwindCdn
+          ? `<script src="https://cdn.tailwindcss.com"></script>
       <script>
         tailwind.config = {
           theme: {
@@ -855,7 +866,9 @@ export const generatePDF = async (cvData, renderedHtml = '') => {
             }
           }
         }
-      </script>
+      </script>`
+          : ''
+      }
 
       ${compiledCss ? `<style>${compiledCss}</style>` : ''}
 
@@ -903,26 +916,65 @@ export const generatePDF = async (cvData, renderedHtml = '') => {
           overflow: visible !important;
         }
         /* Preserve 2-column and desktop grid in print sheets */
-        .resume-sheet-a4 .md\:grid-cols-12,
-        .resume-sheet-letter .md\:grid-cols-12,
+        .resume-sheet-a4 .md\\:grid-cols-12,
+        .resume-sheet-letter .md\\:grid-cols-12,
         .grid-cols-12 {
           display: grid !important;
           grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
         }
-        .resume-sheet-a4 .md\:col-span-4,
-        .resume-sheet-letter .md\:col-span-4,
+        .resume-sheet-a4 .md\\:col-span-4,
+        .resume-sheet-letter .md\\:col-span-4,
         .col-span-4 {
           grid-column: span 4 / span 4 !important;
         }
-        .resume-sheet-a4 .md\:col-span-8,
-        .resume-sheet-letter .md\:col-span-8,
+        .resume-sheet-a4 .md\\:col-span-8,
+        .resume-sheet-letter .md\\:col-span-8,
         .col-span-8 {
           grid-column: span 8 / span 8 !important;
         }
-        .resume-sheet-a4 .sm\:grid-cols-2,
-        .resume-sheet-letter .sm\:grid-cols-2 {
+        .resume-sheet-a4 .sm\\:grid-cols-2,
+        .resume-sheet-letter .sm\\:grid-cols-2 {
           display: grid !important;
           grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+        /* Shared CV icon alignment, badge centering, and photo proportion safeguards */
+        .cv-icon-row {
+          display: flex !important;
+          align-items: center !important;
+          min-width: 0;
+        }
+        .cv-icon-row > svg,
+        .cv-icon-svg {
+          flex-shrink: 0 !important;
+          display: block !important;
+          vertical-align: middle !important;
+        }
+        .cv-badge {
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          text-align: center !important;
+          line-height: 1.25 !important;
+          vertical-align: middle !important;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+        .cv-photo-frame {
+          overflow: hidden !important;
+          flex-shrink: 0 !important;
+          position: relative;
+        }
+        .cv-photo-circle {
+          border-radius: 9999px !important;
+          aspect-ratio: 1 / 1 !important;
+        }
+        .cv-photo-img {
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: cover !important;
+          object-position: center !important;
+          display: block !important;
+          flex-shrink: 0 !important;
         }
         /* Break management */
         .avoid-break,
@@ -983,7 +1035,7 @@ export const generatePDF = async (cvData, renderedHtml = '') => {
 
     await page.setContent(fullHtml, {
       waitUntil: 'domcontentloaded',
-      timeout: 30000,
+      timeout: 60000,
     });
 
     // Wait for fonts and all images to load with individual safety limits

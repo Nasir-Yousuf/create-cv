@@ -1,4 +1,5 @@
 import React from 'react';
+import './shared/cvElements.css';
 import { useDispatch } from 'react-redux';
 import {
   updatePersonalInfo,
@@ -42,10 +43,10 @@ export const ModernMinimal = ({ cvData, onOpenPhotoModal }) => {
     'languages',
   ];
 
-  const isPortrait = personalInfo?.photoStyle === 'portrait' || design?.photoFormat === 'portrait' || true;
-  const photoSizeClass = isPortrait
-    ? (design?.photoSize === 'sm' ? 'w-20 h-28' : design?.photoSize === 'lg' ? 'w-32 h-44' : design?.photoSize === 'xl' ? 'w-36 h-48' : 'w-24 h-32')
-    : (design?.photoSize === 'sm' ? 'w-16 h-16' : design?.photoSize === 'lg' ? 'w-28 h-28' : design?.photoSize === 'xl' ? 'w-36 h-36' : 'w-24 h-24');
+  const isCircleOrSquare = personalInfo?.photoStyle === 'circle' || personalInfo?.photoStyle === 'square';
+  const photoSizeClass = isCircleOrSquare
+    ? (design?.photoSize === 'sm' ? 'w-16 h-16' : design?.photoSize === 'lg' ? 'w-28 h-28' : design?.photoSize === 'xl' ? 'w-36 h-36' : 'w-24 h-24')
+    : (design?.photoSize === 'sm' ? 'w-20 h-28' : design?.photoSize === 'lg' ? 'w-32 h-44' : design?.photoSize === 'xl' ? 'w-36 h-48' : 'w-24 h-32');
 
   const renderSection = (sectionId) => {
     switch (sectionId) {
@@ -196,7 +197,7 @@ export const ModernMinimal = ({ cvData, onOpenPhotoModal }) => {
               {skills.map((skill, index) => (
                 <span
                   key={skill.id || index}
-                  className="px-2.5 py-1 text-xs font-medium rounded-md bg-slate-100 text-slate-800"
+                  className="cv-badge px-2.5 py-1 text-xs font-medium rounded-md bg-slate-100 text-slate-800"
                   style={{ borderLeft: `3px solid ${primary}` }}
                 >
                   <EditableElement
@@ -495,11 +496,11 @@ export const ModernMinimal = ({ cvData, onOpenPhotoModal }) => {
               <img
                 src={personalInfo.photo}
                 alt={personalInfo.fullName}
-                className={`${photoSizeClass} object-cover border-2 shadow-sm transition-transform group-hover/photo:scale-105 ${
+                className={`${photoSizeClass} shrink-0 object-cover object-center block border-2 shadow-sm transition-transform group-hover/photo:scale-105 ${
                   personalInfo.photoStyle === 'square'
                     ? 'rounded-none'
                     : personalInfo.photoStyle === 'circle'
-                    ? 'rounded-full'
+                    ? 'rounded-full aspect-square'
                     : personalInfo.photoStyle === 'rounded'
                     ? 'rounded-2xl'
                     : 'rounded-md'
@@ -519,63 +520,63 @@ export const ModernMinimal = ({ cvData, onOpenPhotoModal }) => {
             design?.photoPosition === 'center' ? 'justify-center' : ''
           }`}
         >
-          <div className="flex items-center gap-1.5">
-            <Mail className="w-3.5 h-3.5" style={{ color: primary }} />
+          <div className="cv-icon-row gap-1.5">
+            <Mail className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
             <EditableElement
               section="personalInfo"
               field="email"
               value={personalInfo.email}
               onSave={(val) => dispatch(updatePersonalInfo({ email: val }))}
               placeholder="email@example.com"
-              className="inline"
+              className="inline min-w-0 break-words"
             />
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <Phone className="w-3.5 h-3.5" style={{ color: primary }} />
+          <div className="cv-icon-row gap-1.5">
+            <Phone className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
             <EditableElement
               section="personalInfo"
               field="phone"
               value={personalInfo.phone}
               onSave={(val) => dispatch(updatePersonalInfo({ phone: val }))}
               placeholder="+1 555-1234"
-              className="inline"
+              className="inline min-w-0 break-words"
             />
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5" style={{ color: primary }} />
+          <div className="cv-icon-row gap-1.5">
+            <MapPin className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
             <EditableElement
               section="personalInfo"
               field="location"
               value={personalInfo.location}
               onSave={(val) => dispatch(updatePersonalInfo({ location: val }))}
               placeholder="City, Country"
-              className="inline"
+              className="inline min-w-0 break-words"
             />
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <Globe className="w-3.5 h-3.5" style={{ color: primary }} />
+          <div className="cv-icon-row gap-1.5">
+            <Globe className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
             <EditableElement
               section="personalInfo"
               field="website"
               value={personalInfo.website}
               onSave={(val) => dispatch(updatePersonalInfo({ website: val }))}
               placeholder="portfolio.com"
-              className="inline"
+              className="inline min-w-0 break-words"
             />
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <Linkedin className="w-3.5 h-3.5" style={{ color: primary }} />
+          <div className="cv-icon-row gap-1.5">
+            <Linkedin className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
             <EditableElement
               section="personalInfo"
               field="linkedin"
               value={personalInfo.linkedin}
               onSave={(val) => dispatch(updatePersonalInfo({ linkedin: val }))}
               placeholder="linkedin.com/in/user"
-              className="inline"
+              className="inline min-w-0 break-words"
             />
           </div>
         </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import './shared/cvElements.css';
 import { useDispatch } from 'react-redux';
 import {
   updatePersonalInfo,
@@ -79,7 +80,7 @@ export const ExecutiveSlate = ({ cvData, onOpenPhotoModal }) => {
               <img
                 src={personalInfo.photo}
                 alt={personalInfo.fullName || 'Photo'}
-                className={`${photoSizeClass} object-cover border-2 border-slate-700 shadow-xl rounded-md`}
+                className={`${photoSizeClass} shrink-0 object-cover object-center block border-2 border-slate-700 shadow-xl rounded-md`}
               />
             ) : (
               <div
@@ -96,54 +97,54 @@ export const ExecutiveSlate = ({ cvData, onOpenPhotoModal }) => {
       {/* Contact Banner */}
       <div className="bg-slate-100 border-b border-slate-200 px-8 py-3 flex flex-wrap items-center justify-between gap-3 text-[11px] font-sans text-slate-700">
         {personalInfo.email && (
-          <span className="flex items-center gap-1.5">
-            <Mail className="w-3.5 h-3.5 text-slate-500" />
+          <span className="cv-icon-row gap-1.5">
+            <Mail className="w-3.5 h-3.5 shrink-0 text-slate-500" />
             <EditableElement
               section="personalInfo"
               field="email"
               value={personalInfo.email}
               onSave={(val) => dispatch(updatePersonalInfo({ email: val }))}
               placeholder="email@example.com"
-              className="inline"
+              className="inline min-w-0 break-words"
             />
           </span>
         )}
         {personalInfo.phone && (
-          <span className="flex items-center gap-1.5">
-            <Phone className="w-3.5 h-3.5 text-slate-500" />
+          <span className="cv-icon-row gap-1.5">
+            <Phone className="w-3.5 h-3.5 shrink-0 text-slate-500" />
             <EditableElement
               section="personalInfo"
               field="phone"
               value={personalInfo.phone}
               onSave={(val) => dispatch(updatePersonalInfo({ phone: val }))}
               placeholder="+1 555-0100"
-              className="inline"
+              className="inline min-w-0 break-words"
             />
           </span>
         )}
         {personalInfo.location && (
-          <span className="flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5 text-slate-500" />
+          <span className="cv-icon-row gap-1.5">
+            <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-500" />
             <EditableElement
               section="personalInfo"
               field="location"
               value={personalInfo.location}
               onSave={(val) => dispatch(updatePersonalInfo({ location: val }))}
               placeholder="City, Country"
-              className="inline"
+              className="inline min-w-0 break-words"
             />
           </span>
         )}
         {personalInfo.linkedin && (
-          <span className="flex items-center gap-1.5">
-            <Linkedin className="w-3.5 h-3.5 text-slate-500" />
+          <span className="cv-icon-row gap-1.5">
+            <Linkedin className="w-3.5 h-3.5 shrink-0 text-slate-500" />
             <EditableElement
               section="personalInfo"
               field="linkedin"
               value={personalInfo.linkedin}
               onSave={(val) => dispatch(updatePersonalInfo({ linkedin: val }))}
               placeholder="linkedin.com/in/username"
-              className="inline"
+              className="inline min-w-0 break-words"
             />
           </span>
         )}
@@ -171,8 +172,8 @@ export const ExecutiveSlate = ({ cvData, onOpenPhotoModal }) => {
         {/* Experience */}
         {experience && experience.length > 0 && (
           <section>
-            <h2 className="text-sm font-serif font-bold text-slate-900 uppercase tracking-wider border-b pb-1 mb-3 flex items-center gap-2">
-              <Briefcase className="w-4 h-4 text-slate-700" /> Career History & Achievements
+            <h2 className="text-sm font-serif font-bold text-slate-900 uppercase tracking-wider border-b pb-1 mb-3 cv-icon-row gap-2">
+              <Briefcase className="w-4 h-4 shrink-0 text-slate-700" /> <span>Career History & Achievements</span>
             </h2>
             <div className="space-y-4">
               {experience.map((exp, index) => (
@@ -252,8 +253,8 @@ export const ExecutiveSlate = ({ cvData, onOpenPhotoModal }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
           {education && education.length > 0 && (
             <section>
-              <h2 className="text-sm font-serif font-bold text-slate-900 uppercase tracking-wider border-b pb-1 mb-3 flex items-center gap-2">
-                <GraduationCap className="w-4 h-4 text-slate-700" /> Education
+              <h2 className="text-sm font-serif font-bold text-slate-900 uppercase tracking-wider border-b pb-1 mb-3 cv-icon-row gap-2">
+                <GraduationCap className="w-4 h-4 shrink-0 text-slate-700" /> <span>Education</span>
               </h2>
               <div className="space-y-3 font-sans text-xs">
                 {education.map((edu, index) => (
@@ -295,7 +296,7 @@ export const ExecutiveSlate = ({ cvData, onOpenPhotoModal }) => {
                 {skills.map((s, index) => (
                   <span
                     key={s.id || index}
-                    className="px-2.5 py-1 rounded bg-slate-100 text-slate-800 text-[11px] font-medium"
+                    className="cv-badge px-2.5 py-1 rounded bg-slate-100 text-slate-800 text-[11px] font-medium"
                   >
                     <EditableElement
                       section="skills"

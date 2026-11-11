@@ -1,4 +1,5 @@
 import React from 'react';
+import './shared/cvElements.css';
 import { useDispatch } from 'react-redux';
 import {
   updatePersonalInfo,
@@ -45,8 +46,8 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
       <div className="bg-slate-950 text-white p-6 sm:p-8 border-b-2 border-indigo-500/50">
         <div className="flex flex-col sm:flex-row justify-between items-start gap-6">
           <div className="space-y-2 flex-1">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-950/80 border border-indigo-800 text-[10px] font-mono text-indigo-300">
-              <Terminal className="w-3 h-3 text-indigo-400" />
+            <div className="cv-badge gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-950/80 border border-indigo-800 text-[10px] font-mono text-indigo-300">
+              <Terminal className="w-3 h-3 shrink-0 text-indigo-400" />
               <span>cv://profile/active</span>
             </div>
 
@@ -73,54 +74,54 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
             {/* Contact Strip */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2 text-[11px] text-slate-400 font-mono">
               {personalInfo.email && (
-                <span className="flex items-center gap-1.5">
-                  <Mail className="w-3 h-3 text-indigo-400" />
+                <span className="cv-icon-row gap-1.5">
+                  <Mail className="w-3 h-3 shrink-0 text-indigo-400" />
                   <EditableElement
                     section="personalInfo"
                     field="email"
                     value={personalInfo.email}
                     onSave={(val) => dispatch(updatePersonalInfo({ email: val }))}
                     placeholder="email@example.com"
-                    className="inline text-slate-300 hover:text-white"
+                    className="inline min-w-0 break-words text-slate-300 hover:text-white"
                   />
                 </span>
               )}
               {personalInfo.phone && (
-                <span className="flex items-center gap-1.5">
-                  <Phone className="w-3 h-3 text-indigo-400" />
+                <span className="cv-icon-row gap-1.5">
+                  <Phone className="w-3 h-3 shrink-0 text-indigo-400" />
                   <EditableElement
                     section="personalInfo"
                     field="phone"
                     value={personalInfo.phone}
                     onSave={(val) => dispatch(updatePersonalInfo({ phone: val }))}
                     placeholder="+1 555-0199"
-                    className="inline text-slate-300 hover:text-white"
+                    className="inline min-w-0 break-words text-slate-300 hover:text-white"
                   />
                 </span>
               )}
               {personalInfo.location && (
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-3 h-3 text-indigo-400" />
+                <span className="cv-icon-row gap-1.5">
+                  <MapPin className="w-3 h-3 shrink-0 text-indigo-400" />
                   <EditableElement
                     section="personalInfo"
                     field="location"
                     value={personalInfo.location}
                     onSave={(val) => dispatch(updatePersonalInfo({ location: val }))}
                     placeholder="City, Country"
-                    className="inline text-slate-300 hover:text-white"
+                    className="inline min-w-0 break-words text-slate-300 hover:text-white"
                   />
                 </span>
               )}
               {personalInfo.github && (
-                <span className="flex items-center gap-1.5">
-                  <Github className="w-3 h-3 text-indigo-400" />
+                <span className="cv-icon-row gap-1.5">
+                  <Github className="w-3 h-3 shrink-0 text-indigo-400" />
                   <EditableElement
                     section="personalInfo"
                     field="github"
                     value={personalInfo.github}
                     onSave={(val) => dispatch(updatePersonalInfo({ github: val }))}
                     placeholder="github.com/username"
-                    className="inline text-slate-300 hover:text-white"
+                    className="inline min-w-0 break-words text-slate-300 hover:text-white"
                   />
                 </span>
               )}
@@ -136,12 +137,12 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
             >
               {personalInfo.photo ? (
                 <div
-                  className={`${photoSizeClass} overflow-hidden rounded-md border-2 border-indigo-500/80 shadow-2xl bg-slate-900`}
+                  className={`${photoSizeClass} cv-photo-frame rounded-md border-2 border-indigo-500/80 shadow-2xl bg-slate-900`}
                 >
                   <img
                     src={personalInfo.photo}
                     alt={personalInfo.fullName || 'Photo'}
-                    className="w-full h-full object-cover"
+                    className="cv-photo-img"
                   />
                 </div>
               ) : (
@@ -269,7 +270,7 @@ export const LinearDark = ({ cvData, onOpenPhotoModal }) => {
                 {skills.map((s, index) => (
                   <span
                     key={s.id || index}
-                    className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 text-[10px] font-mono border border-slate-200"
+                    className="cv-badge px-2 py-0.5 rounded bg-slate-100 text-slate-800 text-[10px] font-mono border border-slate-200"
                   >
                     <EditableElement
                       section="skills"

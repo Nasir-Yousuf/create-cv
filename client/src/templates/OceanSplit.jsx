@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolvePhotoBoxClasses } from './shared/cvElements';
 import { useDispatch } from 'react-redux';
 import {
   updatePersonalInfo,
@@ -31,14 +32,28 @@ export const OceanSplit = ({ cvData, onOpenPhotoModal }) => {
   const accent = design?.accentColor || '#38bdf8';
   const fontFamily = design?.fontFamily || 'Inter';
 
-  const photoSizeClass =
-    design?.photoSize === 'sm'
-      ? 'w-20 h-28'
-      : design?.photoSize === 'lg'
-      ? 'w-32 h-44'
-      : design?.photoSize === 'xl'
-      ? 'w-36 h-48'
-      : 'w-24 h-32';
+  const photoSizeClass = resolvePhotoBoxClasses({
+    photoSize: design?.photoSize,
+    photoStyle: personalInfo?.photoStyle === 'circle' ? 'circle' : personalInfo?.photoStyle === 'square' ? 'square' : 'portrait',
+    circleSizes: {
+      sm: 'w-24 h-24',
+      md: 'w-28 h-28',
+      lg: 'w-36 h-36',
+      xl: 'w-40 h-40',
+    },
+    portraitSizes: {
+      sm: 'w-20 h-28',
+      md: 'w-24 h-32',
+      lg: 'w-32 h-44',
+      xl: 'w-36 h-48',
+    },
+    squareSizes: {
+      sm: 'w-24 h-24',
+      md: 'w-28 h-28',
+      lg: 'w-36 h-36',
+      xl: 'w-40 h-40',
+    },
+  });
 
   return (
     <div className="flex flex-col sm:flex-row min-h-full bg-white text-slate-800 text-xs font-sans" style={{ fontFamily }}>
@@ -52,17 +67,21 @@ export const OceanSplit = ({ cvData, onOpenPhotoModal }) => {
             title="Click to edit photo"
           >
             {personalInfo.photo ? (
-              <img
-                src={personalInfo.photo}
-                alt={personalInfo.fullName || 'User Photo'}
-                className={`${photoSizeClass} object-cover border-4 border-sky-400 shadow-lg ${
+              <div
+                className={`${photoSizeClass} border-4 border-sky-400 shadow-lg ${
                   personalInfo.photoStyle === 'circle'
-                    ? 'rounded-full w-28 h-28'
+                    ? 'rounded-full'
                     : personalInfo.photoStyle === 'square'
                     ? 'rounded-none'
                     : 'rounded-lg'
                 }`}
-              />
+              >
+                <img
+                  src={personalInfo.photo}
+                  alt={personalInfo.fullName || 'User Photo'}
+                  className="cv-photo-img"
+                />
+              </div>
             ) : (
               <div className={`${photoSizeClass} border-2 border-dashed border-sky-400/60 rounded-lg flex flex-col items-center justify-center text-sky-300 p-2 text-center print:hidden cv-photo-placeholder`}>
                 <Camera className="w-5 h-5 mb-1" />
@@ -79,20 +98,20 @@ export const OceanSplit = ({ cvData, onOpenPhotoModal }) => {
           </h3>
           <div className="space-y-2 text-slate-300">
             {personalInfo.email && (
-              <div className="flex items-start gap-2">
-                <Mail className="w-3.5 h-3.5 text-sky-400 shrink-0 mt-0.5" />
+              <div className="cv-icon-row gap-2 min-w-0">
+                <Mail className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                 <EditableElement
                   section="personalInfo"
                   field="email"
                   value={personalInfo.email}
                   onSave={(val) => dispatch(updatePersonalInfo({ email: val }))}
                   placeholder="email@example.com"
-                  className="break-all inline"
+                  className="break-all inline min-w-0"
                 />
               </div>
             )}
             {personalInfo.phone && (
-              <div className="flex items-center gap-2">
+              <div className="cv-icon-row gap-2 min-w-0">
                 <Phone className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                 <EditableElement
                   section="personalInfo"
@@ -100,12 +119,12 @@ export const OceanSplit = ({ cvData, onOpenPhotoModal }) => {
                   value={personalInfo.phone}
                   onSave={(val) => dispatch(updatePersonalInfo({ phone: val }))}
                   placeholder="+1 555-0100"
-                  className="inline"
+                  className="inline min-w-0"
                 />
               </div>
             )}
             {personalInfo.location && (
-              <div className="flex items-center gap-2">
+              <div className="cv-icon-row gap-2 min-w-0">
                 <MapPin className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                 <EditableElement
                   section="personalInfo"
@@ -113,12 +132,12 @@ export const OceanSplit = ({ cvData, onOpenPhotoModal }) => {
                   value={personalInfo.location}
                   onSave={(val) => dispatch(updatePersonalInfo({ location: val }))}
                   placeholder="City, Country"
-                  className="inline"
+                  className="inline min-w-0"
                 />
               </div>
             )}
             {personalInfo.website && (
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="cv-icon-row gap-2 min-w-0">
                 <Globe className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                 <EditableElement
                   section="personalInfo"
@@ -126,12 +145,12 @@ export const OceanSplit = ({ cvData, onOpenPhotoModal }) => {
                   value={personalInfo.website}
                   onSave={(val) => dispatch(updatePersonalInfo({ website: val }))}
                   placeholder="website.com"
-                  className="break-all inline"
+                  className="break-all inline min-w-0"
                 />
               </div>
             )}
             {personalInfo.github && (
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="cv-icon-row gap-2 min-w-0">
                 <Github className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                 <EditableElement
                   section="personalInfo"
@@ -139,12 +158,12 @@ export const OceanSplit = ({ cvData, onOpenPhotoModal }) => {
                   value={personalInfo.github}
                   onSave={(val) => dispatch(updatePersonalInfo({ github: val }))}
                   placeholder="github.com/username"
-                  className="break-all inline"
+                  className="break-all inline min-w-0"
                 />
               </div>
             )}
             {personalInfo.linkedin && (
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="cv-icon-row gap-2 min-w-0">
                 <Linkedin className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                 <EditableElement
                   section="personalInfo"
@@ -152,7 +171,7 @@ export const OceanSplit = ({ cvData, onOpenPhotoModal }) => {
                   value={personalInfo.linkedin}
                   onSave={(val) => dispatch(updatePersonalInfo({ linkedin: val }))}
                   placeholder="linkedin.com/in/username"
-                  className="break-all inline"
+                  className="break-all inline min-w-0"
                 />
               </div>
             )}
