@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, Sparkles, Heart } from 'lucide-react';
+import { TEMPLATES_REGISTRY } from '@shared/constants/cvDefaults.js';
 
 export const Footer = () => {
   return (
@@ -24,7 +25,7 @@ export const Footer = () => {
             Quick Creator
           </Link>
           <Link to="/templates" className="hover:text-slate-900 dark:hover:text-white transition-colors">
-            Templates (30+)
+            Templates ({TEMPLATES_REGISTRY.length})
           </Link>
           <Link to="/builder" className="hover:text-slate-900 dark:hover:text-white transition-colors">
             Editor

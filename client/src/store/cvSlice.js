@@ -1,7 +1,49 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { INITIAL_CV_DATA } from '@shared/constants/cvDefaults.js';
+import {
+  INITIAL_CV_DATA,
+  resolveTemplateId,
+  TEMPLATE_ALIAS_COLORS,
+} from '@shared/constants/cvDefaults.js';
 
 const MAX_HISTORY = 20;
+
+const normalizeLoadedCV = (raw = {}) => {
+  const rawTemplateId = raw?.templateId || INITIAL_CV_DATA.templateId;
+  const canonicalId = resolveTemplateId(rawTemplateId);
+  const aliasColors = canonicalId !== rawTemplateId ? TEMPLATE_ALIAS_COLORS[rawTemplateId] || {} : {};
+
+  return {
+    ...INITIAL_CV_DATA,
+    ...raw,
+    templateId: canonicalId,
+    personalInfo: {
+      ...INITIAL_CV_DATA.personalInfo,
+      ...(raw.personalInfo || {}),
+    },
+    personalDetails: {
+      ...INITIAL_CV_DATA.personalDetails,
+      ...(raw.personalDetails || {}),
+    },
+    declaration: {
+      ...INITIAL_CV_DATA.declaration,
+      ...(raw.declaration || {}),
+    },
+    design: {
+      ...INITIAL_CV_DATA.design,
+      ...aliasColors,
+      ...(raw.design || {}),
+    },
+    experience: Array.isArray(raw.experience) ? raw.experience : INITIAL_CV_DATA.experience,
+    education: Array.isArray(raw.education) ? raw.education : INITIAL_CV_DATA.education,
+    skills: Array.isArray(raw.skills) ? raw.skills : INITIAL_CV_DATA.skills,
+    projects: Array.isArray(raw.projects) ? raw.projects : [],
+    certifications: Array.isArray(raw.certifications) ? raw.certifications : [],
+    languages: Array.isArray(raw.languages) ? raw.languages : [],
+    interests: Array.isArray(raw.interests) ? raw.interests : [],
+    references: Array.isArray(raw.references) ? raw.references : [],
+    customSections: Array.isArray(raw.customSections) ? raw.customSections : [],
+  };
+};
 
 const loadInitialDraft = () => {
   try {
@@ -10,14 +52,14 @@ const loadInitialDraft = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object' && parsed.personalInfo) {
-          return { ...INITIAL_CV_DATA, ...parsed };
+          return normalizeLoadedCV(parsed);
         }
       }
     }
   } catch (err) {
     console.warn('Could not restore draft from localStorage:', err);
   }
-  return { ...INITIAL_CV_DATA };
+  return normalizeLoadedCV(INITIAL_CV_DATA);
 };
 
 const initialState = {
@@ -25,6 +67,9 @@ const initialState = {
   past: [],
   future: [],
   cvId: null,
+  version: 1,
+  isExportUnlocked: false,
+  unlockType: null,
   isDirty: false,
   isAutosaving: false,
   lastSavedAt: null,
@@ -44,13 +89,33 @@ export const cvSlice = createSlice({
   initialState,
   reducers: {
     setCVData: (state, action) => {
-      state.currentCV = action.payload;
+      const payload = action.payload || {};
+      state.currentCV = normalizeLoadedCV(payload);
+      if (payload._id) state.cvId = payload._id;
+      if (payload.version !== undefined) state.version = payload.version;
+      if (payload.isExportUnlocked !== undefined) {
+        state.isExportUnlocked = Boolean(payload.isExportUnlocked);
+      }
+      if (payload.unlockType !== undefined) {
+        state.unlockType = payload.unlockType || null;
+      }
       state.past = [];
       state.future = [];
       state.isDirty = false;
     },
     setCVId: (state, action) => {
       state.cvId = action.payload;
+    },
+    setCVSyncMeta: (state, action) => {
+      const { cvId, version, isExportUnlocked, unlockType } = action.payload || {};
+      if (cvId !== undefined) state.cvId = cvId;
+      if (version !== undefined) state.version = version;
+      if (isExportUnlocked !== undefined) state.isExportUnlocked = Boolean(isExportUnlocked);
+      if (unlockType !== undefined) state.unlockType = unlockType;
+    },
+    markExportUnlocked: (state, action) => {
+      state.isExportUnlocked = true;
+      state.unlockType = action.payload || state.unlockType || 'free';
     },
     updateTitle: (state, action) => {
       pushHistory(state);
@@ -86,7 +151,15 @@ export const cvSlice = createSlice({
     },
     setTemplateId: (state, action) => {
       pushHistory(state);
-      state.currentCV.templateId = action.payload;
+      const rawId = action.payload;
+      const canonicalId = resolveTemplateId(rawId);
+      state.currentCV.templateId = canonicalId;
+      if (canonicalId !== rawId && TEMPLATE_ALIAS_COLORS[rawId]) {
+        state.currentCV.design = {
+          ...state.currentCV.design,
+          ...TEMPLATE_ALIAS_COLORS[rawId],
+        };
+      }
     },
 
     // Undo / Redo
@@ -406,10 +479,13 @@ export const cvSlice = createSlice({
       }
     },
     resetCV: (state) => {
-      state.currentCV = { ...INITIAL_CV_DATA };
+      state.currentCV = normalizeLoadedCV(INITIAL_CV_DATA);
       state.past = [];
       state.future = [];
       state.cvId = null;
+      state.version = 1;
+      state.isExportUnlocked = false;
+      state.unlockType = null;
       state.isDirty = false;
     },
   },
@@ -418,6 +494,8 @@ export const cvSlice = createSlice({
 export const {
   setCVData,
   setCVId,
+  setCVSyncMeta,
+  markExportUnlocked,
   updateTitle,
   updatePersonalInfo,
   updatePersonalDetails,

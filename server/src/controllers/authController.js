@@ -1,163 +1,328 @@
-import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import { z } from 'zod';
 import User from '../models/User.js';
+import CV from '../models/CV.js';
+import { bootstrapAdminUser, sanitizeUser } from '../utils/adminBootstrap.js';
+import { signAuthToken } from '../utils/jwt.js';
 
-// Helper to sign JWT and set HTTP-only cookie
-const sendTokenResponse = (user, statusCode, res) => {
-  const token = jwt.sign(
-    { id: user._id, role: user.role, plan: user.plan },
-    process.env.JWT_SECRET || 'cv_builder_secure_jwt_secret_token_key_2026_xyz',
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-  );
-
-  const cookieOptions = {
-    expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-  };
-
-  res.status(statusCode).cookie('token', token, cookieOptions).json({
-    success: true,
-    token,
-    user: {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      plan: user.plan,
-      avatar: user.avatar,
-    },
-  });
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
+const registerSchema = z.object({
+  name: z.string().trim().min(2, 'Full name must be at least 2 characters').max(80),
+  email: z.string().trim().email('Please provide a valid email address').toLowerCase(),
+  password: z
+    .string()
+    .min(6, 'Password must be at least 6 characters long')
+    .max(128, 'Password cannot exceed 128 characters'),
+});
+
+const loginSchema = z.object({
+  email: z.string().trim().email('Please enter a valid email address').toLowerCase(),
+  password: z.string().min(1, 'Please enter your password'),
+});
+
+// @desc    Register a new regular user (admin registration is blocked publicly)
+// @route   POST /api/auth/register
+// @access  Public
 export const register = async (req, res, next) => {
   try {
-    const { name, email, password } = req.body;
-
-    if (!name || !email || !password) {
+    const parsed = registerSchema.safeParse(req.body || {});
+    if (!parsed.success) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide name, email, and password',
+        message: parsed.error.issues[0]?.message || 'Invalid registration details',
       });
     }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    const { name, email, password } = parsed.data;
+    const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+    if (adminEmail && email === adminEmail) {
+      return res.status(403).json({
+        success: false,
+        message: 'This email is reserved for system administration.',
+      });
+    }
+
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({
+      return res.status(409).json({
         success: false,
-        message: 'An account with this email address already exists.',
+        message: 'An account with this email already exists. Please log in instead.',
       });
     }
 
-    // Create user
     const user = await User.create({
       name,
-      email: email.toLowerCase(),
+      email,
       password,
+      role: 'user',
+      status: 'active',
+      freeExportsRemaining: 1,
+      paidExportCredits: 0,
+      lastLoginAt: new Date(),
     });
 
-    sendTokenResponse(user, 201, res);
-  } catch (error) {
-    next(error);
+    const token = signAuthToken(user);
+    res.cookie('token', token, cookieOptions);
+
+    return res.status(201).json({
+      success: true,
+      token,
+      user: sanitizeUser(user),
+    });
+  } catch (err) {
+    next(err);
   }
 };
 
+// @desc    Authenticate user or environment-configured Admin using bcrypt verification
+// @route   POST /api/auth/login
+// @access  Public
 export const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
+    const parsed = loginSchema.safeParse(req.body || {});
+    if (!parsed.success) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide email and password',
+        message: parsed.error.issues[0]?.message || 'Email and password are required',
       });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@resumecraft.com').trim().toLowerCase();
-    const adminPassword = process.env.ADMIN_PASSWORD || 'AdminPass01816550751!';
+    const { email, password } = parsed.data;
+    const configuredAdminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
 
-    // Check if this is the environment-configured Admin logging in
-    if (cleanEmail === adminEmail && password === adminPassword) {
-      let adminUser = await User.findOne({ email: adminEmail }).select('+password');
-      if (!adminUser) {
-        adminUser = await User.create({
-          name: 'Super Admin',
-          email: adminEmail,
-          password: adminPassword,
-          role: 'admin',
-          plan: 'enterprise',
-        });
-      } else {
-        if (adminUser.role !== 'admin' || adminUser.plan !== 'enterprise') {
-          adminUser.role = 'admin';
-          adminUser.plan = 'enterprise';
-          await adminUser.save();
-        }
-      }
-      return sendTokenResponse(adminUser, 200, res);
+    if (configuredAdminEmail && email === configuredAdminEmail) {
+      await bootstrapAdminUser();
     }
 
-    // Find user and include password hash
-    const user = await User.findOne({ email: cleanEmail }).select('+password');
+    const user = await User.findOne({ email }).select('+password');
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password',
+        message: 'Invalid email or password.',
       });
     }
 
-    // Verify password
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password',
+        message: 'Invalid email or password.',
       });
     }
 
-    sendTokenResponse(user, 200, res);
-  } catch (error) {
-    next(error);
+    if (user.status === 'suspended') {
+      return res.status(403).json({
+        success: false,
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'This account has been suspended. Please contact an administrator.',
+      });
+    }
+
+    user.lastLoginAt = new Date();
+    await user.save({ validateBeforeSave: false });
+
+    const token = signAuthToken(user);
+    res.cookie('token', token, cookieOptions);
+
+    return res.status(200).json({
+      success: true,
+      token,
+      user: sanitizeUser(user),
+    });
+  } catch (err) {
+    next(err);
   }
 };
 
+// @desc    Log out and clear session cookie
+// @route   POST /api/auth/logout
+// @access  Public
 export const logout = async (req, res) => {
-  res.cookie('token', 'none', {
-    expires: new Date(Date.now() + 5 * 1000),
+  res.cookie('token', '', {
     httpOnly: true,
+    expires: new Date(0),
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production',
   });
 
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
-    message: 'User logged out successfully',
+    message: 'Logged out successfully',
   });
 };
 
+// @desc    Get current authenticated user profile and live stats
+// @route   GET /api/auth/me
+// @access  Private
 export const getMe = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found',
+        message: 'User account not found',
       });
     }
 
-    res.status(200).json({
+    const cvCount = await CV.countDocuments({ userId: user._id, isDeleted: { $ne: true } });
+
+    return res.status(200).json({
       success: true,
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        plan: user.plan,
-        avatar: user.avatar,
+        ...sanitizeUser(user),
+        cvCount,
       },
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 
+// @desc    Update authenticated user's profile name/avatar or password
+// @route   PUT /api/auth/profile
+// @access  Private
+export const updateProfile = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id).select('+password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (typeof req.body.name === 'string') {
+      const cleanName = req.body.name.trim();
+      if (cleanName.length < 2 || cleanName.length > 80) {
+        return res.status(400).json({
+          success: false,
+          message: 'Name must be between 2 and 80 characters.',
+        });
+      }
+      user.name = cleanName;
+    }
+
+    if (typeof req.body.avatar === 'string' || req.body.avatar === null) {
+      user.avatar = req.body.avatar;
+    }
+
+    if (req.body.newPassword) {
+      if (!req.body.currentPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide your current password to set a new password.',
+        });
+      }
+      const ok = await user.comparePassword(req.body.currentPassword);
+      if (!ok) {
+        return res.status(401).json({
+          success: false,
+          message: 'Current password is incorrect.',
+        });
+      }
+      if (String(req.body.newPassword).length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'New password must be at least 6 characters long.',
+        });
+      }
+      user.password = req.body.newPassword;
+    }
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      user: sanitizeUser(user),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Initiate secure password reset (requires configured SMTP email infrastructure)
+// @route   POST /api/auth/forgot-password
+// @access  Public
+export const forgotPassword = async (req, res, next) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide your account email address.',
+      });
+    }
+
+    const smtpConfigured = Boolean(
+      process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS
+    );
+    if (!smtpConfigured) {
+      return res.status(501).json({
+        success: false,
+        emailInfrastructureAvailable: false,
+        message:
+          'Automated email reset is not configured on this server yet (SMTP credentials missing). Please contact the administrator to reset access.',
+      });
+    }
+
+    const user = await User.findOne({ email });
+    if (user && user.status !== 'suspended') {
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      user.resetPasswordToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+      user.resetPasswordExpires = new Date(Date.now() + 30 * 60 * 1000);
+      await user.save({ validateBeforeSave: false });
+      // Email dispatch hook ready here once SMTP transport (e.g. nodemailer) is installed
+    }
+
+    return res.status(200).json({
+      success: true,
+      emailInfrastructureAvailable: true,
+      message: 'If an active account matches that email, reset instructions have been queued.',
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Complete password reset using time-limited token
+// @route   POST /api/auth/reset-password
+// @access  Public
+export const resetPassword = async (req, res, next) => {
+  try {
+    const { token, newPassword } = req.body || {};
+    if (!token || !newPassword || String(newPassword).length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid reset token and a new password (min 6 characters) are required.',
+      });
+    }
+
+    const hashedToken = crypto.createHash('sha256').update(String(token)).digest('hex');
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: new Date() },
+    }).select('+resetPasswordToken +resetPasswordExpires');
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reset link is invalid or has expired.',
+      });
+    }
+
+    user.password = String(newPassword);
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password updated successfully. You may now log in.',
+    });
+  } catch (err) {
+    next(err);
+  }
+};

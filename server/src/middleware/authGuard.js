@@ -1,49 +1,77 @@
-import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
+import { verifyAuthToken } from '../utils/jwt.js';
+
+export const extractRequestToken = (req) => {
+  if (req.cookies && req.cookies.token) {
+    return req.cookies.token;
+  }
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    return req.headers.authorization.split(' ')[1];
+  }
+  return null;
+};
 
 export const authGuard = async (req, res, next) => {
-  let token = null;
-
-  // 1. Check HTTP-only cookie
-  if (req.cookies && req.cookies.token) {
-    token = req.cookies.token;
-  }
-  // 2. Check Authorization Bearer header
-  else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
+  const token = extractRequestToken(req);
 
   if (!token) {
     return res.status(401).json({
       success: false,
-      message: 'Not authorized. Please log in to access this resource.',
+      code: 'AUTH_REQUIRED',
+      message: 'Authentication required. Please log in to continue.',
     });
   }
 
   try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || 'cv_builder_secure_jwt_secret_token_key_2026_xyz'
-    );
-    req.user = decoded; // { id, role, plan }
+    const decoded = verifyAuthToken(token);
+    const user = await User.findById(decoded.id).select('-password');
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        code: 'INVALID_SESSION',
+        message: 'Account not found. Please log in again.',
+      });
+    }
+
+    if (user.status === 'suspended') {
+      return res.status(403).json({
+        success: false,
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'Your account has been suspended by an administrator. Contact support for assistance.',
+      });
+    }
+
+    req.user = {
+      id: String(user._id),
+      _id: user._id,
+      role: user.role === 'admin' ? 'admin' : 'user',
+      status: user.status,
+      email: user.email,
+      name: user.name,
+      freeExportsRemaining: user.freeExportsRemaining,
+      paidExportCredits: user.paidExportCredits,
+      plan: user.plan,
+    };
     next();
   } catch (err) {
     return res.status(401).json({
       success: false,
-      message: 'Session expired or token invalid. Please log in again.',
+      code: 'SESSION_EXPIRED',
+      message: 'Session expired or invalid token. Please log in again.',
     });
   }
 };
 
 export const adminGuard = (req, res, next) => {
   if (req.user && req.user.role === 'admin') {
-    next();
-  } else {
-    return res.status(403).json({
-      success: false,
-      message: 'Access denied. Administrator privileges required.',
-    });
+    return next();
   }
+  return res.status(403).json({
+    success: false,
+    code: 'ADMIN_REQUIRED',
+    message: 'Access denied. Administrator privileges required.',
+  });
 };
 
 export default authGuard;
-

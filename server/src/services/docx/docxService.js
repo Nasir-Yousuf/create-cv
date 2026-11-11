@@ -12,6 +12,7 @@ import {
   WidthType,
   ImageRun,
 } from 'docx';
+import { resolveTemplateId } from '../../../../shared/constants/cvDefaults.js';
 
 /**
  * Validates image buffer magic bytes to ensure compatibility with Word OpenXML.
@@ -61,7 +62,7 @@ const resolveImageBuffer = async (photoUri) => {
  */
 export const generateDOCX = async (cvData) => {
   const {
-    templateId = 'bd-corporate-standard',
+    templateId: rawTemplateId = 'onepage-fresher-clean',
     personalInfo = {},
     personalDetails = {},
     experience = [],
@@ -75,6 +76,8 @@ export const generateDOCX = async (cvData) => {
     customSections = [],
     design = {},
   } = cvData || {};
+
+  const templateId = resolveTemplateId(rawTemplateId);
 
   const isLetter = design?.pageSize === 'Letter';
   const primaryHex = (design?.primaryColor || '#1E40AF').replace('#', '');

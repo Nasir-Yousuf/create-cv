@@ -9,6 +9,7 @@ import cvRoutes from './routes/cvRoutes.js';
 import templateRoutes from './routes/templateRoutes.js';
 import exportRoutes from './routes/exportRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
 
 const app = express();
@@ -30,13 +31,13 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, or Postman)
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
         return callback(null, true);
       }
-      return callback(null, true); // Dev-friendly permissive for local testing
+      return callback(new Error('Origin not allowed by CORS policy'));
     },
     credentials: true,
+    exposedHeaders: ['X-CV-Id', 'X-Unlock-Type', 'X-Export-Request-Id'],
   })
 );
 
@@ -65,6 +66,7 @@ app.use('/api/cvs', cvRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 Handler for undefined routes
 app.use('/api/*', (req, res) => {

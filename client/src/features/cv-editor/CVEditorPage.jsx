@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector, useStore } from 'react-redux';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   setCVData,
   setCVId,
+  setCVSyncMeta,
   updateTitle,
   updateDesign,
   setTemplateId,
@@ -11,18 +12,17 @@ import {
   redo,
   setSavingState,
 } from '../../store/cvSlice';
+import { openAuthModal } from '../../store/authSlice';
 import {
   setMobileViewMode,
   setPreviewScale,
   showToast,
   openAIModal,
   toggleDarkMode,
-  openExportModal,
-  updateExportState,
-  closeExportModal,
 } from '../../store/uiSlice';
 import cvService from '../../services/cvService';
 import exportService from '../../services/exportService';
+import templateService from '../../services/templateService';
 import { RenderCVTemplate } from '../../templates';
 import SortableSectionList from './components/SortableSectionList';
 import SectionFormEditor from './components/SectionFormEditor';
@@ -30,10 +30,18 @@ import PhotoUploadCropModal from './components/PhotoUploadCropModal';
 import AIAssistantModal from '../../components/common/AIAssistantModal';
 import WhatsAppSupportButton from '../../components/common/WhatsAppSupportButton';
 import PaymentExportModal from '../../components/common/PaymentExportModal';
-import ExportStatusModal from '../../components/common/ExportStatusModal';
 import PDFPreviewModal from '../../components/common/PDFPreviewModal';
-import paymentService from '../../services/paymentService';
-import { TEMPLATES_REGISTRY, DANIEL_CARTER_CV, TAHMIDUR_RAHMAN_CV, INITIAL_CV_DATA } from '@shared/constants/cvDefaults.js';
+import { runProtectedExport } from '../../utils/runProtectedExport';
+import { analyzeOnePageFit } from '../../utils/onePageFit';
+import {
+  TEMPLATES_REGISTRY,
+  TEMPLATE_CATEGORIES,
+  resolveTemplateId,
+  templateMatchesCategory,
+  DANIEL_CARTER_CV,
+  TAHMIDUR_RAHMAN_CV,
+  INITIAL_CV_DATA,
+} from '@shared/constants/cvDefaults.js';
 import {
   Undo2,
   Redo2,
@@ -70,22 +78,28 @@ import {
   Save,
   Share2,
   Eye,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 
 export const CVEditorPage = () => {
   const dispatch = useDispatch();
+  const store = useStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const canvasScrollContainerRef = useRef(null);
 
-  const { currentCV, cvId, isDirty, past, future, isAutosaving } = useSelector(
+  const { currentCV, cvId, version, isDirty, past, future, isAutosaving } = useSelector(
     (state) => state.cv
   );
   const { previewScale, isDarkMode } = useSelector((state) => state.ui);
   const { isAuthenticated, user } = useSelector((state) => state.auth);
 
   // macOS App State
+  const [templatesList, setTemplatesList] = useState(TEMPLATES_REGISTRY);
+  const [categoriesList, setCategoriesList] = useState(TEMPLATE_CATEGORIES);
   const [activeSidebarTab, setActiveSidebarTab] = useState('templates'); // 'templates' | 'design' | 'sections' | 'settings'
-  const [templateFilter, setTemplateFilter] = useState('all'); // 'all' | 'modern' | 'classic' | 'creative' | 'bangladesh'
+  const [templateFilter, setTemplateFilter] = useState('One-Page CVs');
   const [devicePreview, setDevicePreview] = useState('desktop'); // 'desktop' | 'tablet' | 'mobile'
   const [zoomDropdownOpen, setZoomDropdownOpen] = useState(false);
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
@@ -100,12 +114,18 @@ export const CVEditorPage = () => {
   );
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [activeActionDock, setActiveActionDock] = useState('edit');
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [pendingExportType, setPendingExportType] = useState('pdf');
-  const [pendingExportAction, setPendingExportAction] = useState(null);
+  const [paymentModalState, setPaymentModalState] = useState({
+    isOpen: false,
+    exportType: 'pdf',
+    cvId: null,
+    cvTitle: '',
+    retryExport: null,
+  });
   const [mobileExportSheetOpen, setMobileExportSheetOpen] = useState(false);
   const [pdfPreviewModalOpen, setPdfPreviewModalOpen] = useState(false);
   const [previewPdfUrl, setPreviewPdfUrl] = useState('');
+  const [versionConflict, setVersionConflict] = useState(null);
+  const [onePageFit, setOnePageFit] = useState(() => analyzeOnePageFit(currentCV));
 
   // Zoom preset values
   const zoomPresets = [
@@ -172,35 +192,88 @@ export const CVEditorPage = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [dispatch]);
 
-  // Cloud Document Auto-Sync on Mount / Login across devices
+  // Load dynamic published templates catalog + measure live 1-page fit
+  useEffect(() => {
+    templateService
+      .getTemplatesCatalog()
+      .then(({ templates, categories }) => {
+        if (Array.isArray(templates) && templates.length > 0) setTemplatesList(templates);
+        if (Array.isArray(categories) && categories.length > 0) setCategoriesList(categories);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const sheetEl = document.getElementById('cv-export-sheet');
+      setOnePageFit(analyzeOnePageFit(currentCV, sheetEl));
+    }, 180);
+    return () => clearTimeout(timer);
+  }, [currentCV]);
+
+  // Cloud Document Auto-Sync on Mount / Login / URL ?cvId= across devices
   useEffect(() => {
     const syncCloudCV = async () => {
       if (!isAuthenticated) return;
-      if (cvId && !cvId.startsWith('sample-')) return; // Already editing a specific cloud CV
+      const requestedCvId = searchParams.get('cvId');
+
+      if (requestedCvId && requestedCvId !== cvId) {
+        try {
+          const fullCVRes = await cvService.getCVById(requestedCvId);
+          if (fullCVRes?.data) {
+            dispatch(setCVData(fullCVRes.data));
+            dispatch(
+              setCVSyncMeta({
+                cvId: fullCVRes.data._id,
+                version: fullCVRes.data.version || 1,
+                isExportUnlocked: Boolean(fullCVRes.data.isExportUnlocked),
+                unlockType: fullCVRes.data.unlockType || null,
+              })
+            );
+            setVersionConflict(null);
+            return;
+          }
+        } catch (err) {
+          console.warn('Requested CV load error:', err.message);
+        }
+      }
+
+      if (cvId && !String(cvId).startsWith('sample-')) return;
+      if (isDirty) return; // Never overwrite unsaved local edits when logging in
 
       try {
         const res = await cvService.getCVs();
         if (res.data && res.data.length > 0) {
-          // User already has saved CVs in their cloud account!
           const latestCVMeta = res.data[0];
           const fullCVRes = await cvService.getCVById(latestCVMeta._id);
           if (fullCVRes.data) {
             dispatch(setCVData(fullCVRes.data));
-            dispatch(setCVId(fullCVRes.data._id));
+            dispatch(
+              setCVSyncMeta({
+                cvId: fullCVRes.data._id,
+                version: fullCVRes.data.version || 1,
+                isExportUnlocked: Boolean(fullCVRes.data.isExportUnlocked),
+                unlockType: fullCVRes.data.unlockType || null,
+              })
+            );
             dispatch(
               showToast({
-                message: `Loaded your cloud document: ${fullCVRes.data.title || 'My Professional Resume'}`,
+                message: `Loaded cloud document: ${fullCVRes.data.title || 'My Resume'}`,
                 type: 'info',
               })
             );
           }
         } else {
-          // User has no CV in cloud yet -> create first cloud CV from current draft
-          const draftStr = localStorage.getItem('resumecraft_draft');
-          const draftToSave = draftStr ? JSON.parse(draftStr) : currentCV;
-          const created = await cvService.createCV(draftToSave);
+          const created = await cvService.createCV(currentCV);
           if (created.data?._id) {
-            dispatch(setCVId(created.data._id));
+            dispatch(
+              setCVSyncMeta({
+                cvId: created.data._id,
+                version: created.data.version || 1,
+                isExportUnlocked: Boolean(created.data.isExportUnlocked),
+                unlockType: created.data.unlockType || null,
+              })
+            );
           }
         }
       } catch (err) {
@@ -209,47 +282,115 @@ export const CVEditorPage = () => {
     };
 
     syncCloudCV();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, searchParams]);
 
-  // Debounced Autosave
+  // Debounced Autosave with optimistic version guard
   useEffect(() => {
-    if (!isDirty) return;
+    if (!isDirty || versionConflict) return;
 
     const timer = setTimeout(async () => {
       dispatch(setSavingState(true));
       try {
         if (isAuthenticated) {
-          if (cvId && !cvId.startsWith('sample-')) {
-            await cvService.updateCV(cvId, currentCV);
+          if (cvId && !String(cvId).startsWith('sample-')) {
+            const res = await cvService.updateCV(cvId, {
+              ...currentCV,
+              expectedVersion: version,
+            });
+            if (res?.data) {
+              dispatch(
+                setCVSyncMeta({
+                  cvId: res.data._id,
+                  version: res.data.version,
+                  isExportUnlocked: Boolean(res.data.isExportUnlocked),
+                  unlockType: res.data.unlockType || null,
+                })
+              );
+            }
           } else {
             const res = await cvService.createCV(currentCV);
             if (res.data?._id) {
-              dispatch(setCVId(res.data._id));
+              dispatch(
+                setCVSyncMeta({
+                  cvId: res.data._id,
+                  version: res.data.version || 1,
+                  isExportUnlocked: Boolean(res.data.isExportUnlocked),
+                  unlockType: res.data.unlockType || null,
+                })
+              );
             }
           }
         }
         localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
-        dispatch(setSavingState(false));
       } catch (err) {
-        console.warn('Autosave status:', err.message);
+        if (err?.status === 409) {
+          setVersionConflict({
+            serverVersion: err?.data?.serverVersion || err?.serverVersion,
+            message: err.message || 'This CV was updated on another device.',
+          });
+        } else {
+          console.warn('Autosave status:', err.message);
+        }
         localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
+      } finally {
         dispatch(setSavingState(false));
       }
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [currentCV, isDirty, cvId, isAuthenticated, dispatch]);
+  }, [currentCV, isDirty, cvId, version, versionConflict, isAuthenticated, dispatch]);
 
-  const handleManualSave = async () => {
+  const handleReloadLatestCloud = async () => {
+    if (!cvId) return;
+    try {
+      const fullCVRes = await cvService.getCVById(cvId);
+      if (fullCVRes?.data) {
+        dispatch(setCVData(fullCVRes.data));
+        dispatch(
+          setCVSyncMeta({
+            cvId: fullCVRes.data._id,
+            version: fullCVRes.data.version || 1,
+            isExportUnlocked: Boolean(fullCVRes.data.isExportUnlocked),
+            unlockType: fullCVRes.data.unlockType || null,
+          })
+        );
+        setVersionConflict(null);
+        dispatch(showToast({ message: 'Reloaded latest cloud version.', type: 'success' }));
+      }
+    } catch (err) {
+      dispatch(showToast({ message: err.message || 'Failed to reload latest version.', type: 'error' }));
+    }
+  };
+
+  const handleManualSave = async ({ forceOverwrite = false } = {}) => {
     dispatch(setSavingState(true));
     try {
       if (isAuthenticated) {
-        if (cvId && !cvId.startsWith('sample-')) {
-          await cvService.updateCV(cvId, currentCV);
+        if (cvId && !String(cvId).startsWith('sample-')) {
+          const payload = forceOverwrite ? currentCV : { ...currentCV, expectedVersion: version };
+          const res = await cvService.updateCV(cvId, payload);
+          if (res?.data) {
+            dispatch(
+              setCVSyncMeta({
+                cvId: res.data._id,
+                version: res.data.version,
+                isExportUnlocked: Boolean(res.data.isExportUnlocked),
+                unlockType: res.data.unlockType || null,
+              })
+            );
+            setVersionConflict(null);
+          }
         } else {
           const res = await cvService.createCV(currentCV);
           if (res.data?._id) {
-            dispatch(setCVId(res.data._id));
+            dispatch(
+              setCVSyncMeta({
+                cvId: res.data._id,
+                version: res.data.version || 1,
+                isExportUnlocked: Boolean(res.data.isExportUnlocked),
+                unlockType: res.data.unlockType || null,
+              })
+            );
           }
         }
       }
@@ -257,125 +398,61 @@ export const CVEditorPage = () => {
       dispatch(
         showToast({
           message: isAuthenticated
-            ? 'Changes saved successfully to your cloud document!'
-            : 'Saved locally in browser cache. Sign in to sync across devices!',
+            ? 'Changes saved to your cloud account!'
+            : 'Saved locally. Sign in to sync across devices!',
           type: 'success',
         })
       );
     } catch (err) {
-      localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
-      dispatch(showToast({ message: 'Saved locally in browser cache.', type: 'info' }));
+      if (err?.status === 409) {
+        setVersionConflict({
+          serverVersion: err?.data?.serverVersion || err?.serverVersion,
+          message: err.message || 'Document updated from another session.',
+        });
+        dispatch(
+          showToast({
+            message: 'Sync conflict detected — choose Reload Latest or Overwrite.',
+            type: 'warning',
+          })
+        );
+      } else {
+        localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
+        dispatch(showToast({ message: 'Saved locally in browser cache.', type: 'info' }));
+      }
     } finally {
       dispatch(setSavingState(false));
     }
   };
 
-  // Core PDF Export execution
-  const executeExportPDF = async () => {
-    if (isExporting) return;
-    // Commit any active in-line edits before reading CV state
-    if (typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
-      document.activeElement.blur();
-    }
-    try {
-      setIsExporting(true);
-      setExportDropdownOpen(false);
-      dispatch(
-        openExportModal({
-          format: 'pdf',
-          stage: 'preparing',
-          progress: 15,
-          statusMessage: 'Preparing vector document...',
-        })
-      );
-
-      await exportService.exportPDF(currentCV, '', 'cv-export-sheet', (update) => {
-        if (typeof update === 'object') {
-          dispatch(
-            updateExportState({
-              stage: update.stage || 'rendering',
-              progress: update.progress || 50,
-              statusMessage: update.message || 'Processing...',
-            })
-          );
-        } else {
-          dispatch(updateExportState({ statusMessage: String(update) }));
-        }
-      });
-
-      dispatch(
-        updateExportState({
-          stage: 'ready',
-          progress: 100,
-          isGenerating: false,
-          statusMessage: 'PDF downloaded successfully!',
-        })
-      );
-      setTimeout(() => {
-        dispatch(closeExportModal());
-      }, 1500);
-    } catch (err) {
-      console.error('PDF export error:', err);
-      dispatch(
-        updateExportState({
-          stage: 'error',
-          isGenerating: false,
-          error: {
-            title: 'PDF Generation Interrupted',
-            message: 'We were unable to render this template to PDF. Your CV edits and content are completely safe. You can try again or export as Word (.docx).',
-          },
-        })
-      );
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  // Generate & Preview actual PDF binary in modal
+  // Explicit In-Editor Preview (preserved strictly for the explicit Preview button — never triggered on download)
   const handlePreviewPDF = async () => {
     if (isExporting) return;
+    if (!isAuthenticated) {
+      dispatch(
+        openAuthModal({
+          mode: 'login',
+          promptMessage: 'Sign in to generate and inspect the live server PDF preview.',
+        })
+      );
+      return;
+    }
     if (typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
       document.activeElement.blur();
     }
     try {
       setIsExporting(true);
       setExportDropdownOpen(false);
-      dispatch(
-        openExportModal({
-          format: 'pdf',
-          stage: 'preparing',
-          progress: 20,
-          statusMessage: 'Generating verified PDF binary for preview...',
-        })
-      );
-
-      const result = await exportService.generatePDFBlob(currentCV, '', 'cv-export-sheet', (update) => {
-        if (typeof update === 'object') {
-          dispatch(
-            updateExportState({
-              stage: update.stage || 'rendering',
-              progress: update.progress || 50,
-              statusMessage: update.message || 'Processing...',
-            })
-          );
-        } else {
-          dispatch(updateExportState({ statusMessage: String(update) }));
-        }
+      const result = await exportService.generatePDFBlob(currentCV, '', 'cv-export-sheet', null, {
+        cvId,
+        previewOnly: true,
       });
-
-      dispatch(closeExportModal());
       setPreviewPdfUrl(result.url);
       setPdfPreviewModalOpen(true);
     } catch (err) {
-      console.error('PDF preview error:', err);
       dispatch(
-        updateExportState({
-          stage: 'error',
-          isGenerating: false,
-          error: {
-            title: 'PDF Generation Interrupted',
-            message: 'Unable to render the PDF binary for preview. You can try downloading directly or export as Word (.docx).',
-          },
+        showToast({
+          message: err.message || 'Unable to generate PDF preview right now.',
+          type: 'error',
         })
       );
     } finally {
@@ -383,106 +460,56 @@ export const CVEditorPage = () => {
     }
   };
 
-  // Export PDF with bKash 10 Tk / Coupon Check
-  const handleExportPDF = async () => {
-    if (!paymentService.isExportUnlocked(user)) {
-      setPendingExportType('pdf');
-      setPendingExportAction(() => () => executeExportPDF());
-      setPaymentModalOpen(true);
-      return;
-    }
-    executeExportPDF();
-  };
-
-  // Core DOCX Export execution
-  const executeExportDOCX = async () => {
+  // Unified Export Handler (direct browser download + Toast feedback; never opens post-download preview panel)
+  const triggerEditorExport = async (format) => {
     if (isExporting) return;
-    // Commit any active in-line edits before reading CV state
     if (typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
       document.activeElement.blur();
     }
+
+    setIsExporting(true);
+    setExportDropdownOpen(false);
     try {
-      setIsExporting(true);
-      setExportDropdownOpen(false);
-      dispatch(
-        openExportModal({
-          format: 'docx',
-          stage: 'preparing',
-          progress: 20,
-          statusMessage: 'Compiling Word document structure...',
-        })
-      );
-
-      await exportService.exportDOCX(currentCV, (update) => {
-        if (typeof update === 'object') {
-          dispatch(
-            updateExportState({
-              stage: update.stage || 'generating',
-              progress: update.progress || 50,
-              statusMessage: update.message || 'Processing...',
-            })
-          );
-        } else {
-          dispatch(updateExportState({ statusMessage: String(update) }));
-        }
+      await runProtectedExport({
+        dispatch,
+        getState: store.getState,
+        cvData: currentCV,
+        cvId,
+        format,
+        elementId: 'cv-export-sheet',
+        isActiveEditorCV: true,
+        openPaymentModal: ({ cvId: lockedId, cvTitle, format: payFormat, retryExport }) => {
+          setPaymentModalState({
+            isOpen: true,
+            exportType: payFormat,
+            cvId: lockedId,
+            cvTitle,
+            retryExport,
+          });
+        },
       });
-
-      dispatch(
-        updateExportState({
-          stage: 'ready',
-          progress: 100,
-          isGenerating: false,
-          statusMessage: 'Word document downloaded successfully!',
-        })
-      );
-      setTimeout(() => {
-        dispatch(closeExportModal());
-      }, 1500);
-    } catch (err) {
-      console.error('DOCX export error:', err);
-      dispatch(
-        updateExportState({
-          stage: 'error',
-          isGenerating: false,
-          error: {
-            title: 'Word Export Interrupted',
-            message: 'We were unable to compile this document to .docx. Your CV edits and content are completely safe. You can try again or export as PDF.',
-          },
-        })
-      );
     } finally {
       setIsExporting(false);
     }
   };
 
-  // Export DOCX with bKash 10 Tk / Coupon Check
-  const handleExportDOCX = async () => {
-    if (!paymentService.isExportUnlocked(user)) {
-      setPendingExportType('docx');
-      setPendingExportAction(() => () => executeExportDOCX());
-      setPaymentModalOpen(true);
-      return;
-    }
-    executeExportDOCX();
-  };
+  const handleExportPDF = () => triggerEditorExport('pdf');
 
-  // Filter templates
-  const filteredTemplates = TEMPLATES_REGISTRY.filter((tmpl) => {
-    if (templateFilter === 'all') return true;
-    if (templateFilter === 'modern') return tmpl.category === 'Modern Minimal';
-    if (templateFilter === 'classic') return tmpl.category === 'Classic Formal';
-    if (templateFilter === 'creative') return tmpl.category === 'Creative & Design';
-    if (templateFilter === 'bangladesh') return tmpl.category === 'Bangladesh Standard';
-    return true;
-  });
+  const handleExportDOCX = () => triggerEditorExport('docx');
 
-  const activeTemplateId = currentCV?.templateId || 'modern-blue';
+  // Filter templates dynamically inside sidebar
+  const filteredTemplates = templatesList.filter((tmpl) =>
+    templateMatchesCategory(tmpl, templateFilter)
+  );
+
+  const activeTemplateId = resolveTemplateId(currentCV?.templateId);
 
   const handleSelectTemplate = (tmplId) => {
-    dispatch(setTemplateId(tmplId));
+    const canonicalId = resolveTemplateId(tmplId);
+    dispatch(setTemplateId(canonicalId));
     dispatch(
       showToast({
-        message: `Template applied: ${TEMPLATES_REGISTRY.find((t) => t.id === tmplId)?.name || tmplId}`,
+        message: `Template applied: ${templatesList.find((t) => t.id === canonicalId)?.name || canonicalId}`,
         type: 'info',
       })
     );
@@ -657,21 +684,37 @@ export const CVEditorPage = () => {
               {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
             </button>
 
-            {/* User Avatar from reference image */}
-            <div
-              onClick={() => navigate('/dashboard')}
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer shadow-sm hover:ring-2 hover:ring-blue-500/50 transition-all shrink-0"
-              title={user?.name || 'User Profile'}
-            >
-              <img
-                src={
-                  user?.avatar ||
-                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'
-                }
-                alt="Avatar"
-                className="w-full h-full object-cover"
-              />
-            </div>
+            {isAuthenticated ? (
+              <div
+                onClick={() => navigate('/dashboard')}
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer shadow-sm hover:ring-2 hover:ring-blue-500/50 transition-all shrink-0 flex items-center justify-center bg-gradient-to-tr from-indigo-600 to-blue-500 text-white text-xs font-bold"
+                title={user?.name || user?.email || 'User Profile'}
+              >
+                {user?.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={user.name || 'User'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span>
+                    {(user?.name || user?.email || 'U')
+                      .split(/\s+/)
+                      .slice(0, 2)
+                      .map((p) => p[0]?.toUpperCase() || '')
+                      .join('')}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Sign In
+              </button>
+            )}
           </div>
         </header>
 
@@ -816,17 +859,19 @@ export const CVEditorPage = () => {
                       Choose from our professional designs
                     </p>
 
-                    {/* Filter Pills: [All] [Modern] [Classic] [Creative] [Bangladesh] */}
-                    <div className="flex items-center gap-1.5 mt-3 overflow-x-auto pb-1 text-xs">
-                      {['all', 'modern', 'classic', 'creative', 'bangladesh'].map((category) => (
+                    {/* Dynamic Category Filter Pills */}
+                    <div className="flex items-center gap-1.5 mt-3 overflow-x-auto pb-1 text-xs scrollbar-none">
+                      {categoriesList.map((category) => (
                         <button
                           key={category}
                           type="button"
                           onClick={() => setTemplateFilter(category)}
-                          className={`px-3 py-1 rounded-full text-[11px] font-medium capitalize shrink-0 transition-all ${
+                          className={`px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap shrink-0 transition-all cursor-pointer ${
                             templateFilter === category
                               ? 'bg-blue-600 text-white shadow-sm'
-                              : 'text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                              : category === 'Multiple-Page CVs'
+                                ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800'
+                                : 'text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                           }`}
                         >
                           {category}
@@ -838,7 +883,7 @@ export const CVEditorPage = () => {
                   {/* 3-Column Thumbnail Grid */}
                   <div className="flex-1 overflow-y-auto p-4 space-y-4">
                     <div className="grid grid-cols-3 gap-2.5">
-                      {filteredTemplates.slice(0, 15).map((tmpl) => {
+                      {filteredTemplates.map((tmpl) => {
                         const isSelected = activeTemplateId === tmpl.id;
                         return (
                           <div
@@ -854,7 +899,16 @@ export const CVEditorPage = () => {
                                   : 'border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:shadow-md'
                               }`}
                             >
-                              {/* Blue Checkmark Badge on Active Card (as in Reference Image) */}
+                              <span
+                                className={`absolute top-1 left-1 px-1 py-0.2 rounded text-[8px] font-bold z-10 ${
+                                  tmpl.isOnePage !== false
+                                    ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                                    : 'bg-purple-50 text-purple-700 border border-purple-200/60'
+                                }`}
+                              >
+                                {tmpl.isOnePage !== false ? '1P' : 'MP'}
+                              </span>
+                              {/* Blue Checkmark Badge on Active Card */}
                               {isSelected && (
                                 <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md z-10 animate-fade-in">
                                   <Check className="w-2.5 h-2.5 stroke-[3]" />
@@ -1383,6 +1437,32 @@ export const CVEditorPage = () => {
               </div>
             </div>
 
+            {/* Version Conflict Banner (cross-device safety) */}
+            {versionConflict && (
+              <div className="mx-3 sm:mx-6 mt-2 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900 dark:text-amber-100 z-20 shrink-0">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>{versionConflict.message}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleReloadLatestCloud}
+                    className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 font-semibold hover:bg-amber-100 cursor-pointer flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-3 h-3" /> Reload Latest
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleManualSave({ forceOverwrite: true })}
+                    className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold cursor-pointer"
+                  >
+                    Keep My Edits
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* -----------------------------------------------------------------
                 DOCUMENT CANVAS (Centered, Scaled, Fully Click-to-Edit WYSIWYG)
             ------------------------------------------------------------------ */}
@@ -1425,27 +1505,48 @@ export const CVEditorPage = () => {
             </div>
 
             {/* -----------------------------------------------------------------
-                BOTTOM PAGE NAVIGATOR (< 1 / 1 >)
+                BOTTOM PAGE NAVIGATOR & ONE-PAGE FIT GUIDANCE
             ------------------------------------------------------------------ */}
-            <div className="h-10 flex items-center justify-center shrink-0 z-10 pointer-events-none pb-16 md:pb-2">
-              <div className="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 shadow-sm rounded-full px-3 py-1 flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300 pointer-events-auto">
-                <button
-                  type="button"
-                  disabled
-                  className="p-0.5 opacity-40 cursor-not-allowed hover:text-slate-900"
-                  title="Previous Page"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-                <span className="font-medium text-[11px] tracking-wide">1 / 1</span>
-                <button
-                  type="button"
-                  disabled
-                  className="p-0.5 opacity-40 cursor-not-allowed hover:text-slate-900"
-                  title="Next Page"
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
+            <div className="min-h-10 flex flex-wrap items-center justify-center gap-2 px-3 shrink-0 z-10 pointer-events-none pb-16 md:pb-2">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 shadow-sm rounded-full px-3 py-1 flex items-center gap-2.5 text-xs text-slate-600 dark:text-slate-300 pointer-events-auto">
+                <span className="font-semibold text-[11px] tracking-wide">
+                  {onePageFit.isOnePageTemplate
+                    ? `Page 1 / ${onePageFit.estimatedPages || 1}`
+                    : 'Multi-Page Layout'}
+                </span>
+
+                {onePageFit.isOnePageTemplate && (
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      onePageFit.status === 'overflow'
+                        ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
+                        : onePageFit.status === 'tight'
+                          ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
+                          : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                    }`}
+                    title={onePageFit.suggestions?.[0] || 'Fits comfortably on one A4 page'}
+                  >
+                    {onePageFit.status === 'overflow'
+                      ? `Exceeds 1 Page (~${onePageFit.wordCount}w)`
+                      : onePageFit.status === 'tight'
+                        ? `Tight 1-Page (${onePageFit.percentUsed}%)`
+                        : `1-Page Fit (${onePageFit.percentUsed}%)`}
+                  </span>
+                )}
+
+                {onePageFit.isOnePageTemplate && onePageFit.status === 'overflow' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSidebarOpen(true);
+                      setActiveSidebarTab('templates');
+                      setTemplateFilter('Multiple-Page CVs');
+                    }}
+                    className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                  >
+                    Switch to Multi-Page
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1751,25 +1852,23 @@ export const CVEditorPage = () => {
         onClose={() => setPhotoModalOpen(false)}
       />
 
-      {/* Payment & Export Authorization Modal (bKash 10 Tk / VIP Coupon) */}
+      {/* Payment & Export Authorization Modal */}
       <PaymentExportModal
-        isOpen={paymentModalOpen}
-        onClose={() => setPaymentModalOpen(false)}
-        exportType={pendingExportType}
+        isOpen={paymentModalState.isOpen}
+        onClose={() =>
+          setPaymentModalState((prev) => ({ ...prev, isOpen: false }))
+        }
+        exportType={paymentModalState.exportType}
+        cvId={paymentModalState.cvId}
+        cvTitle={paymentModalState.cvTitle}
         onSuccess={() => {
-          if (pendingExportAction) pendingExportAction();
+          const retry = paymentModalState.retryExport;
+          setPaymentModalState((prev) => ({ ...prev, isOpen: false }));
+          if (typeof retry === 'function') retry();
         }}
       />
 
-      {/* Modern macOS Export Status & Error Modal */}
-      <ExportStatusModal
-        onRetry={() => (pendingExportType === 'docx' ? executeExportDOCX() : executeExportPDF())}
-        onAlternativeExport={(altFormat) =>
-          altFormat === 'docx' ? executeExportDOCX() : executeExportPDF()
-        }
-      />
-
-      {/* Real Generated PDF Binary Preview Modal */}
+      {/* Explicit PDF Binary Preview Modal (only triggered via Preview button) */}
       <PDFPreviewModal
         isOpen={pdfPreviewModalOpen}
         onClose={() => setPdfPreviewModalOpen(false)}

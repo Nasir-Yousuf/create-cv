@@ -1,424 +1,864 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
-import { setCVData, setCVId } from '../store/cvSlice';
-import { showToast, openExportModal, updateExportState, closeExportModal } from '../store/uiSlice';
+import { useSelector, useDispatch, useStore } from 'react-redux';
+import { setCVData, setCVSyncMeta, resetCV } from '../store/cvSlice';
+import { showToast } from '../store/uiSlice';
+import { syncUserProfile } from '../store/authSlice';
 import cvService from '../services/cvService';
-import exportService from '../services/exportService';
-import ExportStatusModal from '../components/common/ExportStatusModal';
+import paymentService from '../services/paymentService';
+import authService from '../services/authService';
+import { runProtectedExport } from '../utils/runProtectedExport';
+import PaymentExportModal from '../components/common/PaymentExportModal';
+import Modal from '../components/common/Modal';
+import Button from '../components/common/Button';
+import { resolveTemplateMeta } from '@shared/constants/cvDefaults.js';
 import {
   Plus,
-  Sparkles,
   FileText,
   Copy,
   Trash2,
-  ExternalLink,
   Edit3,
   Download,
   Calendar,
   Layers,
   CheckCircle2,
-  AlertCircle,
-  MoreVertical,
+  Lock,
+  Search,
+  RotateCcw,
+  History,
+  Pencil,
+  Check,
+  X,
+  Activity,
+  CreditCard,
+  Clock,
+  XCircle,
+  BookmarkPlus,
 } from 'lucide-react';
-import Button from '../components/common/Button';
-import Modal from '../components/common/Modal';
-import { INITIAL_CV_DATA } from '@shared/constants/cvDefaults.js';
 
-export const DashboardPage = ({ onOpenAuth }) => {
+const PAYMENT_BADGE = {
+  pending: { label: 'Pending Verification', cls: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800', icon: Clock },
+  approved: { label: 'Approved', cls: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800', icon: CheckCircle2 },
+  rejected: { label: 'Rejected', cls: 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800', icon: XCircle },
+};
+
+export const DashboardPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const store = useStore();
 
   const { isAuthenticated, user } = useSelector((state) => state.auth);
 
+  const [activeTab, setActiveTab] = useState('active'); // 'active' | 'trash' | 'payments' | 'activity'
+  const [searchQuery, setSearchQuery] = useState('');
   const [cvList, setCvList] = useState([]);
+  const [activityList, setActivityList] = useState([]);
+  const [myPayments, setMyPayments] = useState([]);
+  const [entitlements, setEntitlements] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [deleteModal, setDeleteModal] = useState({ isOpen: false, cvId: null, title: '' });
+  const [busyCvId, setBusyCvId] = useState(null);
 
-  // Sample fallback CVs for previewing the dashboard when guest or database is empty
-  const sampleCVs = [
-    {
-      _id: 'sample-1',
-      title: 'Senior Software Engineer CV',
-      templateId: 'modern-minimal',
-      updatedAt: new Date().toISOString(),
-      personalInfo: {
-        fullName: user?.name || 'Alex Morgan',
-        jobTitle: 'Senior Full Stack Software Engineer',
-      },
-      design: {
-        primaryColor: '#4f46e5',
-      },
-    },
-    {
-      _id: 'sample-2',
-      title: 'Executive Leadership Profile',
-      templateId: 'executive-slate',
-      updatedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-      personalInfo: {
-        fullName: user?.name || 'Alex Morgan',
-        jobTitle: 'Director of Engineering',
-      },
-      design: {
-        primaryColor: '#0f172a',
-      },
-    },
-  ];
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameText, setRenameText] = useState('');
 
-  const fetchCVs = async () => {
-    if (!isAuthenticated) {
-      setCvList(sampleCVs);
-      setIsLoading(false);
-      return;
-    }
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    cvId: null,
+    title: '',
+    permanent: false,
+  });
 
+  const [historyModal, setHistoryModal] = useState({
+    isOpen: false,
+    cv: null,
+    versions: [],
+    loading: false,
+    checkpointLabel: '',
+  });
+
+  const [paymentModalState, setPaymentModalState] = useState({
+    isOpen: false,
+    exportType: 'pdf',
+    cvId: null,
+    cvTitle: '',
+    retryExport: null,
+  });
+
+  const fetchDashboardData = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const res = await cvService.getCVs();
-      if (res.data && res.data.length > 0) {
-        setCvList(res.data);
-      } else {
-        setCvList(sampleCVs); // Friendly initial sample so dashboard is never barren
-      }
+      const [cvsRes, entRes, actRes, payRes, meRes] = await Promise.all([
+        cvService.getCVs({
+          trash: activeTab === 'trash',
+          search: searchQuery.trim() || undefined,
+        }),
+        paymentService.getEntitlements().catch(() => null),
+        cvService.getRecentActivity(25).catch(() => null),
+        paymentService.getMyPayments().catch(() => null),
+        authService.getMe().catch(() => null),
+      ]);
+
+      setCvList(Array.isArray(cvsRes?.data) ? cvsRes.data : []);
+      if (entRes?.data) setEntitlements(entRes.data);
+      if (actRes?.data) setActivityList(actRes.data);
+      if (payRes?.data) setMyPayments(payRes.data);
+      if (meRes?.user) dispatch(syncUserProfile(meRes.user));
     } catch (err) {
-      console.warn('Could not load CVs from backend, using local sample:', err.message);
-      setCvList(sampleCVs);
+      dispatch(
+        showToast({
+          message: err.message || 'Unable to load cloud documents right now.',
+          type: 'error',
+        })
+      );
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isAuthenticated, activeTab, searchQuery, dispatch]);
 
   useEffect(() => {
-    fetchCVs();
-  }, [isAuthenticated]);
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const handleCreateNew = () => {
-    dispatch(setCVData({ ...INITIAL_CV_DATA }));
-    dispatch(setCVId(null));
+    dispatch(resetCV());
     navigate('/builder');
   };
 
   const handleEditCV = async (cv) => {
+    setBusyCvId(cv._id);
     try {
-      if (isAuthenticated && !cv._id.startsWith('sample-')) {
-        const fullCV = await cvService.getCVById(cv._id);
+      const fullCV = await cvService.getCVById(cv._id);
+      if (fullCV?.data) {
         dispatch(setCVData(fullCV.data));
-        dispatch(setCVId(cv._id));
-      } else {
         dispatch(
-          setCVData({
-            ...INITIAL_CV_DATA,
-            title: cv.title,
-            templateId: cv.templateId || 'modern-minimal',
+          setCVSyncMeta({
+            cvId: fullCV.data._id,
+            version: fullCV.data.version || 1,
+            isExportUnlocked: Boolean(fullCV.data.isExportUnlocked),
+            unlockType: fullCV.data.unlockType || null,
           })
         );
-        dispatch(setCVId(cv._id));
+        navigate(`/builder?cvId=${cv._id}`);
       }
-      navigate('/builder');
     } catch (err) {
-      dispatch(showToast({ message: 'Failed to load resume details', type: 'error' }));
+      dispatch(showToast({ message: err.message || 'Failed to load document.', type: 'error' }));
+    } finally {
+      setBusyCvId(null);
     }
   };
 
   const handleDuplicate = async (cv) => {
+    setBusyCvId(cv._id);
     try {
-      if (isAuthenticated && !cv._id.startsWith('sample-')) {
-        const res = await cvService.duplicateCV(cv._id);
-        setCvList([res.data, ...cvList]);
-        dispatch(showToast({ message: 'Resume duplicated successfully', type: 'success' }));
-      } else {
-        const copy = {
-          ...cv,
-          _id: `sample-${Date.now()}`,
-          title: `${cv.title} (Copy)`,
-          updatedAt: new Date().toISOString(),
-        };
-        setCvList([copy, ...cvList]);
-        dispatch(showToast({ message: 'Resume duplicated', type: 'success' }));
-      }
+      await cvService.duplicateCV(cv._id);
+      dispatch(showToast({ message: 'CV duplicated as a separate document.', type: 'success' }));
+      await fetchDashboardData();
     } catch (err) {
-      dispatch(showToast({ message: 'Could not duplicate resume', type: 'error' }));
+      dispatch(showToast({ message: err.message || 'Failed to duplicate CV.', type: 'error' }));
+    } finally {
+      setBusyCvId(null);
     }
   };
 
-  const handleDownloadPDF = async (cv) => {
+  const handleStartRename = (cv) => {
+    setRenamingId(cv._id);
+    setRenameText(cv.title || '');
+  };
+
+  const handleSaveRename = async (cv) => {
+    const trimmed = renameText.trim();
+    if (!trimmed) return;
     try {
-      const fullCv = { ...INITIAL_CV_DATA, ...cv };
-      dispatch(
-        openExportModal({
-          format: 'pdf',
-          stage: 'preparing',
-          progress: 15,
-          statusMessage: `Preparing vector PDF for ${fullCv.title || 'Resume'}...`,
-        })
-      );
-
-      await exportService.exportPDF(fullCv, '', 'cv-export-sheet', (update) => {
-        if (typeof update === 'object') {
-          dispatch(
-            updateExportState({
-              stage: update.stage || 'rendering',
-              progress: update.progress || 50,
-              statusMessage: update.message || 'Processing...',
-            })
-          );
-        } else {
-          dispatch(updateExportState({ statusMessage: String(update) }));
-        }
-      });
-
-      dispatch(
-        updateExportState({
-          stage: 'ready',
-          progress: 100,
-          isGenerating: false,
-          statusMessage: 'PDF downloaded successfully!',
-        })
-      );
-      setTimeout(() => {
-        dispatch(closeExportModal());
-      }, 1500);
+      await cvService.updateCV(cv._id, { title: trimmed });
+      setRenamingId(null);
+      dispatch(showToast({ message: 'Document renamed.', type: 'success' }));
+      await fetchDashboardData();
     } catch (err) {
-      console.error('Dashboard PDF download error:', err);
-      dispatch(
-        updateExportState({
-          stage: 'error',
-          isGenerating: false,
-          error: {
-            title: 'PDF Generation Interrupted',
-            message: 'We were unable to render this resume. You can open it in the editor to review and download.',
-          },
-        })
-      );
+      dispatch(showToast({ message: err.message || 'Rename failed.', type: 'error' }));
+    }
+  };
+
+  const handleExportDocument = async (cv, format) => {
+    setBusyCvId(cv._id);
+    try {
+      const res = await cvService.getCVById(cv._id);
+      if (!res?.data) throw new Error('Unable to load document contents.');
+      await runProtectedExport({
+        dispatch,
+        getState: store.getState,
+        cvData: res.data,
+        cvId: res.data._id,
+        format,
+        openPaymentModal: ({ cvId, cvTitle, format: payFmt, retryExport }) => {
+          setPaymentModalState({
+            isOpen: true,
+            exportType: payFmt,
+            cvId,
+            cvTitle,
+            retryExport,
+          });
+        },
+        onExportSuccess: () => {
+          fetchDashboardData();
+        },
+      });
+    } catch (err) {
+      dispatch(showToast({ message: err.message || 'Failed to prepare export.', type: 'error' }));
+    } finally {
+      setBusyCvId(null);
     }
   };
 
   const confirmDelete = async () => {
-    const { cvId } = deleteModal;
+    const { cvId, permanent } = deleteModal;
     try {
-      if (isAuthenticated && !cvId.startsWith('sample-')) {
-        await cvService.deleteCV(cvId);
-      }
-      setCvList(cvList.filter((item) => item._id !== cvId));
-      dispatch(showToast({ message: 'Resume deleted', type: 'info' }));
+      await cvService.deleteCV(cvId, { permanent });
+      dispatch(
+        showToast({
+          message: permanent ? 'Document permanently deleted.' : 'Moved to Trash.',
+          type: 'info',
+        })
+      );
+      setDeleteModal({ isOpen: false, cvId: null, title: '', permanent: false });
+      await fetchDashboardData();
     } catch (err) {
-      dispatch(showToast({ message: 'Failed to delete resume', type: 'error' }));
-    } finally {
-      setDeleteModal({ isOpen: false, cvId: null, title: '' });
+      dispatch(showToast({ message: err.message || 'Delete failed.', type: 'error' }));
     }
   };
 
+  const handleRestoreFromTrash = async (cv) => {
+    try {
+      await cvService.restoreCV(cv._id);
+      dispatch(showToast({ message: 'Document restored to Active CVs.', type: 'success' }));
+      await fetchDashboardData();
+    } catch (err) {
+      dispatch(showToast({ message: err.message || 'Restore failed.', type: 'error' }));
+    }
+  };
+
+  const openVersionHistory = async (cv) => {
+    setHistoryModal({ isOpen: true, cv, versions: [], loading: true, checkpointLabel: '' });
+    try {
+      const res = await cvService.getVersions(cv._id);
+      setHistoryModal((prev) => ({
+        ...prev,
+        versions: Array.isArray(res?.data) ? res.data : [],
+        loading: false,
+      }));
+    } catch (err) {
+      setHistoryModal((prev) => ({ ...prev, loading: false }));
+      dispatch(showToast({ message: err.message || 'Failed to fetch history.', type: 'error' }));
+    }
+  };
+
+  const handleCreateCheckpoint = async () => {
+    if (!historyModal.cv) return;
+    try {
+      await cvService.createCheckpoint(
+        historyModal.cv._id,
+        historyModal.checkpointLabel.trim() || `Manual snapshot (${new Date().toLocaleTimeString()})`
+      );
+      const res = await cvService.getVersions(historyModal.cv._id);
+      setHistoryModal((prev) => ({
+        ...prev,
+        versions: Array.isArray(res?.data) ? res.data : [],
+        checkpointLabel: '',
+      }));
+      dispatch(showToast({ message: 'Version snapshot saved.', type: 'success' }));
+    } catch (err) {
+      dispatch(showToast({ message: err.message || 'Could not create snapshot.', type: 'error' }));
+    }
+  };
+
+  const handleRestoreVersion = async (versionId) => {
+    if (!historyModal.cv) return;
+    try {
+      await cvService.restoreVersion(historyModal.cv._id, versionId);
+      dispatch(showToast({ message: 'Document restored to selected snapshot!', type: 'success' }));
+      setHistoryModal({ isOpen: false, cv: null, versions: [], loading: false, checkpointLabel: '' });
+      await fetchDashboardData();
+    } catch (err) {
+      dispatch(showToast({ message: err.message || 'Failed to restore snapshot.', type: 'error' }));
+    }
+  };
+
+  const freeLeft = Number(entitlements?.freeExportsRemaining ?? user?.freeExportsRemaining ?? 0);
+  const paidLeft = Number(entitlements?.paidExportCredits ?? user?.paidExportCredits ?? 0);
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-10 px-4 sm:px-6 lg:px-8 transition-colors">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Top Greeting & Stats */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-8 sm:py-10 px-4 sm:px-6 lg:px-8 transition-colors">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Top Bar & Entitlements Banner */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                Welcome back, {user?.name || 'Professional'}!
-              </h1>
-              {user?.plan === 'pro' ? (
-                <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-indigo-600 text-white uppercase tracking-wider">
-                  Pro Plan
-                </span>
-              ) : (
-                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                  Starter Plan
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Manage your career documents, tailor ATS keywords, and download high-resolution exports.
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+              My Cloud Documents
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Signed in as <strong className="text-slate-800 dark:text-slate-200">{user?.name}</strong> ({user?.email}) • Synced automatically across devices.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {user?.role !== 'admin' && (
+              <div className="px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs flex items-center gap-3">
+                <div>
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block">Available Credits</span>
+                  <span className="font-bold text-slate-900 dark:text-white">
+                    {freeLeft} Free + {paidLeft} Paid
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPaymentModalState({
+                      isOpen: true,
+                      exportType: 'pdf',
+                      cvId: null,
+                      cvTitle: 'Additional CV Export Credit',
+                      retryExport: () => fetchDashboardData(),
+                    })
+                  }
+                  className="px-2.5 py-1.5 rounded-lg bg-[#E2136E] hover:bg-[#c91060] text-white font-bold text-[11px] cursor-pointer"
+                >
+                  + Add ৳10 Credit
+                </button>
+              </div>
+            )}
+
             <Link to="/templates">
-              <Button variant="outline" size="md" icon={Layers}>
+              <Button variant="secondary" iconLeft={Layers}>
                 Browse Templates
               </Button>
             </Link>
-            <Button
-              variant="primary"
-              size="md"
-              icon={Plus}
-              onClick={handleCreateNew}
-            >
-              New Resume
+            <Button variant="primary" iconLeft={Plus} onClick={handleCreateNew}>
+              Create New CV
             </Button>
           </div>
         </div>
 
-        {/* Quick Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Resumes</span>
-            <p className="text-2xl font-bold text-slate-900 dark:text-white">{cvList.length}</p>
-          </div>
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">ATS Readiness</span>
-            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-              98% <CheckCircle2 className="w-4 h-4" />
-            </p>
-          </div>
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">AI Assistant</span>
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
-              Active <Sparkles className="w-4 h-4 text-blue-500" />
-            </p>
-          </div>
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Exports Available</span>
-            <p className="text-2xl font-bold text-slate-900 dark:text-white">PDF + DOCX</p>
-          </div>
-        </div>
-
-        {/* Saved Resumes Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-              My Saved Resumes
-            </h2>
-            <span className="text-xs text-slate-500">
-              {cvList.length} {cvList.length === 1 ? 'document' : 'documents'}
-            </span>
-          </div>
-
-          {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-64 rounded-2xl bg-slate-200 dark:bg-slate-800 animate-pulse" />
-              ))}
-            </div>
-          ) : cvList.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {cvList.map((cv) => (
-                <div
-                  key={cv._id}
-                  className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-indigo-500/50 dark:hover:border-indigo-500/50 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden"
+        {/* Navigation Tabs + Search */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-1.5 bg-white dark:bg-slate-900 p-1.5 rounded-xl border border-slate-200/80 dark:border-slate-800">
+            {[
+              { id: 'active', label: 'Active CVs', icon: FileText },
+              { id: 'trash', label: 'Trash', icon: Trash2 },
+              { id: 'payments', label: 'Payments', icon: CreditCard },
+              { id: 'activity', label: 'Activity', icon: Activity },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    activeTab === tab.id
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
                 >
-                  {/* Miniature Header Preview */}
-                  <div
-                    onClick={() => handleEditCV(cv)}
-                    className="h-44 p-5 cursor-pointer relative flex flex-col justify-between border-b border-slate-100 dark:border-slate-800/80 group-hover:bg-slate-50 dark:group-hover:bg-slate-800/40 transition-colors"
-                    style={{
-                      borderTop: `4px solid ${cv.design?.primaryColor || '#4f46e5'}`,
-                    }}
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-2 py-0.5 rounded">
-                          {cv.templateId || 'modern-minimal'}
-                        </span>
-                        <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(cv.updatedAt || Date.now()).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <h3 className="text-base font-bold text-slate-900 dark:text-white pt-2 line-clamp-1">
-                        {cv.title}
-                      </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {cv.personalInfo?.fullName || 'Full Name'} • {cv.personalInfo?.jobTitle || 'Profession'}
-                      </p>
-                    </div>
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
 
-                    <div className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 font-medium">
-                      <span>Click to edit in builder</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </div>
-                  </div>
-
-                  {/* Card Action Controls */}
-                  <div className="p-4 bg-slate-50/50 dark:bg-slate-900 flex items-center justify-between gap-2">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => handleEditCV(cv)}
-                      icon={Edit3}
-                    >
-                      Edit
-                    </Button>
-
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => handleDuplicate(cv)}
-                        title="Duplicate"
-                        className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        onClick={() => handleDownloadPDF(cv)}
-                        title="Download PDF"
-                        className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        onClick={() => setDeleteModal({ isOpen: true, cvId: cv._id, title: cv.title })}
-                        title="Delete"
-                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 space-y-4">
-              <FileText className="w-12 h-12 text-slate-300 mx-auto" />
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                No resumes created yet
-              </h3>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                Start by creating your first resume with our AI writing assistant or choose from 10+ professional templates.
-              </p>
-              <Button variant="primary" size="md" icon={Plus} onClick={handleCreateNew}>
-                Create My First Resume
-              </Button>
+          {(activeTab === 'active' || activeTab === 'trash') && (
+            <div className="relative w-full sm:w-72">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search CVs by title, name, or role..."
+                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
           )}
         </div>
+
+        {/* ACTIVE / TRASH CV LIST */}
+        {(activeTab === 'active' || activeTab === 'trash') && (
+          <>
+            {isLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="h-56 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 animate-pulse flex flex-col justify-between"
+                  >
+                    <div className="space-y-3">
+                      <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-3/4" />
+                      <div className="h-3 bg-slate-100 dark:bg-slate-800/60 rounded w-1/2" />
+                    </div>
+                    <div className="h-9 bg-slate-100 dark:bg-slate-800 rounded-xl w-full" />
+                  </div>
+                ))}
+              </div>
+            ) : cvList.length === 0 ? (
+              <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-12 text-center space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
+                  <FileText className="w-7 h-7" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    {activeTab === 'trash'
+                      ? 'Trash is empty'
+                      : searchQuery
+                        ? 'No matching CVs found'
+                        : 'No CVs saved to your cloud account yet'}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                    {activeTab === 'trash'
+                      ? 'Deleted resumes appear here for 30+ days so you can restore them anytime.'
+                      : 'Start with a dedicated One-Page CV for students & freshers or choose a Multiple-Page executive template.'}
+                  </p>
+                </div>
+                {activeTab === 'active' && (
+                  <div className="pt-2 flex justify-center gap-2">
+                    <Button variant="primary" iconLeft={Plus} onClick={handleCreateNew}>
+                      Create Your First CV
+                    </Button>
+                    <Link to="/templates">
+                      <Button variant="secondary">Explore Templates</Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {cvList.map((cv) => {
+                  const tmplMeta = resolveTemplateMeta(cv.templateId);
+                  const isBusy = busyCvId === cv._id;
+                  const isRenaming = renamingId === cv._id;
+                  return (
+                    <div
+                      key={cv._id}
+                      className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-600 transition-all shadow-sm hover:shadow-xl flex flex-col justify-between overflow-hidden"
+                    >
+                      <div className="h-2 w-full" style={{ backgroundColor: cv.design?.primaryColor || tmplMeta.thumbnailColor || '#2563eb' }} />
+
+                      <div className="p-5 space-y-3 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            {isRenaming ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  value={renameText}
+                                  onChange={(e) => setRenameText(e.target.value)}
+                                  className="w-full px-2 py-1 text-xs rounded-lg border border-blue-400 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveRename(cv)}
+                                  className="p-1 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
+                                  title="Save title"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setRenamingId(null)}
+                                  className="p-1 text-slate-400 hover:bg-slate-100 rounded cursor-pointer"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                                  {cv.title || 'Untitled Resume'}
+                                </h3>
+                                {activeTab === 'active' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartRename(cv)}
+                                    className="text-slate-400 hover:text-blue-600 p-0.5 cursor-pointer"
+                                    title="Rename CV"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                              {cv.personalInfo?.fullName || 'Unnamed'} • {cv.personalInfo?.jobTitle || 'Role not set'}
+                            </p>
+                          </div>
+
+                          <span
+                            className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-1 ${
+                              cv.isExportUnlocked
+                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                            }`}
+                            title={
+                              cv.isExportUnlocked
+                                ? 'Unlocked: unlimited free edits and re-downloads for this CV'
+                                : 'Locked: uses 1st free credit or ৳10 credit on first export'
+                            }
+                          >
+                            {cv.isExportUnlocked ? (
+                              <>
+                                <CheckCircle2 className="w-3 h-3" />
+                                Unlocked
+                              </>
+                            ) : (
+                              <>
+                                <Lock className="w-3 h-3" />
+                                Locked
+                              </>
+                            )}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                          <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold">
+                            {tmplMeta.name}
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold">
+                            {tmplMeta.isOnePage !== false ? '1-Page' : 'Multi-Page'}
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">
+                            v{cv.version || 1}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(cv.updatedAt).toLocaleDateString()}
+                          </span>
+                          <span>Exports: {(cv.pdfExportCount || 0) + (cv.docxExportCount || 0)}</span>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                        {activeTab === 'active' ? (
+                          <>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => handleEditCV(cv)}
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-blue-500 hover:text-blue-600 cursor-pointer disabled:opacity-50"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => handleExportDocument(cv, 'pdf')}
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 cursor-pointer disabled:opacity-50"
+                                title="Download PDF"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                <span>PDF</span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => handleExportDocument(cv, 'docx')}
+                                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-blue-500 cursor-pointer disabled:opacity-50"
+                                title="Download Word (.docx)"
+                              >
+                                DOCX
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => openVersionHistory(cv)}
+                                className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white dark:hover:bg-slate-900 rounded-lg transition-colors cursor-pointer"
+                                title="Version History"
+                              >
+                                <History className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => handleDuplicate(cv)}
+                                className="p-1.5 text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-900 rounded-lg transition-colors cursor-pointer"
+                                title="Duplicate CV"
+                              >
+                                <Copy className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setDeleteModal({
+                                    isOpen: true,
+                                    cvId: cv._id,
+                                    title: cv.title,
+                                    permanent: false,
+                                  })
+                                }
+                                className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-white dark:hover:bg-slate-900 rounded-lg transition-colors cursor-pointer"
+                                title="Move to Trash"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleRestoreFromTrash(cv)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Restore</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDeleteModal({
+                                  isOpen: true,
+                                  cvId: cv._id,
+                                  title: cv.title,
+                                  permanent: true,
+                                })
+                              }
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-semibold hover:bg-rose-100 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete Permanently</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* PAYMENTS TAB */}
+        {activeTab === 'payments' && (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                  Your bKash Payment History
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Track verification statuses for all submitted Transaction IDs.
+                </p>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() =>
+                  setPaymentModalState({
+                    isOpen: true,
+                    exportType: 'pdf',
+                    cvId: null,
+                    cvTitle: 'New CV Export Credit',
+                    retryExport: () => fetchDashboardData(),
+                  })
+                }
+              >
+                Submit bKash Payment (৳10)
+              </Button>
+            </div>
+
+            {myPayments.length === 0 ? (
+              <p className="text-xs text-slate-500 py-8 text-center">
+                No payment requests submitted yet. Your first CV export is free!
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500">
+                      <th className="py-2.5 pr-4 font-semibold">TrxID</th>
+                      <th className="py-2.5 pr-4 font-semibold">Sender Number</th>
+                      <th className="py-2.5 pr-4 font-semibold">Amount</th>
+                      <th className="py-2.5 pr-4 font-semibold">Status</th>
+                      <th className="py-2.5 pr-4 font-semibold">Details / Reason</th>
+                      <th className="py-2.5 font-semibold">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                    {myPayments.map((p) => {
+                      const badge = PAYMENT_BADGE[p.status] || PAYMENT_BADGE.pending;
+                      const Icon = badge.icon;
+                      return (
+                        <tr key={p._id}>
+                          <td className="py-3 pr-4 font-mono font-bold text-slate-900 dark:text-white">
+                            {p.transactionId}
+                          </td>
+                          <td className="py-3 pr-4 text-slate-600 dark:text-slate-300 font-mono">{p.phoneNumber || p.phone || '—'}</td>
+                          <td className="py-3 pr-4 font-semibold">৳{p.amount || 10}</td>
+                          <td className="py-3 pr-4">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold ${badge.cls}`}>
+                              <Icon className="w-3 h-3" />
+                              {badge.label}
+                            </span>
+                          </td>
+                          <td className="py-3 pr-4 text-slate-500">
+                            {p.status === 'rejected' && p.rejectionReason
+                              ? p.rejectionReason
+                              : p.notes || '—'}
+                          </td>
+                          <td className="py-3 text-slate-500">
+                            {new Date(p.createdAt).toLocaleString()}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ACTIVITY TAB */}
+        {activeTab === 'activity' && (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-3">
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">
+              Recent Account Activity
+            </h2>
+            {activityList.length === 0 ? (
+              <p className="text-xs text-slate-500 py-8 text-center">No recent document activity logged.</p>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {activityList.map((act) => (
+                  <div key={act._id} className="py-3 flex items-center justify-between gap-3 text-xs">
+                    <div>
+                      <span className="font-semibold text-slate-900 dark:text-white">
+                        {act.cvTitle || 'Account Action'}
+                      </span>
+                      <span className="mx-2 text-slate-400">•</span>
+                      <span className="uppercase tracking-wider text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                        {String(act.action || '').replace(/_/g, ' ')}
+                      </span>
+                      {act.details && <p className="text-[11px] text-slate-500 mt-0.5">{act.details}</p>}
+                    </div>
+                    <span className="text-[11px] text-slate-400 shrink-0">
+                      {new Date(act.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}
       <Modal
         isOpen={deleteModal.isOpen}
-        onClose={() => setDeleteModal({ isOpen: false, cvId: null, title: '' })}
-        title="Delete Resume"
-        subtitle={`Are you sure you want to permanently delete "${deleteModal.title}"? This action cannot be undone.`}
-        maxWidth="max-w-md"
+        onClose={() => setDeleteModal({ isOpen: false, cvId: null, title: '', permanent: false })}
+        title={deleteModal.permanent ? 'Delete CV Permanently' : 'Move CV to Trash'}
+        subtitle={
+          deleteModal.permanent
+            ? 'This permanently removes the CV and its version history. Export unlock records remain safe.'
+            : 'You can restore trashed CVs anytime from the Trash tab.'
+        }
       >
-        <div className="pt-4 flex items-center justify-end gap-3">
-          <Button
-            variant="outline"
-            size="md"
-            onClick={() => setDeleteModal({ isOpen: false, cvId: null, title: '' })}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="danger"
-            size="md"
-            icon={Trash2}
-            onClick={confirmDelete}
-          >
-            Delete Permanently
-          </Button>
+        <div className="space-y-4 pt-2">
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            Document: <strong>{deleteModal.title || 'Untitled CV'}</strong>
+          </p>
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setDeleteModal({ isOpen: false, cvId: null, title: '', permanent: false })}
+            >
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={confirmDelete}>
+              {deleteModal.permanent ? 'Delete Forever' : 'Move to Trash'}
+            </Button>
+          </div>
         </div>
       </Modal>
 
-      {/* Modern macOS Export Status & Error Modal */}
-      <ExportStatusModal />
+      {/* Version History Modal */}
+      <Modal
+        isOpen={historyModal.isOpen}
+        onClose={() => setHistoryModal({ isOpen: false, cv: null, versions: [], loading: false, checkpointLabel: '' })}
+        title={`Version History • ${historyModal.cv?.title || 'CV'}`}
+        subtitle="Create manual checkpoints or restore any previous version."
+      >
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={historyModal.checkpointLabel}
+              onChange={(e) => setHistoryModal((prev) => ({ ...prev, checkpointLabel: e.target.value }))}
+              placeholder="Checkpoint note (e.g. Tailored for Frontend Role)"
+              className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+            />
+            <Button variant="primary" size="sm" iconLeft={BookmarkPlus} onClick={handleCreateCheckpoint}>
+              Save Snapshot
+            </Button>
+          </div>
+
+          {historyModal.loading ? (
+            <p className="text-xs text-slate-500 py-6 text-center">Loading version history...</p>
+          ) : historyModal.versions.length === 0 ? (
+            <p className="text-xs text-slate-500 py-6 text-center">
+              No saved checkpoints yet. Snapshots are created on checkpoints and version restores.
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {historyModal.versions.map((ver) => (
+                <div
+                  key={ver._id}
+                  className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 flex items-center justify-between gap-2 text-xs"
+                >
+                  <div className="min-w-0">
+                    <div className="font-bold text-slate-800 dark:text-white truncate">
+                      v{ver.versionNumber} • {ver.label || 'Autosave Checkpoint'}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      {new Date(ver.createdAt).toLocaleString()}
+                    </div>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    iconLeft={RotateCcw}
+                    onClick={() => handleRestoreVersion(ver._id)}
+                  >
+                    Restore
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* Payment Modal */}
+      <PaymentExportModal
+        isOpen={paymentModalState.isOpen}
+        onClose={() => setPaymentModalState((prev) => ({ ...prev, isOpen: false }))}
+        exportType={paymentModalState.exportType}
+        cvId={paymentModalState.cvId}
+        cvTitle={paymentModalState.cvTitle}
+        onSuccess={() => {
+          const retry = paymentModalState.retryExport;
+          setPaymentModalState((prev) => ({ ...prev, isOpen: false }));
+          if (typeof retry === 'function') retry();
+        }}
+      />
     </div>
   );
 };
 
 export default DashboardPage;
-

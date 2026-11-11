@@ -5,12 +5,18 @@ const paymentSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
+      required: true,
+      index: true,
+    },
+    cvId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CV',
       default: null,
     },
     customerName: {
       type: String,
       trim: true,
-      default: 'Guest User',
+      default: '',
     },
     customerEmail: {
       type: String,
@@ -28,34 +34,59 @@ const paymentSchema = new mongoose.Schema(
       required: [true, 'Please provide the bKash Transaction ID (TrxID)'],
       trim: true,
       uppercase: true,
+      unique: true,
     },
     amount: {
       type: Number,
-      default: 10, // 10 Taka
+      default: 10,
+      min: 10,
+    },
+    currency: {
+      type: String,
+      default: 'BDT',
     },
     paymentMethod: {
       type: String,
-      enum: ['bKash', 'Nagad', 'Rocket', 'coupon'],
+      enum: ['bKash', 'Nagad', 'Rocket', 'bkash_gateway'],
       default: 'bKash',
+    },
+    paymentProvider: {
+      type: String,
+      enum: ['bkash_manual', 'bkash_gateway'],
+      default: 'bkash_manual',
     },
     recipientNumber: {
       type: String,
-      default: '01816550751',
+      default: '',
     },
     status: {
       type: String,
       enum: ['pending', 'approved', 'rejected'],
       default: 'pending',
+      index: true,
     },
-    couponCode: {
+    rejectionReason: {
       type: String,
-      default: null,
+      default: '',
       trim: true,
-      uppercase: true,
+      maxlength: 300,
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
     },
     approvedAt: {
       type: Date,
       default: null,
+    },
+    entitlementsGranted: {
+      type: Number,
+      default: 0,
     },
     notes: {
       type: String,
@@ -67,12 +98,8 @@ const paymentSchema = new mongoose.Schema(
   }
 );
 
-// Index for fast lookup by transaction ID and phone
-paymentSchema.index({ transactionId: 1 });
 paymentSchema.index({ phone: 1 });
-paymentSchema.index({ customerEmail: 1 });
-paymentSchema.index({ status: 1 });
+paymentSchema.index({ userId: 1, createdAt: -1 });
 
 export const Payment = mongoose.model('Payment', paymentSchema);
 export default Payment;
-

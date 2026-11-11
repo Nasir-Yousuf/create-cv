@@ -24,6 +24,8 @@ const initialState = {
     show: false,
     message: '',
     type: 'info', // 'success' | 'error' | 'info' | 'warning'
+    actionLabel: '',
+    actionKey: null,
   },
 };
 
@@ -92,10 +94,14 @@ export const uiSlice = createSlice({
         show: true,
         message: action.payload.message,
         type: action.payload.type || 'info',
+        actionLabel: action.payload.actionLabel || '',
+        actionKey: action.payload.actionKey || null,
       };
     },
     hideToast: (state) => {
       state.toast.show = false;
+      state.toast.actionLabel = '';
+      state.toast.actionKey = null;
     },
   },
 });

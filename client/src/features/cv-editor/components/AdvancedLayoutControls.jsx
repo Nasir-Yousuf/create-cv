@@ -46,13 +46,15 @@ export const AdvancedLayoutControls = ({ onOpenPhotoModal }) => {
                   : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300'
               }`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-1">
                 <span className="font-bold text-[11px] text-slate-900 dark:text-white truncate">
                   {t.name}
                 </span>
-                {templateId === t.id && <Check className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />}
+                {templateId === t.id && <Check className="w-3 h-3 text-indigo-600 dark:text-indigo-400 shrink-0" />}
               </div>
-              <span className="text-[10px] text-slate-500 block mt-0.5">{t.category}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5">
+                {t.isOnePage ? '1-Page CV' : 'Multi-Page'} • {t.category}
+              </span>
             </button>
           ))}
         </div>

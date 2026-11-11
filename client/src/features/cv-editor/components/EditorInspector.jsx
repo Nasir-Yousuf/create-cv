@@ -55,17 +55,17 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
               Active Template
             </label>
             <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded">
-              30+ Available
+              {TEMPLATES_REGISTRY.length} Distinct Designs
             </span>
           </div>
           <select
-            value={templateId || 'bd-corporate-standard'}
+            value={templateId || 'onepage-fresher-clean'}
             onChange={(e) => dispatch(setTemplateId(e.target.value))}
             className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
           >
             {TEMPLATES_REGISTRY.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name} ({t.category})
+                {t.name} ({t.isOnePage ? '1-Page' : 'Multi-Page'})
               </option>
             ))}
           </select>

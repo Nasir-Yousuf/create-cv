@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch, useSelector, useStore } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
   setCVData,
@@ -19,20 +19,18 @@ import {
   TEMPLATES_REGISTRY,
   TEMPLATE_CATEGORIES,
   INITIAL_CV_DATA,
+  FRESHER_ONE_PAGE_CV,
   TAHMIDUR_RAHMAN_CV,
   DANIEL_CARTER_CV,
+  resolveTemplateId,
+  templateMatchesCategory,
 } from "@shared/constants/cvDefaults.js";
 import { RenderCVTemplate } from "../../templates";
-import {
-  showToast,
-  openExportModal,
-  updateExportState,
-  closeExportModal,
-} from "../../store/uiSlice";
-import exportService from "../../services/exportService";
-import paymentService from "../../services/paymentService";
+import { showToast } from "../../store/uiSlice";
+import templateService from "../../services/templateService";
+import { runProtectedExport } from "../../utils/runProtectedExport";
+import { analyzeOnePageFit } from "../../utils/onePageFit";
 import PaymentExportModal from "../../components/common/PaymentExportModal";
-import ExportStatusModal from "../../components/common/ExportStatusModal";
 import {
   generateSmartBio,
   enhanceBulletPoint,
@@ -62,9 +60,9 @@ import {
 import Button from "../../components/common/Button";
 
 const FRESHER_SAMPLE = {
-  ...INITIAL_CV_DATA,
+  ...FRESHER_ONE_PAGE_CV,
   title: "Management Trainee Resume",
-  templateId: "bd-fresher-graduate",
+  templateId: "onepage-fresher-clean",
   personalInfo: {
     fullName: "Nusrat Jahan",
     jobTitle: "Management Trainee / Business Analyst",
@@ -237,29 +235,48 @@ const BLANK_SAMPLE = {
 
 export const QuickCVWizard = () => {
   const dispatch = useDispatch();
+  const store = useStore();
   const navigate = useNavigate();
   const cvData = useSelector(
     (state) => state.cv.currentCV || state.cv.present || {},
   );
-  const { user } = useSelector((state) => state.auth);
 
-  const [activeCategory, setActiveCategory] = useState("All");
+  const [templatesList, setTemplatesList] = useState(TEMPLATES_REGISTRY);
+  const [categoriesList, setCategoriesList] = useState(TEMPLATE_CATEGORIES);
+  const [activeCategory, setActiveCategory] = useState("One-Page CVs");
   const [downloadingTemplateId, setDownloadingTemplateId] = useState(null);
   const [downloadType, setDownloadType] = useState(null); // 'pdf' | 'docx'
   const [isGeneratingBio, setIsGeneratingBio] = useState(false);
   const [showBDDetails, setShowBDDetails] = useState(true);
   const [fullscreenPreview, setFullscreenPreview] = useState(null);
   const [newSkillInput, setNewSkillInput] = useState("");
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [pendingExportType, setPendingExportType] = useState("pdf");
-  const [pendingExportTemplate, setPendingExportTemplate] = useState(null);
-  const [lastExportTemplate, setLastExportTemplate] = useState(null);
+  const [paymentModalState, setPaymentModalState] = useState({
+    isOpen: false,
+    exportType: "pdf",
+    cvId: null,
+    cvTitle: "",
+    retryExport: null,
+  });
   const [showSampleInInputs, setShowSampleInInputs] = useState(false);
   const [windowWidth, setWindowWidth] = useState(
     typeof window !== "undefined" ? window.innerWidth : 1024,
   );
   const fileInputRef = useRef(null);
   const generatedSectionRef = useRef(null);
+
+  useEffect(() => {
+    templateService
+      .getTemplatesCatalog()
+      .then(({ templates, categories }) => {
+        if (Array.isArray(templates) && templates.length > 0) {
+          setTemplatesList(templates);
+        }
+        if (Array.isArray(categories) && categories.length > 0) {
+          setCategoriesList(categories);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -274,6 +291,15 @@ export const QuickCVWizard = () => {
 
   // Default sample strings that should NOT force user to backspace or delete from form inputs
   const SAMPLE_DUMMY_STRINGS = new Set([
+    "Nafis Ahmed",
+    "Junior Software Engineer & CS Graduate",
+    "nafis.ahmed@example.com",
+    "Dhanmondi, Dhaka",
+    "linkedin.com/in/nafisahmed",
+    "Computer Science graduate (CGPA 3.78/4.00) with hands-on internship experience building responsive React and Node.js web applications. Eager to contribute clean, maintainable code to a collaborative engineering team.",
+    "B.Sc. in Computer Science & Engineering",
+    "North South University, Dhaka",
+    "CGPA 3.78 / 4.00",
     "Tahmidur Rahman Dipto",
     "Tahmidur Rahman",
     "Daniel Carter",
@@ -321,10 +347,18 @@ export const QuickCVWizard = () => {
   // Get complete, rich CV Data for template preview card or export
   const getTemplateCVData = (template) => {
     if (!template) return cvData;
+    const isOnePage = template.isOnePage !== false;
     const isBD =
-      template.category === "Bangladesh Standard" ||
-      template.id?.startsWith("bd-");
-    const fallback = isBD ? TAHMIDUR_RAHMAN_CV : DANIEL_CARTER_CV;
+      template.category === "Bangladesh CVs" ||
+      template.categories?.includes("Bangladesh CVs") ||
+      template.id?.startsWith("bd-") ||
+      template.id === "onepage-bd-compact";
+
+    const fallback = isOnePage
+      ? FRESHER_ONE_PAGE_CV
+      : isBD
+        ? TAHMIDUR_RAHMAN_CV
+        : DANIEL_CARTER_CV;
 
     const userPersonalInfo = { ...cvData.personalInfo };
     const userPersonalDetails = { ...cvData.personalDetails };
@@ -455,10 +489,13 @@ export const QuickCVWizard = () => {
   const experience = cvData.experience || [];
   const skills = cvData.skills || [];
 
-  // Filter templates
-  const filteredTemplates = TEMPLATES_REGISTRY.filter((t) => {
-    if (activeCategory === "All") return true;
-    return t.category === activeCategory;
+  // Filter templates dynamically across curated categories (1-Page collection prioritized)
+  const filteredTemplates = templatesList.filter((t) =>
+    templateMatchesCategory(t, activeCategory)
+  );
+  const onePageFitAnalysis = analyzeOnePageFit({
+    ...cvData,
+    templateId: "onepage-fresher-clean",
   });
 
   // Handle Image Upload
@@ -502,25 +539,14 @@ export const QuickCVWizard = () => {
     }
   };
 
-  // Execute One-click PDF download
-  const executeDownloadPDF = async (template) => {
+  // Unified protected PDF / Word download without blocking status overlays or extra post-download previews
+  const triggerTemplateExport = async (template, format) => {
     if (!template || downloadingTemplateId) return;
+    setDownloadingTemplateId(template.id);
+    setDownloadType(format);
+
     try {
-      setLastExportTemplate(template);
-      setDownloadingTemplateId(template.id);
-      setDownloadType("pdf");
       const targetCVData = getTemplateCVData(template);
-
-      dispatch(
-        openExportModal({
-          format: "pdf",
-          stage: "preparing",
-          progress: 15,
-          statusMessage: `Preparing crisp A4 PDF for ${template.name}...`,
-        })
-      );
-
-      // Query template container element if mounted on screen
       const elementId = `preview-sheet-${template.id}`;
       const cardEl = document.getElementById(elementId);
       const sheetEl = cardEl
@@ -528,138 +554,41 @@ export const QuickCVWizard = () => {
         : null;
       const html = sheetEl ? sheetEl.outerHTML : "";
 
-      await exportService.exportPDF(targetCVData, html, elementId, (update) => {
-        if (typeof update === "object") {
-          dispatch(
-            updateExportState({
-              stage: update.stage || "rendering",
-              progress: update.progress || 50,
-              statusMessage: update.message || "Processing...",
-            })
-          );
-        } else {
-          dispatch(updateExportState({ statusMessage: String(update) }));
-        }
+      await runProtectedExport({
+        dispatch,
+        getState: store.getState,
+        cvData: targetCVData,
+        format,
+        elementId,
+        customHtml: html,
+        isActiveEditorCV: true,
+        openPaymentModal: ({ cvId, cvTitle, format: payFormat, retryExport }) => {
+          setPaymentModalState({
+            isOpen: true,
+            exportType: payFormat,
+            cvId,
+            cvTitle,
+            retryExport,
+          });
+        },
       });
-
-      dispatch(
-        updateExportState({
-          stage: "ready",
-          progress: 100,
-          isGenerating: false,
-          statusMessage: "PDF downloaded successfully!",
-        })
-      );
-      setTimeout(() => {
-        dispatch(closeExportModal());
-      }, 1500);
-    } catch (error) {
-      console.error("Download error:", error);
-      dispatch(
-        updateExportState({
-          stage: "error",
-          isGenerating: false,
-          error: {
-            title: "PDF Generation Interrupted",
-            message: `We encountered an issue preparing the PDF for ${template.name}. You can try again or download as Word (.docx).`,
-          },
-        })
-      );
     } finally {
       setDownloadingTemplateId(null);
       setDownloadType(null);
     }
   };
 
-  // PDF download with bKash 10 Tk / Coupon Check
-  const handleDownloadPDF = async (template) => {
-    if (!paymentService.isExportUnlocked(user)) {
-      setPendingExportTemplate(template);
-      setPendingExportType("pdf");
-      setPaymentModalOpen(true);
-      return;
-    }
-    executeDownloadPDF(template);
-  };
+  const handleDownloadPDF = (template) => triggerTemplateExport(template, "pdf");
 
-  // Execute One-click DOCX download
-  const executeDownloadDOCX = async (template) => {
-    if (!template || downloadingTemplateId) return;
-    try {
-      setLastExportTemplate(template);
-      setDownloadingTemplateId(template.id);
-      setDownloadType("docx");
-      const targetCVData = getTemplateCVData(template);
-
-      dispatch(
-        openExportModal({
-          format: "docx",
-          stage: "preparing",
-          progress: 20,
-          statusMessage: `Compiling Word document for ${template.name}...`,
-        })
-      );
-
-      await exportService.exportDOCX(targetCVData, (update) => {
-        if (typeof update === "object") {
-          dispatch(
-            updateExportState({
-              stage: update.stage || "generating",
-              progress: update.progress || 50,
-              statusMessage: update.message || "Processing...",
-            })
-          );
-        } else {
-          dispatch(updateExportState({ statusMessage: String(update) }));
-        }
-      });
-
-      dispatch(
-        updateExportState({
-          stage: "ready",
-          progress: 100,
-          isGenerating: false,
-          statusMessage: "Word document (.docx) downloaded successfully!",
-        })
-      );
-      setTimeout(() => {
-        dispatch(closeExportModal());
-      }, 1500);
-    } catch (error) {
-      console.error("DOCX download error:", error);
-      dispatch(
-        updateExportState({
-          stage: "error",
-          isGenerating: false,
-          error: {
-            title: "Word Export Interrupted",
-            message: `We encountered an issue compiling the Word document for ${template.name}. You can try again or download as PDF.`,
-          },
-        })
-      );
-    } finally {
-      setDownloadingTemplateId(null);
-      setDownloadType(null);
-    }
-  };
-
-  // DOCX download with bKash 10 Tk / Coupon Check
-  const handleDownloadDOCX = async (template) => {
-    if (!paymentService.isExportUnlocked(user)) {
-      setPendingExportTemplate(template);
-      setPendingExportType("docx");
-      setPaymentModalOpen(true);
-      return;
-    }
-    executeDownloadDOCX(template);
-  };
+  const handleDownloadDOCX = (template) => triggerTemplateExport(template, "docx");
 
   // Open full editor with selected template
   const handleCustomize = (templateId) => {
-    const tmpl = TEMPLATES_REGISTRY.find((t) => t.id === templateId) || { id: templateId };
+    const canonicalId = resolveTemplateId(templateId);
+    const tmpl = templatesList.find((t) => t.id === canonicalId) || { id: canonicalId };
     const cvToLoad = getTemplateCVData(tmpl);
     dispatch(setCVData(cvToLoad));
-    dispatch(setTemplateId(templateId));
+    dispatch(setTemplateId(canonicalId));
     navigate("/builder");
   };
 
@@ -670,7 +599,7 @@ export const QuickCVWizard = () => {
     }
     dispatch(
       showToast({
-        message: "✨ All 50+ templates updated with your details! Select any design below to preview or download.",
+        message: `Updated ${templatesList.length} curated templates with your details! Browse One-Page or Multi-Page layouts below.`,
         type: "success",
       })
     );
@@ -743,13 +672,13 @@ export const QuickCVWizard = () => {
         <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white">
           Enter Your Details Once. Get{" "}
           <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            50+ Styled CVs Instantly.
+            {templatesList.length} Distinct CVs Instantly.
           </span>
         </h1>
         <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
-          Fill in your details below or launch our full desktop editor. Your CV
-          automatically renders across 50+ recruiter-approved styles—including
-          Bangladesh BDJobs standards and modern dual-column layouts.
+          Fill in your details below or launch our full desktop editor. Built around our crisp{" "}
+          <strong className="text-slate-800 dark:text-slate-200">One-Page CV Collection</strong>{" "}
+          for students and graduates alongside Bangladesh &amp; international multi-page formats.
         </p>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-3 pt-2">
@@ -1512,7 +1441,7 @@ export const QuickCVWizard = () => {
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Click below to preview your CV live across 50+ templates, or jump straight to the interactive editor.
+                Click below to preview your CV live across {templatesList.length} templates, or jump straight to the interactive editor.
               </p>
             </div>
 
@@ -1547,40 +1476,73 @@ export const QuickCVWizard = () => {
         ref={generatedSectionRef}
         className="space-y-6 scroll-mt-20"
       >
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">
-                Your Generated CVs
-              </h2>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
-                {filteredTemplates.length} Styles Live
-              </span>
+        <div className="space-y-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">
+                  Your Generated CVs
+                </h2>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
+                  {filteredTemplates.length} Styles Live
+                </span>
+                {activeCategory === "One-Page CVs" && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 text-[11px] font-bold">
+                    Default Student &amp; Fresher Collection
+                  </span>
+                )}
+              </div>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
+                One-Page templates fit crisp A4 layouts by default. Switch to Multiple-Page CVs anytime if you have extensive career history.
+              </p>
             </div>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
-              Select any design below. One-click download genuine PDF or Word
-              DOCX with your details and portrait photo.
-            </p>
+
+            {activeCategory !== "Multiple-Page CVs" &&
+              (onePageFitAnalysis.status === "overflow" || onePageFitAnalysis.status === "tight") && (
+                <div className="px-3.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/70 text-[11px] text-amber-800 dark:text-amber-200 flex items-center justify-between gap-3 max-w-md">
+                  <span>
+                    {onePageFitAnalysis.status === "overflow"
+                      ? `Your content (~${onePageFitAnalysis.wordCount} words) may extend past 1 page. Nothing is trimmed—consider Multiple-Page CVs.`
+                      : `One-page density is near capacity (~${onePageFitAnalysis.wordCount} words).`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveCategory("Multiple-Page CVs")}
+                    className="shrink-0 font-bold text-amber-900 dark:text-amber-100 underline cursor-pointer"
+                  >
+                    Multi-Page
+                  </button>
+                </div>
+              )}
           </div>
 
-          {/* Category Filter Tabs */}
+          {/* Dynamic Category Filter Tabs */}
           <div className="flex flex-wrap gap-1.5">
-            {TEMPLATE_CATEGORIES.map((category) => (
-              <button
-                key={category}
-                type="button"
-                onClick={() => setActiveCategory(category)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                  activeCategory === category
-                    ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md"
-                    : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                }`}
-              >
-                {category === "Bangladesh Standard"
-                  ? "🇧🇩 BD Standard"
-                  : category}
-              </button>
-            ))}
+            {categoriesList.map((category) => {
+              const isSelected = activeCategory === category;
+              const isOnePageCat = category === "One-Page CVs";
+              const isMultiPageCat = category === "Multiple-Page CVs";
+              return (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => setActiveCategory(category)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    isSelected
+                      ? isOnePageCat
+                        ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                        : "bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md"
+                      : isMultiPageCat
+                        ? "bg-purple-50 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/70 text-purple-700 dark:text-purple-300 hover:bg-purple-100"
+                        : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  {category === "Bangladesh CVs"
+                    ? "🇧🇩 Bangladesh CVs"
+                    : category}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -1595,9 +1557,9 @@ export const QuickCVWizard = () => {
                 key={template.id}
                 className="group bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all flex flex-col"
               >
-                {/* Header bar with Template Name & Badge */}
-                <div className="px-4 py-3 bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                {/* Header bar with Template Name & Badges */}
+                <div className="px-4 py-3 bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span
                       className="w-3 h-3 rounded-full shrink-0"
                       style={{ backgroundColor: template.thumbnailColor }}
@@ -1606,11 +1568,22 @@ export const QuickCVWizard = () => {
                       {template.name}
                     </h3>
                   </div>
-                  {template.badge && (
-                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold border border-emerald-200/60 dark:border-emerald-800">
-                      {template.badge}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+                        template.isOnePage !== false
+                          ? "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200/60 dark:border-blue-800"
+                          : "bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200/60 dark:border-purple-800"
+                      }`}
+                    >
+                      {template.isOnePage !== false ? "1-Page" : "Multi-Page"}
                     </span>
-                  )}
+                    {template.badge && (
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold border border-emerald-200/60 dark:border-emerald-800">
+                        {template.badge}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Scaled Live Sheet Preview Container */}
@@ -1765,38 +1738,18 @@ export const QuickCVWizard = () => {
 
       {/* Payment & Export Authorization Modal */}
       <PaymentExportModal
-        isOpen={paymentModalOpen}
-        onClose={() => setPaymentModalOpen(false)}
-        exportType={pendingExportType}
+        isOpen={paymentModalState.isOpen}
+        onClose={() =>
+          setPaymentModalState((prev) => ({ ...prev, isOpen: false }))
+        }
+        exportType={paymentModalState.exportType}
+        cvId={paymentModalState.cvId}
+        cvTitle={paymentModalState.cvTitle}
         onSuccess={() => {
-          if (pendingExportTemplate) {
-            if (pendingExportType === "docx") {
-              executeDownloadDOCX(pendingExportTemplate);
-            } else {
-              executeDownloadPDF(pendingExportTemplate);
-            }
-          }
-        }}
-      />
-
-      {/* Modern macOS Export Status & Error Modal */}
-      <ExportStatusModal
-        onRetry={() => {
-          if (lastExportTemplate) {
-            if (downloadType === "docx") {
-              executeDownloadDOCX(lastExportTemplate);
-            } else {
-              executeDownloadPDF(lastExportTemplate);
-            }
-          }
-        }}
-        onAlternativeExport={(altFormat) => {
-          if (lastExportTemplate) {
-            if (altFormat === "docx") {
-              executeDownloadDOCX(lastExportTemplate);
-            } else {
-              executeDownloadPDF(lastExportTemplate);
-            }
+          const retry = paymentModalState.retryExport;
+          setPaymentModalState((prev) => ({ ...prev, isOpen: false }));
+          if (typeof retry === "function") {
+            retry();
           }
         }}
       />

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { logout } from '../../store/authSlice';
+import { logout, openAuthModal } from '../../store/authSlice';
 import { toggleDarkMode, openAIModal } from '../../store/uiSlice';
+import authService from '../../services/authService';
 import {
   FileText,
   Sparkles,
@@ -10,16 +11,14 @@ import {
   Moon,
   Menu,
   X,
-  User,
   LogOut,
   LayoutDashboard,
-  Layers,
   LayoutGrid,
   Edit3,
   ChevronLeft,
   ChevronRight,
+  Coins,
 } from 'lucide-react';
-import Button from '../common/Button';
 
 export const Navbar = ({ onOpenAuth }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -30,25 +29,49 @@ export const Navbar = ({ onOpenAuth }) => {
   const { isAuthenticated, user } = useSelector((state) => state.auth);
   const { isDarkMode } = useSelector((state) => state.ui);
 
+  const triggerAuth = (mode = 'login') => {
+    if (typeof onOpenAuth === 'function') {
+      onOpenAuth(mode);
+    } else {
+      dispatch(openAuthModal({ mode }));
+    }
+  };
+
   const handleLogout = () => {
+    authService.logout().catch(() => {});
     dispatch(logout());
     setMobileMenuOpen(false);
     navigate('/');
   };
 
+  const freeLeft = Number(user?.freeExportsRemaining || 0);
+  const paidLeft = Number(user?.paidExportCredits || 0);
+  const totalCredits = freeLeft + paidLeft;
+  const initials = (user?.name || user?.email || 'U')
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || '')
+    .join('');
+
   const navTabs = [
     { name: 'Templates', href: '/templates', icon: LayoutGrid },
     { name: 'Editor', href: '/builder', icon: Edit3 },
-    { name: 'AI Assistant', isAction: true, action: () => dispatch(openAIModal({ mode: 'summary' })), icon: Sparkles },
+    {
+      name: 'AI Assistant',
+      isAction: true,
+      action: () => dispatch(openAIModal({ mode: 'summary' })),
+      icon: Sparkles,
+    },
     { name: 'My Documents', href: '/dashboard', icon: FileText },
-    ...(user?.role === 'admin' ? [{ name: 'Admin', href: '/admin', icon: LayoutDashboard }] : []),
+    ...(user?.role === 'admin'
+      ? [{ name: 'Admin', href: '/admin', icon: LayoutDashboard }]
+      : []),
   ];
 
   return (
     <header className="sticky top-0 z-40 w-full h-14 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between shrink-0 select-none transition-colors">
-      {/* Left: Traffic Lights 🔴🟡🟢, Chevrons & Brand Logo */}
+      {/* Left: Traffic Lights, History Chevrons & Brand Logo */}
       <div className="flex items-center gap-2 sm:gap-4">
-        {/* 3 macOS Window Controls (Desktop Only) */}
         <div className="hidden sm:flex items-center gap-2">
           <button
             type="button"
@@ -70,7 +93,6 @@ export const Navbar = ({ onOpenAuth }) => {
           />
         </div>
 
-        {/* Back / Forward History Chevrons */}
         <div className="hidden sm:flex items-center text-slate-400 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 rounded-md border border-slate-200/60 dark:border-slate-700/60">
           <button
             type="button"
@@ -90,7 +112,6 @@ export const Navbar = ({ onOpenAuth }) => {
           </button>
         </div>
 
-        {/* ResumeCraft Brand Logo */}
         <Link to="/" className="flex items-center gap-2 cursor-pointer group">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-600 via-purple-600 to-indigo-500 flex items-center justify-center text-white shadow-sm shadow-indigo-500/20 group-hover:scale-105 transition-transform">
             <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
@@ -141,8 +162,7 @@ export const Navbar = ({ onOpenAuth }) => {
       </nav>
 
       {/* Right Action Buttons */}
-      <div className="flex items-center gap-3">
-        {/* Theme Toggle */}
+      <div className="flex items-center gap-2 sm:gap-3">
         <button
           onClick={() => dispatch(toggleDarkMode())}
           aria-label="Toggle theme"
@@ -152,34 +172,48 @@ export const Navbar = ({ onOpenAuth }) => {
         </button>
 
         {isAuthenticated ? (
-          <div className="flex items-center gap-2 sm:gap-3">
-            {user?.role === 'admin' && (
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            {user?.role === 'admin' ? (
               <Link
                 to="/admin"
                 className="px-2.5 py-1 rounded-lg bg-[#E2136E]/10 text-[#E2136E] border border-[#E2136E]/30 text-xs font-bold hover:bg-[#E2136E]/20 transition-all flex items-center gap-1"
                 title="Open Admin Center"
               >
+                <LayoutDashboard className="w-3 h-3" />
                 <span>Admin</span>
               </Link>
-            )}
-            <Link to="/dashboard">
-              <div
-                className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer shadow-sm hover:ring-2 hover:ring-blue-500/50 transition-all"
-                title={user?.name || 'User Profile'}
+            ) : (
+              <Link
+                to="/dashboard"
+                className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/70 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors"
+                title="Available new CV export credits"
               >
-                <img
-                  src={
-                    user?.avatar ||
-                    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'
-                  }
-                  alt="Avatar"
-                  className="w-full h-full object-cover"
-                />
-              </div>
+                <Coins className="w-3 h-3" />
+                <span>
+                  {freeLeft > 0 && paidLeft === 0
+                    ? '1 Free CV'
+                    : totalCredits > 0
+                      ? `${totalCredits} Credit${totalCredits > 1 ? 's' : ''}`
+                      : '৳10 / New CV'}
+                </span>
+              </Link>
+            )}
+
+            <Link to="/dashboard" title={`${user?.name || 'User'} (${user?.email || ''})`}>
+              {user?.avatar ? (
+                <div className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer shadow-sm hover:ring-2 hover:ring-blue-500/50 transition-all">
+                  <img src={user.avatar} alt={user.name || 'User'} className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-blue-500 text-white text-xs font-bold flex items-center justify-center shadow-sm hover:ring-2 hover:ring-blue-500/50 transition-all cursor-pointer">
+                  {initials}
+                </div>
+              )}
             </Link>
+
             <button
               onClick={handleLogout}
-              className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors"
+              className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
               title="Log out"
             >
               <LogOut className="w-4 h-4" />
@@ -188,10 +222,18 @@ export const Navbar = ({ onOpenAuth }) => {
         ) : (
           <div className="flex items-center gap-1.5 sm:gap-2">
             <button
-              onClick={() => onOpenAuth && onOpenAuth('login')}
+              type="button"
+              onClick={() => triggerAuth('login')}
               className="px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
             >
               Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => triggerAuth('register')}
+              className="hidden sm:inline-flex px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold transition-all cursor-pointer"
+            >
+              Register
             </button>
             <Link to="/builder" className="hidden sm:inline-flex">
               <button className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow hover:shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5">
@@ -232,8 +274,47 @@ export const Navbar = ({ onOpenAuth }) => {
               {tab.name}
             </Link>
           ))}
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-            <Link to="/builder" onClick={() => setMobileMenuOpen(false)}>
+
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+            {isAuthenticated ? (
+              <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 py-1">
+                <span>
+                  Signed in as <strong>{user?.name || user?.email}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="text-rose-600 font-semibold"
+                >
+                  Log Out
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    triggerAuth('login');
+                  }}
+                  className="py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200"
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    triggerAuth('register');
+                  }}
+                  className="py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold"
+                >
+                  Register Free
+                </button>
+              </div>
+            )}
+
+            <Link to="/builder" onClick={() => setMobileMenuOpen(false)} className="block">
               <button className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold shadow">
                 Launch CV Editor
               </button>

@@ -18,6 +18,18 @@ const templateSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    categories: {
+      type: [String],
+      default: [],
+    },
+    isOnePage: {
+      type: Boolean,
+      default: true,
+    },
+    isFeatured: {
+      type: Boolean,
+      default: false,
+    },
     description: {
       type: String,
       default: '',
@@ -36,11 +48,19 @@ const templateSchema = new mongoose.Schema(
     },
     thumbnailColor: {
       type: String,
-      default: '#4f46e5',
+      default: '#2563eb',
+    },
+    photoFormat: {
+      type: String,
+      default: 'circle',
     },
     features: {
       type: [String],
       default: [],
+    },
+    sortOrder: {
+      type: Number,
+      default: 0,
     },
   },
   {
@@ -50,4 +70,3 @@ const templateSchema = new mongoose.Schema(
 
 export const Template = mongoose.model('Template', templateSchema);
 export default Template;
-

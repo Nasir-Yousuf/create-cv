@@ -1,67 +1,136 @@
 import mongoose from 'mongoose';
 import Template from '../models/Template.js';
-import { TEMPLATES_REGISTRY } from '../../../shared/constants/cvDefaults.js';
+import {
+  TEMPLATES_REGISTRY,
+  getDynamicCategories,
+} from '../../../shared/constants/cvDefaults.js';
 
+const mergeRegistryMetadata = (dbTemplate) => {
+  const reg = TEMPLATES_REGISTRY.find((t) => t.id === dbTemplate.templateId) || {};
+  return {
+    ...reg,
+    id: dbTemplate.templateId,
+    name: dbTemplate.name || reg.name,
+    category: dbTemplate.category || reg.category,
+    categories:
+      Array.isArray(dbTemplate.categories) && dbTemplate.categories.length > 0
+        ? dbTemplate.categories
+        : reg.categories || [dbTemplate.category],
+    isOnePage:
+      typeof dbTemplate.isOnePage === 'boolean' ? dbTemplate.isOnePage : Boolean(reg.isOnePage),
+    isFeatured:
+      typeof dbTemplate.isFeatured === 'boolean' ? dbTemplate.isFeatured : Boolean(reg.isFeatured),
+    description: dbTemplate.description || reg.description || '',
+    badge: dbTemplate.badge || reg.badge || '',
+    isPremium: false,
+    isPublished: dbTemplate.isPublished !== false,
+    thumbnailColor: dbTemplate.thumbnailColor || reg.thumbnailColor || '#2563eb',
+    photoFormat: dbTemplate.photoFormat || reg.photoFormat || 'circle',
+    features:
+      Array.isArray(dbTemplate.features) && dbTemplate.features.length > 0
+        ? dbTemplate.features
+        : reg.features || [],
+    sortOrder: typeof dbTemplate.sortOrder === 'number' ? dbTemplate.sortOrder : 99,
+  };
+};
+
+// @desc    Get all published CV templates + dynamically derived categories
+// @route   GET /api/templates
+// @access  Public
 export const getTemplates = async (req, res, next) => {
   try {
-    // If database is not currently connected, immediately serve registry without buffering delay
     if (mongoose.connection.readyState !== 1) {
       return res.status(200).json({
         success: true,
         count: TEMPLATES_REGISTRY.length,
+        categories: getDynamicCategories(TEMPLATES_REGISTRY),
         data: TEMPLATES_REGISTRY,
       });
     }
 
-    let templates = await Template.find({ isPublished: true })
+    const dbTemplates = await Template.find({ isPublished: true })
       .maxTimeMS(3000)
-      .sort({ createdAt: -1 });
+      .sort({ sortOrder: 1, createdAt: 1 });
 
-    if (!templates || templates.length === 0) {
+    if (!dbTemplates || dbTemplates.length === 0) {
       return res.status(200).json({
         success: true,
         count: TEMPLATES_REGISTRY.length,
+        categories: getDynamicCategories(TEMPLATES_REGISTRY),
         data: TEMPLATES_REGISTRY,
       });
     }
 
-    res.status(200).json({
+    const canonicalIds = new Set(TEMPLATES_REGISTRY.map((t) => t.id));
+    const filtered = dbTemplates
+      .filter((t) => canonicalIds.has(t.templateId))
+      .map(mergeRegistryMetadata);
+
+    const list = filtered.length > 0 ? filtered : TEMPLATES_REGISTRY;
+
+    return res.status(200).json({
       success: true,
-      count: templates.length,
-      data: templates,
+      count: list.length,
+      categories: getDynamicCategories(list),
+      data: list,
     });
-  } catch (error) {
-    // Graceful fallback to static registry if DB query times out
+  } catch (err) {
+    console.warn('Database error loading templates, falling back cleanly:', err.message);
     return res.status(200).json({
       success: true,
       count: TEMPLATES_REGISTRY.length,
+      categories: getDynamicCategories(TEMPLATES_REGISTRY),
       data: TEMPLATES_REGISTRY,
     });
   }
 };
 
+/**
+ * Synchronizes canonical TEMPLATES_REGISTRY into MongoDB and unpublishes removed legacy duplicates.
+ */
 export const seedTemplates = async () => {
   if (mongoose.connection.readyState !== 1) {
     return;
   }
+
   try {
-    const count = await Template.countDocuments().maxTimeMS(3000);
-    if (count === 0) {
-      console.log('Seeding initial 10 templates into MongoDB Atlas...');
-      const seedData = TEMPLATES_REGISTRY.map((t) => ({
-        templateId: t.id,
-        name: t.name,
-        category: t.category,
-        description: t.description,
-        badge: t.badge,
-        isPremium: t.isPremium,
-        thumbnailColor: t.thumbnailColor,
-        features: t.features,
-      }));
-      await Template.insertMany(seedData);
-      console.log('✅ Templates seeded successfully.');
-    }
+    const canonicalIds = TEMPLATES_REGISTRY.map((t) => t.id);
+
+    // Unpublish any old duplicate template IDs from previous releases
+    await Template.updateMany(
+      { templateId: { $nin: canonicalIds } },
+      { $set: { isPublished: false } }
+    );
+
+    const ops = TEMPLATES_REGISTRY.map((t, idx) => ({
+      updateOne: {
+        filter: { templateId: t.id },
+        update: {
+          $setOnInsert: {
+            name: t.name,
+            category: t.category,
+            categories: t.categories,
+            isOnePage: Boolean(t.isOnePage),
+            isFeatured: Boolean(t.isFeatured),
+            description: t.description,
+            badge: t.badge,
+            isPremium: false,
+            isPublished: true,
+            thumbnailColor: t.thumbnailColor,
+            photoFormat: t.photoFormat,
+            features: t.features,
+          },
+          $set: {
+            sortOrder: idx,
+          },
+        },
+        upsert: true,
+      },
+    }));
+
+    await Template.bulkWrite(ops);
+    console.log(`✅ Synchronized ${TEMPLATES_REGISTRY.length} distinct templates in MongoDB.`);
   } catch (err) {
-    console.warn('Template seed skipped (DB offline or timeout):', err.message);
+    console.error('❌ Error syncing templates:', err.message);
   }
 };

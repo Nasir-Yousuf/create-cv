@@ -8,7 +8,6 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Request interceptor to attach JWT token
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('novacv_token');
@@ -20,37 +19,44 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for centralized error formatting
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     let message = error.message || 'An unexpected error occurred';
+    let parsedData = null;
 
     if (error.response?.data) {
       if (typeof error.response.data === 'object' && !(error.response.data instanceof Blob)) {
-        message = error.response.data.message || error.response.data.error || message;
+        parsedData = error.response.data;
+        message = parsedData.message || parsedData.error || message;
       } else if (typeof Blob !== 'undefined' && error.response.data instanceof Blob) {
         try {
           const text = await error.response.data.text();
-          const parsed = JSON.parse(text);
-          message = parsed.message || parsed.error || message;
+          parsedData = JSON.parse(text);
+          message = parsedData.message || parsedData.error || message;
         } catch (e) {
-          // If not JSON text, retain default error message
+          // Retain default error message when non-JSON blob error occurs
         }
       }
     }
 
-    // If 401 unauthorized on protected routes, can clear stale token
-    if (error.response?.status === 401) {
-      if (localStorage.getItem('novacv_token')) {
-        localStorage.removeItem('novacv_token');
-        localStorage.removeItem('novacv_user');
-      }
+    const status = error.response?.status;
+    const reqUrl = String(error.config?.url || '');
+    const isAuthAttempt = reqUrl.includes('/auth/login') || reqUrl.includes('/auth/register');
+
+    if (status === 401 && !isAuthAttempt) {
+      localStorage.removeItem('novacv_token');
+      localStorage.removeItem('novacv_user');
     }
 
-    return Promise.reject(new Error(message));
+    const wrapped = new Error(message);
+    wrapped.status = status;
+    wrapped.code = parsedData?.code;
+    wrapped.entitlements = parsedData?.entitlements;
+    wrapped.data = parsedData;
+    wrapped.response = error.response;
+    return Promise.reject(wrapped);
   }
 );
 
 export default api;
-

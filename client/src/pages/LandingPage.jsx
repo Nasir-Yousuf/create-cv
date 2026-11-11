@@ -1,26 +1,28 @@
 import React, { useState } from 'react';
 import QuickCVWizard from '../features/quick-wizard/QuickCVWizard';
-import { ChevronDown, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
+import { TEMPLATES_REGISTRY } from '@shared/constants/cvDefaults.js';
 
 export const LandingPage = ({ onOpenAuth }) => {
   const [openFaq, setOpenFaq] = useState(null);
+  const templateCount = TEMPLATES_REGISTRY.length;
 
   const faqs = [
     {
+      q: 'Why is there a dedicated One-Page CV collection?',
+      a: 'Most students, fresh graduates, and entry-level candidates need a sharp, recruiter-ready single-page CV rather than a stretched multi-page document. Our One-Page collection uses smart spacing and clean typography calibrated specifically for A4 single-page PDF exports.',
+    },
+    {
+      q: 'How does the First-CV Free and ৳10 bKash pricing model work?',
+      a: 'Every registered account gets its first CV export completely free. Once unlocked, that CV can be edited and re-downloaded in PDF or Word formats unlimited times at no extra cost. To export each additional separate CV, simply pay ৳10 once via bKash.',
+    },
+    {
       q: 'Does this match Bangladeshi corporate & BDJobs recruiter expectations?',
-      a: 'Yes, 100%. Our Bangladeshi CV templates feature formal passport-size (35×45mm) portrait photos on the top-right, structured academic qualification tables (SSC, HSC, Honours/B.Sc. with passing year and CGPA), complete personal details (Father/Mother’s name, DOB, NID, Blood Group), 2 professional references, and a signed declaration statement.',
+      a: 'Yes! Our Bangladesh CVs include compact one-page fresher formats as well as detailed Multi-Page Corporate templates with passport-size (35×45mm) photo framing, structured academic tables (SSC, HSC, Bachelor’s/Master’s), personal details, references, and declaration.',
     },
     {
-      q: 'Will my CV pass modern Applicant Tracking Systems (ATS)?',
-      a: 'Every template is engineered to strict semantic markup standards. In addition, our dedicated "ATS Friendly" category uses single-column linear hierarchy and standard header tags ensuring a 100% parse rate on Taleo, Workday, Greenhouse, and BDJobs automated screening engines.',
-    },
-    {
-      q: 'Can I export both PDF and editable Microsoft Word (DOCX)?',
-      a: 'Yes. You can download vector-crisp A4 PDFs rendered via our headless browser engine with zero margins and font embedding, as well as genuine, fully editable .docx Word documents.',
-    },
-    {
-      q: 'Can I switch templates without losing my typed information?',
-      a: 'Yes! Your personal details, work experience, education, and photo remain intact across all 30+ templates. You can switch between styles anytime with zero risk of data loss.',
+      q: 'Can I switch templates or log in from another device without losing my CVs?',
+      a: `Yes! All your CVs and version history are stored securely under your authenticated account in the cloud. You can switch across any of our ${templateCount} curated layouts anytime or continue editing from another computer.`,
     },
   ];
 

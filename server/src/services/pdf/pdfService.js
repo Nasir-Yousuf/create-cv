@@ -1,6 +1,8 @@
 import puppeteer from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
+import { resolveTemplateId, resolveTemplateMeta, TEMPLATE_ALIAS_COLORS } from '../../../../shared/constants/cvDefaults.js';
+import { generateOnePageTemplateHtml } from './onePageHtmlRenderers.js';
 
 /**
  * Resolves the Chromium/Chrome executable path across Windows, Linux, and Cloud environments.
@@ -80,7 +82,7 @@ const getCompiledClientStyles = () => {
  */
 export const generateTemplateHtml = (cvData) => {
   const {
-    templateId = 'bd-corporate-standard',
+    templateId = 'onepage-fresher-clean',
     personalInfo = {},
     personalDetails = {},
     experience = [],
@@ -94,14 +96,28 @@ export const generateTemplateHtml = (cvData) => {
     design = {},
   } = cvData || {};
 
-  const isATS = templateId === 'ats-classic' || templateId.includes('ats') || templateId.includes('academic');
-  const isApple = templateId.includes('apple') || templateId === 'zurich-clean' || templateId === 'nordic-minimal';
-  const isOcean = templateId.includes('ocean') || templateId.includes('split');
-  const isLinear = templateId.includes('linear') || templateId === 'dark-mode' || templateId.includes('tech') || templateId.includes('fintech');
-  const isCoral = templateId.includes('coral') || templateId.includes('creative') || templateId.includes('sunset') || templateId.includes('horizon');
-  const isSlate = templateId.includes('slate') || templateId.includes('executive') || templateId.includes('director') || templateId.includes('harvard') || templateId.includes('corporate-royal');
-  const isMinimal = templateId.includes('minimal') || templateId.includes('breeze') || templateId.includes('forest') || templateId.includes('sun');
-  const isModernBlue = templateId === 'modern-blue' || templateId.includes('blue') || templateId === 'daniel-carter' || templateId === 'simple-white' || templateId === 'professional' || templateId === 'elegant-minimal';
+  const canonicalId = resolveTemplateId(templateId);
+  const templateMeta = resolveTemplateMeta(canonicalId);
+  const aliasColor = TEMPLATE_ALIAS_COLORS[templateId];
+  const mergedDesign = aliasColor && !design?.primaryColor ? { ...design, ...aliasColor } : design;
+
+  if (templateMeta?.isOnePage || canonicalId.startsWith('onepage-')) {
+    return generateOnePageTemplateHtml(canonicalId, {
+      ...cvData,
+      templateId: canonicalId,
+      design: mergedDesign,
+    });
+  }
+
+  const effectiveId = canonicalId;
+  const isATS = effectiveId === 'ats-classic' || effectiveId.includes('ats') || effectiveId.includes('academic');
+  const isApple = effectiveId.includes('apple') || effectiveId === 'zurich-clean' || effectiveId === 'nordic-minimal';
+  const isOcean = effectiveId.includes('ocean') || effectiveId.includes('split');
+  const isLinear = effectiveId.includes('linear') || effectiveId === 'dark-mode' || effectiveId.includes('tech') || effectiveId.includes('fintech');
+  const isCoral = effectiveId.includes('coral') || effectiveId.includes('creative') || effectiveId.includes('sunset') || effectiveId.includes('horizon');
+  const isSlate = effectiveId.includes('slate') || effectiveId.includes('executive') || effectiveId.includes('director') || effectiveId.includes('harvard') || effectiveId.includes('corporate-royal');
+  const isMinimal = effectiveId.includes('minimal') || effectiveId.includes('breeze') || effectiveId.includes('forest') || effectiveId.includes('sun');
+  const isModernBlue = effectiveId === 'modern-blue' || effectiveId.includes('blue') || effectiveId === 'daniel-carter' || effectiveId === 'simple-white' || effectiveId === 'professional' || effectiveId === 'elegant-minimal';
 
   const primary = design?.primaryColor || (
     isATS ? '#0f172a' :
@@ -891,7 +907,7 @@ export const generatePDF = async (cvData, renderedHtml = '') => {
         }
         .resume-sheet-a4 {
           width: 210mm !important;
-          min-height: 297mm !important;
+          min-height: 295mm !important;
           box-sizing: border-box !important;
           margin: 0 auto !important;
           box-shadow: none !important;
@@ -901,7 +917,7 @@ export const generatePDF = async (cvData, renderedHtml = '') => {
         }
         .resume-sheet-letter {
           width: 8.5in !important;
-          min-height: 11in !important;
+          min-height: 10.9in !important;
           box-sizing: border-box !important;
           margin: 0 auto !important;
           box-shadow: none !important;

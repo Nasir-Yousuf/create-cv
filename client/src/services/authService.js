@@ -20,7 +20,21 @@ export const authService = {
     const res = await api.get('/auth/me');
     return res.data;
   },
+
+  async updateProfile(payload) {
+    const res = await api.put('/auth/profile', payload);
+    return res.data;
+  },
+
+  async forgotPassword(email) {
+    const res = await api.post('/auth/forgot-password', { email });
+    return res.data;
+  },
+
+  async resetPassword(token, newPassword) {
+    const res = await api.post('/auth/reset-password', { token, newPassword });
+    return res.data;
+  },
 };
 
 export default authService;
-

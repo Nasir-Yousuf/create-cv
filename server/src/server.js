@@ -10,12 +10,14 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 import app from './app.js';
 import connectDB from './config/db.js';
 import { seedTemplates } from './controllers/templateController.js';
+import { bootstrapAdminUser } from './utils/adminBootstrap.js';
 
 const PORT = process.env.PORT || 5000;
 
 // Connect to Database and start server
 const startServer = async () => {
   await connectDB();
+  await bootstrapAdminUser();
   await seedTemplates();
 
   const server = app.listen(PORT, () => {

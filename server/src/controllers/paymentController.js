@@ -1,407 +1,193 @@
+import { z } from 'zod';
 import Payment from '../models/Payment.js';
 import User from '../models/User.js';
 import CV from '../models/CV.js';
+import CVActivity from '../models/CVActivity.js';
 
-const ADMIN_PASSKEY = process.env.ADMIN_PASSKEY || '01816550751';
+export const getPaymentConfigValues = () => ({
+  bkashNumber: process.env.BKASH_NUMBER || '01816550751',
+  amountBdt: Number(process.env.CV_EXPORT_PRICE_BDT) || 10,
+  currency: 'BDT',
+  paymentMethod: 'bKash',
+  provider: 'bkash_manual',
+});
 
-// Helper to verify admin access via auth token or passkey header
-const isAuthorizedAdmin = (req) => {
-  if (req.user && req.user.role === 'admin') return true;
-  const adminKey = req.headers['x-admin-key'] || req.query.adminKey || req.body.adminKey;
-  const envPromo = (process.env.PROMO_COUPON_CODE || '').trim().toUpperCase();
-  if (adminKey && (adminKey === ADMIN_PASSKEY || adminKey === 'UDOY518' || (envPromo && adminKey === envPromo))) return true;
-  return false;
+const submitPaymentSchema = z.object({
+  phoneNumber: z
+    .string()
+    .trim()
+    .regex(/^(\+?880|0)1[3-9]\d{8}$/, 'Please enter a valid Bangladeshi bKash mobile number (e.g. 017XXXXXXXX).'),
+  transactionId: z
+    .string()
+    .trim()
+    .min(6, 'bKash Transaction ID (TrxID) must be at least 6 characters.')
+    .max(32, 'Transaction ID is too long.')
+    .regex(/^[A-Za-z0-9_-]+$/, 'Transaction ID may contain only letters and numbers.'),
+  cvId: z.string().optional().nullable(),
+  notes: z.string().max(250).optional(),
+});
+
+export const computeUserEntitlements = async (userId) => {
+  const [user, unlockedCvsCount, pendingPaymentsCount, recentPayments] = await Promise.all([
+    User.findById(userId).select('role freeExportsRemaining paidExportCredits totalExports status'),
+    CV.countDocuments({ userId, isExportUnlocked: true, isDeleted: { $ne: true } }),
+    Payment.countDocuments({ userId, status: 'pending' }),
+    Payment.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .select('amount currency phone transactionId status rejectionReason paymentMethod createdAt reviewedAt'),
+  ]);
+
+  if (!user) return null;
+
+  const isAdmin = user.role === 'admin';
+  const freeExportsRemaining = isAdmin ? 999999 : Math.max(0, user.freeExportsRemaining || 0);
+  const paidExportCredits = isAdmin ? 999999 : Math.max(0, user.paidExportCredits || 0);
+
+  return {
+    isAdmin,
+    freeExportsRemaining,
+    paidExportCredits,
+    availableNewCvExports: freeExportsRemaining + paidExportCredits,
+    unlockedCvsCount,
+    totalExports: user.totalExports || 0,
+    pendingPaymentsCount,
+    recentPayments,
+  };
 };
 
-// 1. Submit bKash payment for 10 Tk
+// @desc    Get public non-sensitive bKash payment instructions & pricing
+// @route   GET /api/payment/config
+// @access  Public
+export const getPaymentConfig = (req, res) => {
+  const cfg = getPaymentConfigValues();
+  res.status(200).json({
+    success: true,
+    data: {
+      bkashNumber: cfg.bkashNumber,
+      amountBdt: cfg.amountBdt,
+      currency: cfg.currency,
+      paymentMethod: cfg.paymentMethod,
+      provider: cfg.provider,
+      pricingPolicy: 'First CV export is free. Additional CV creation/export costs ৳10 per new CV.',
+    },
+  });
+};
+
+// @desc    Get authenticated user's export entitlements & payment summary
+// @route   GET /api/payment/entitlements
+// @access  Private
+export const getMyEntitlements = async (req, res, next) => {
+  try {
+    const entitlements = await computeUserEntitlements(req.user.id);
+    if (!entitlements) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    res.status(200).json({
+      success: true,
+      data: entitlements,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Submit manual bKash TrxID payment verification request (৳10 = 1 additional CV credit)
+// @route   POST /api/payment/submit
+// @access  Private
 export const submitPayment = async (req, res, next) => {
   try {
-    const { phone, transactionId, customerName, customerEmail } = req.body;
-
-    if (!phone || !phone.trim()) {
+    const parsed = submitPaymentSchema.safeParse(req.body || {});
+    if (!parsed.success) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide your bKash sender phone number.',
+        message: parsed.error.issues[0]?.message || 'Invalid payment submission details.',
       });
     }
 
-    if (!transactionId || !transactionId.trim()) {
-      return res.status(400).json({
+    const cleanTrxId = parsed.data.transactionId.toUpperCase();
+    const cfg = getPaymentConfigValues();
+
+    const duplicate = await Payment.findOne({ transactionId: cleanTrxId });
+    if (duplicate) {
+      return res.status(409).json({
         success: false,
-        message: 'Please provide the bKash Transaction ID (TrxID).',
+        code: 'DUPLICATE_TRX_ID',
+        message: `Transaction ID "${cleanTrxId}" has already been submitted (${duplicate.status}). Duplicate Transaction IDs cannot be reused.`,
       });
     }
 
-    const cleanTrx = transactionId.trim().toUpperCase();
-    const cleanPhone = phone.trim();
-
-    // Check if TrxID was already submitted
-    const existing = await Payment.findOne({ transactionId: cleanTrx });
-    if (existing) {
-      if (existing.status === 'approved') {
-        return res.status(200).json({
-          success: true,
-          status: 'approved',
-          unlocked: true,
-          payment: existing,
-          message: 'This Transaction ID has already been verified and approved! You can export now.',
-        });
-      }
-      return res.status(200).json({
-        success: true,
-        status: 'pending',
-        unlocked: false,
-        payment: existing,
-        message: 'Transaction ID is already submitted and pending admin verification.',
-      });
+    let validCvId = null;
+    if (parsed.data.cvId) {
+      const ownedCv = await CV.findOne({ _id: parsed.data.cvId, userId: req.user.id }).select('_id');
+      if (ownedCv) validCvId = ownedCv._id;
     }
 
-    const newPayment = await Payment.create({
-      userId: req.user ? req.user.id : null,
-      customerName: customerName ? customerName.trim() : (req.user?.name || 'Guest User'),
-      customerEmail: customerEmail ? customerEmail.trim().toLowerCase() : (req.user?.email || ''),
-      phone: cleanPhone,
-      transactionId: cleanTrx,
-      amount: 10,
+    const payment = await Payment.create({
+      userId: req.user.id,
+      cvId: validCvId,
+      customerName: req.user.name,
+      customerEmail: req.user.email,
+      phone: parsed.data.phoneNumber,
+      transactionId: cleanTrxId,
+      amount: cfg.amountBdt,
+      currency: cfg.currency,
       paymentMethod: 'bKash',
-      recipientNumber: ADMIN_PASSKEY,
+      paymentProvider: 'bkash_manual',
+      recipientNumber: cfg.bkashNumber,
       status: 'pending',
+      notes: parsed.data.notes || '',
     });
+
+    await CVActivity.create({
+      userId: req.user.id,
+      cvId: validCvId,
+      action: 'payment_submitted',
+      details: `Submitted bKash payment ৳${cfg.amountBdt} (TrxID: ${cleanTrxId})`,
+      actorRole: 'user',
+      actorId: req.user.id,
+    }).catch(() => {});
 
     res.status(201).json({
       success: true,
-      status: 'pending',
-      unlocked: false,
-      payment: newPayment,
-      message: 'bKash payment submitted successfully! Waiting for admin approval.',
+      message: 'Payment request submitted. An administrator will verify your bKash TrxID shortly.',
+      data: {
+        _id: payment._id,
+        transactionId: payment.transactionId,
+        phone: payment.phone,
+        amount: payment.amount,
+        currency: payment.currency,
+        status: payment.status,
+        createdAt: payment.createdAt,
+      },
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    if (err?.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        code: 'DUPLICATE_TRX_ID',
+        message: 'This Transaction ID has already been recorded.',
+      });
+    }
+    next(err);
   }
 };
 
-// 2. Check status of a transaction or user
-export const checkPaymentStatus = async (req, res, next) => {
+// @desc    List authenticated user's own payment requests and statuses
+// @route   GET /api/payment/my-payments
+// @access  Private
+export const getMyPayments = async (req, res, next) => {
   try {
-    const { transactionId, phone, email } = req.query;
-
-    const query = {};
-    if (transactionId) query.transactionId = transactionId.trim().toUpperCase();
-    else if (phone) query.phone = phone.trim();
-    else if (email) query.customerEmail = email.trim().toLowerCase();
-    else if (req.user?.id) query.userId = req.user.id;
-    else {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide a transactionId, phone, or email to check.',
-      });
-    }
-
-    // Look for an approved payment first, or the newest payment
-    let payment = await Payment.findOne({ ...query, status: 'approved' });
-    if (!payment) {
-      payment = await Payment.findOne(query).sort({ createdAt: -1 });
-    }
-
-    if (!payment) {
-      return res.status(200).json({
-        success: true,
-        status: 'not_found',
-        unlocked: false,
-      });
-    }
+    const payments = await Payment.find({ userId: req.user.id })
+      .sort({ createdAt: -1 })
+      .select('amount currency phone transactionId recipientNumber paymentMethod status rejectionReason entitlementsGranted createdAt reviewedAt');
 
     res.status(200).json({
       success: true,
-      status: payment.status,
-      unlocked: payment.status === 'approved',
-      payment,
+      count: payments.length,
+      data: payments,
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
-
-// 3. Apply Promo / Coupon Code (e.g. UDOY26)
-export const applyCoupon = async (req, res, next) => {
-  try {
-    const { couponCode, customerName, customerEmail, phone } = req.body;
-
-    if (!couponCode || typeof couponCode !== 'string') {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide a coupon code.',
-      });
-    }
-
-    const code = couponCode.trim().toUpperCase();
-    const envPromo = (process.env.PROMO_COUPON_CODE || '').trim().toUpperCase();
-    if (code !== 'UDOY518' && (!envPromo || code !== envPromo)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid coupon code. Please check your code or send 10 Tk via bKash to 01816550751.',
-      });
-    }
-
-    // Create an approved record for this coupon redemption
-    const payment = await Payment.create({
-      userId: req.user ? req.user.id : null,
-      customerName: customerName ? customerName.trim() : (req.user?.name || 'Coupon User'),
-      customerEmail: customerEmail ? customerEmail.trim().toLowerCase() : (req.user?.email || ''),
-      phone: phone ? phone.trim() : 'COUPON-USER',
-      transactionId: `COUPON-${code}-${Date.now().toString(36).toUpperCase()}`,
-      amount: 0,
-      paymentMethod: 'coupon',
-      couponCode: code,
-      status: 'approved',
-      approvedAt: new Date(),
-      notes: `Unlocked instantly with authorized promo coupon ${code}`,
-    });
-
-    // If user is logged in, upgrade user plan to pro
-    if (req.user?.id) {
-      await User.findByIdAndUpdate(req.user.id, { plan: 'pro' });
-    }
-
-    res.status(200).json({
-      success: true,
-      unlocked: true,
-      payment,
-      message: 'Coupon code applied successfully! Lifetime export access unlocked.',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// 4. Admin: Get all payments and stats
-export const adminGetPayments = async (req, res, next) => {
-  try {
-    if (!isAuthorizedAdmin(req)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Unauthorized admin access. Enter admin passkey or sign in as admin.',
-      });
-    }
-
-    const payments = await Payment.find().sort({ createdAt: -1 });
-
-    const stats = {
-      total: payments.length,
-      pending: payments.filter((p) => p.status === 'pending').length,
-      approved: payments.filter((p) => p.status === 'approved').length,
-      rejected: payments.filter((p) => p.status === 'rejected').length,
-      totalRevenue: payments
-        .filter((p) => p.status === 'approved')
-        .reduce((sum, p) => sum + (p.amount || 0), 0),
-    };
-
-    res.status(200).json({
-      success: true,
-      stats,
-      payments,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// 5. Admin: Approve a payment
-export const adminApprovePayment = async (req, res, next) => {
-  try {
-    if (!isAuthorizedAdmin(req)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Unauthorized admin access.',
-      });
-    }
-
-    const { id } = req.params;
-    const payment = await Payment.findById(id);
-
-    if (!payment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Payment record not found.',
-      });
-    }
-
-    payment.status = 'approved';
-    payment.approvedAt = new Date();
-    await payment.save();
-
-    // If linked to a registered user, upgrade their plan to 'pro'
-    if (payment.userId) {
-      await User.findByIdAndUpdate(payment.userId, { plan: 'pro' });
-    } else if (payment.customerEmail) {
-      await User.findOneAndUpdate({ email: payment.customerEmail.toLowerCase() }, { plan: 'pro' });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: `Transaction ${payment.transactionId} approved! User is now unlocked for export.`,
-      payment,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// 6. Admin: Reject a payment
-export const adminRejectPayment = async (req, res, next) => {
-  try {
-    if (!isAuthorizedAdmin(req)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Unauthorized admin access.',
-      });
-    }
-
-    const { id } = req.params;
-    const payment = await Payment.findById(id);
-
-    if (!payment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Payment record not found.',
-      });
-    }
-
-    payment.status = 'rejected';
-    await payment.save();
-
-    res.status(200).json({
-      success: true,
-      message: `Transaction ${payment.transactionId} has been rejected.`,
-      payment,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// 7. Admin: Delete a payment record
-export const adminDeletePayment = async (req, res, next) => {
-  try {
-    if (!isAuthorizedAdmin(req)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Unauthorized admin access.',
-      });
-    }
-
-    const { id } = req.params;
-    await Payment.findByIdAndDelete(id);
-
-    res.status(200).json({
-      success: true,
-      message: 'Payment record removed successfully.',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// 8. Admin: Verify Passkey Login
-export const adminVerifyPasskey = async (req, res, next) => {
-  try {
-    const { passkey } = req.body;
-    if (passkey === ADMIN_PASSKEY || passkey === 'UDOY518') {
-      return res.status(200).json({
-        success: true,
-        message: 'Admin passkey verified successfully.',
-        adminKey: passkey,
-      });
-    }
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid Admin passkey. Enter your admin phone number.',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// 9. Admin: Get all users with CV count and plan status
-export const adminGetUsers = async (req, res, next) => {
-  try {
-    if (!isAuthorizedAdmin(req)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Unauthorized admin access.',
-      });
-    }
-
-    const users = await User.find().select('-password').sort({ createdAt: -1 }).lean();
-
-    // Attach CV count and payments info for each user
-    const usersWithStats = await Promise.all(
-      users.map(async (u) => {
-        const cvCount = await CV.countDocuments({ userId: u._id });
-        const userPayments = await Payment.find({
-          $or: [{ userId: u._id }, { customerEmail: u.email }],
-        }).sort({ createdAt: -1 });
-
-        return {
-          ...u,
-          cvCount,
-          paymentsCount: userPayments.length,
-          lastPayment: userPayments[0] || null,
-          hasApprovedPayment: userPayments.some((p) => p.status === 'approved'),
-        };
-      })
-    );
-
-    res.status(200).json({
-      success: true,
-      count: usersWithStats.length,
-      users: usersWithStats,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// 10. Admin: Update user plan (e.g. approve to Pro or downgrade to Free)
-export const adminUpdateUserPlan = async (req, res, next) => {
-  try {
-    if (!isAuthorizedAdmin(req)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Unauthorized admin access.',
-      });
-    }
-
-    const { id } = req.params;
-    const { plan } = req.body;
-
-    if (!['free', 'pro', 'enterprise'].includes(plan)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid plan type. Must be free, pro, or enterprise.',
-      });
-    }
-
-    const user = await User.findByIdAndUpdate(
-      id,
-      { plan },
-      { new: true, runValidators: true }
-    ).select('-password');
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found.',
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: `User plan updated to ${plan}. Export permissions updated!`,
-      user,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-

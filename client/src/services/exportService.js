@@ -21,7 +21,31 @@ import {
 } from 'docx';
 
 /**
- * Safely triggers file download with mobile and desktop support.
+ * Safely extracts structured JSON errors from axios Blob responses so auth/payment gates propagate properly.
+ */
+const extractExportError = async (err) => {
+  const status = err?.response?.status || err?.status;
+  let parsed = null;
+  if (err?.response?.data instanceof Blob) {
+    try {
+      const txt = await err.response.data.text();
+      parsed = JSON.parse(txt);
+    } catch (_) {}
+  } else if (err?.response?.data && typeof err.response.data === 'object') {
+    parsed = err.response.data;
+  }
+  const message = parsed?.message || err?.message || 'Export request failed';
+  const wrapped = new Error(message);
+  wrapped.status = status;
+  wrapped.code = parsed?.code;
+  wrapped.entitlements = parsed?.entitlements;
+  return wrapped;
+};
+
+const isHardPolicyReject = (status) => [400, 401, 402, 403, 429].includes(Number(status));
+
+/**
+ * Safely triggers file download without opening unwanted preview tabs.
  */
 export const triggerDownload = (blob, filename) => {
   try {
@@ -32,7 +56,7 @@ export const triggerDownload = (blob, filename) => {
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
-    a.target = '_blank';
+    a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
@@ -441,9 +465,10 @@ export const exportService = {
   /**
    * Generates a validated PDF binary Blob, caching it for identical preview and download.
    */
-  async generatePDFBlob(cvData, customHtml = '', elementId = 'cv-export-sheet', onProgress = null) {
-    const currentHash = computeCvHash(cvData);
-    if (cachedPdf.blob && cachedPdf.hash === currentHash && cachedPdf.url) {
+  async generatePDFBlob(cvData, customHtml = '', elementId = 'cv-export-sheet', onProgress = null, options = {}) {
+    const cvId = options?.cvId || cvData?._id || null;
+    const currentHash = `${cvId || 'draft'}:${computeCvHash(cvData)}`;
+    if (!options?.skipCache && options?.previewOnly && cachedPdf.blob && cachedPdf.hash === currentHash && cachedPdf.url) {
       notifyProgress(onProgress, 'ready', 100, 'Reusing verified PDF binary...');
       return { blob: cachedPdf.blob, url: cachedPdf.url, fromCache: true };
     }
@@ -453,14 +478,14 @@ export const exportService = {
 
     let generatedBlob = null;
 
-    // 1. PRIMARY STRATEGY: High-Fidelity Server-Side Puppeteer Engine
+    // 1. PRIMARY STRATEGY: High-Fidelity Server-Side Puppeteer Engine (enforces auth & entitlements)
     try {
       notifyProgress(onProgress, 'rendering', 45, 'Rendering vector typography & layout...');
       notifyProgress(onProgress, 'generating', 75, 'Generating vector PDF document...');
 
       const response = await api.post(
         '/export/pdf',
-        { cvData, html: cleanHtml },
+        { cvData, html: cleanHtml, cvId, previewOnly: Boolean(options?.previewOnly) },
         {
           responseType: 'blob',
           timeout: 45000,
@@ -487,7 +512,11 @@ export const exportService = {
         }
       }
     } catch (serverErr) {
-      console.warn('Backend PDF export error, attempting client-side fallback:', serverErr.message);
+      const parsedErr = await extractExportError(serverErr);
+      if (isHardPolicyReject(parsedErr.status)) {
+        throw parsedErr;
+      }
+      console.warn('Backend PDF export error, attempting client-side fallback:', parsedErr.message);
     }
 
     // 2. SECONDARY RESILIENT FALLBACK: Client-Side Crisp jsPDF Engine
@@ -509,18 +538,18 @@ export const exportService = {
         const stageWidth = isLetterStage ? 816 : 794;
         const stageMinHeight = isLetterStage ? 1056 : 1123;
 
-        // Create an off-screen staging container at (0,0) with high z-index
+        // Create strictly off-screen staging container so no visual preview panel flashes over the UI
         stageContainer = document.createElement('div');
         stageContainer.id = 'client-pdf-active-stage';
         stageContainer.style.cssText = `
           position: fixed;
-          left: 0;
+          left: -15000px;
           top: 0;
           width: ${stageWidth}px;
           min-height: ${stageMinHeight}px;
-          z-index: 99999;
+          z-index: -1;
           background: #ffffff;
-          opacity: 0.99;
+          opacity: 1;
           pointer-events: none;
           overflow: visible;
           margin: 0;
@@ -678,12 +707,12 @@ export const exportService = {
    * 2. Obtain verified PDF binary (from cache or newly rendered)
    * 3. Download the exact same binary
    */
-  async exportPDF(cvData, customHtml = '', elementId = 'cv-export-sheet', onProgress = null) {
+  async exportPDF(cvData, customHtml = '', elementId = 'cv-export-sheet', onProgress = null, options = {}) {
     const rawName = (cvData?.personalInfo?.fullName || cvData?.title || 'Resume').trim();
     const cleanName = rawName.replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_') || 'Resume';
     const filename = `${cleanName}.pdf`;
 
-    const { blob } = await this.generatePDFBlob(cvData, customHtml, elementId, onProgress);
+    const { blob } = await this.generatePDFBlob(cvData, customHtml, elementId, onProgress, options);
     triggerDownload(blob, filename);
     return blob;
   },
@@ -770,7 +799,8 @@ export const exportService = {
    * 3. Fallback to client-side docx library
    * 4. Verify binary document and download
    */
-  async exportDOCX(cvData, onProgress = null) {
+  async exportDOCX(cvData, onProgress = null, options = {}) {
+    const cvId = options?.cvId || cvData?._id || null;
     const rawName = (cvData?.personalInfo?.fullName || cvData?.title || 'Resume').trim();
     const cleanName = rawName.replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_') || 'Resume';
     const filename = `${cleanName}.docx`;
@@ -783,7 +813,7 @@ export const exportService = {
 
       const response = await api.post(
         '/export/docx',
-        { cvData },
+        { cvData, cvId },
         {
           responseType: 'blob',
           timeout: 30000,
@@ -808,7 +838,11 @@ export const exportService = {
         }
       }
     } catch (serverErr) {
-      console.warn('Backend DOCX export error, falling back to client-side docx:', serverErr.message);
+      const parsedErr = await extractExportError(serverErr);
+      if (isHardPolicyReject(parsedErr.status)) {
+        throw parsedErr;
+      }
+      console.warn('Backend DOCX export error, falling back to client-side docx:', parsedErr.message);
     }
 
     // 2. SECONDARY RESILIENT FALLBACK: Client-side docx library

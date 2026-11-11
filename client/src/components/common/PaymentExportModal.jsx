@@ -1,94 +1,155 @@
-import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import paymentService from '../../services/paymentService';
+import authService from '../../services/authService';
+import { syncUserProfile } from '../../store/authSlice';
 import {
   X,
   Check,
   Copy,
-  ExternalLink,
-  Sparkles,
   ShieldCheck,
-  Tag,
   Clock,
   ArrowRight,
   CheckCircle2,
   RefreshCw,
   AlertCircle,
   Smartphone,
+  XCircle,
+  Info,
 } from 'lucide-react';
+
+const STATUS_BADGE = {
+  pending: {
+    label: 'Pending Verification',
+    cls: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+    icon: Clock,
+  },
+  approved: {
+    label: 'Approved',
+    cls: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+    icon: CheckCircle2,
+  },
+  rejected: {
+    label: 'Rejected',
+    cls: 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+    icon: XCircle,
+  },
+};
 
 export const PaymentExportModal = ({
   isOpen,
   onClose,
   onSuccess,
-  exportType = 'pdf', // 'pdf' | 'docx'
+  exportType = 'pdf',
+  cvId = null,
+  cvTitle = '',
 }) => {
+  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
 
-  const [activeTab, setActiveTab] = useState('bkash'); // 'bkash' | 'coupon'
-  const [phone, setPhone] = useState('');
+  const [config, setConfig] = useState({
+    bkashNumber: '',
+    amountBdt: 10,
+    pricingPolicy: 'First CV export is free. Each additional new CV costs ৳10 via bKash.',
+  });
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [transactionId, setTransactionId] = useState('');
-  const [customerName, setCustomerName] = useState(user?.name || '');
-  const [customerEmail, setCustomerEmail] = useState(user?.email || '');
-  const [couponCode, setCouponCode] = useState('');
-  
+  const [notes, setNotes] = useState('');
+
+  const [myPayments, setMyPayments] = useState([]);
+  const [entitlements, setEntitlements] = useState(null);
+
   const [copied, setCopied] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
-  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
-  
-  const [submittedPayment, setSubmittedPayment] = useState(null);
   const [statusMessage, setStatusMessage] = useState({ text: '', type: '' });
 
-  const BKASH_NUMBER = '01816550751';
-  const WHATSAPP_URL = 'https://wa.me/8801816550751?text=Hello%20I%20sent%2010%20Taka%20on%20bKash%20to%20export%20my%20CV.%20TrxID:%20';
+  const loadModalState = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setIsLoadingData(true);
+    try {
+      const [cfgRes, entRes, payRes] = await Promise.all([
+        paymentService.getPaymentConfig().catch(() => null),
+        paymentService.getEntitlements().catch(() => null),
+        paymentService.getMyPayments().catch(() => null),
+      ]);
+
+      if (cfgRes?.data) {
+        setConfig((prev) => ({ ...prev, ...cfgRes.data }));
+      }
+      if (payRes?.data) {
+        setMyPayments(payRes.data);
+      }
+      if (entRes?.data) {
+        setEntitlements(entRes.data);
+        const credits = Number(entRes.data.availableNewCvExports || 0);
+        if (credits > 0 && entRes.data.isAdmin !== true) {
+          // Credit was approved! Sync user profile & resume export automatically
+          const me = await authService.getMe().catch(() => null);
+          if (me?.user) dispatch(syncUserProfile(me.user));
+          setStatusMessage({
+            text: 'Payment approved! Your new CV export credit is ready. Starting download...',
+            type: 'success',
+          });
+          setTimeout(() => {
+            if (typeof onSuccess === 'function') onSuccess();
+            if (typeof onClose === 'function') onClose();
+          }, 900);
+        }
+      }
+    } finally {
+      if (!silent) setIsLoadingData(false);
+    }
+  }, [dispatch, onClose, onSuccess]);
 
   useEffect(() => {
-    if (isOpen) {
-      // Check if user already has a pending or approved payment saved locally
-      const lastTrx = paymentService.getLastTrxId();
-      if (lastTrx) {
-        setTransactionId(lastTrx);
-        checkStatus(lastTrx);
-      }
-      if (user) {
-        if (!customerName) setCustomerName(user.name || '');
-        if (!customerEmail) setCustomerEmail(user.email || '');
-      }
+    if (!isOpen) {
+      setStatusMessage({ text: '', type: '' });
+      return;
     }
-  }, [isOpen, user]);
+    loadModalState();
+  }, [isOpen, loadModalState]);
 
-  // Auto-poll approval status every 4 seconds when payment is pending
+  const hasPendingPayment = myPayments.some((p) => p.status === 'pending');
+
+  // Poll every 5 seconds only while a payment is awaiting admin review
   useEffect(() => {
-    let interval = null;
-    const currentTrx = transactionId || submittedPayment?.transactionId;
-    if (isOpen && currentTrx && statusMessage.type === 'info') {
-      interval = setInterval(() => {
-        checkStatus(currentTrx);
-      }, 4000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isOpen, transactionId, submittedPayment, statusMessage.type]);
+    if (!isOpen || !hasPendingPayment) return undefined;
+    const timer = setInterval(() => {
+      loadModalState({ silent: true });
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [isOpen, hasPendingPayment, loadModalState]);
 
   if (!isOpen) return null;
 
   const handleCopyNumber = () => {
-    navigator.clipboard.writeText(BKASH_NUMBER);
+    if (!config.bkashNumber) return;
+    navigator.clipboard.writeText(config.bkashNumber);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  // Submit bKash payment
+  const handleManualRefresh = async () => {
+    setIsChecking(true);
+    await loadModalState({ silent: true });
+    setIsChecking(false);
+  };
+
   const handleSubmitBkash = async (e) => {
     e.preventDefault();
-    if (!phone.trim()) {
-      setStatusMessage({ text: 'Please enter your bKash sender phone number.', type: 'error' });
+    if (!phoneNumber.trim() || phoneNumber.trim().length < 6) {
+      setStatusMessage({
+        text: 'Please enter the bKash sender mobile number you used (e.g. 017XXXXXXXX).',
+        type: 'error',
+      });
       return;
     }
-    if (!transactionId.trim()) {
-      setStatusMessage({ text: 'Please enter the bKash Transaction ID (TrxID).', type: 'error' });
+    if (!transactionId.trim() || transactionId.trim().length < 4) {
+      setStatusMessage({
+        text: 'Please enter the valid bKash Transaction ID (TrxID).',
+        type: 'error',
+      });
       return;
     }
 
@@ -97,28 +158,24 @@ export const PaymentExportModal = ({
 
     try {
       const res = await paymentService.submitPayment({
-        phone: phone.trim(),
+        phoneNumber: phoneNumber.trim(),
         transactionId: transactionId.trim().toUpperCase(),
-        customerName: customerName.trim(),
-        customerEmail: customerEmail.trim(),
+        cvId,
+        notes: notes.trim(),
       });
 
-      if (res.unlocked || res.status === 'approved') {
-        setStatusMessage({ text: 'Payment verified and approved! Unlocking download...', type: 'success' });
-        setTimeout(() => {
-          onSuccess && onSuccess();
-          onClose();
-        }, 1200);
-      } else {
-        setSubmittedPayment(res.payment);
-        setStatusMessage({
-          text: 'bKash submission recorded! Admin will review your TrxID shortly.',
-          type: 'info',
-        });
-      }
+      setStatusMessage({
+        text:
+          res?.message ||
+          'Payment submitted for verification! Once the admin approves your TrxID, you will receive +1 CV export credit.',
+        type: 'info',
+      });
+      setTransactionId('');
+      setNotes('');
+      await loadModalState({ silent: true });
     } catch (err) {
       setStatusMessage({
-        text: err.response?.data?.message || 'Error submitting payment. Please try again.',
+        text: err.message || 'Could not submit payment request. Please verify details and retry.',
         type: 'error',
       });
     } finally {
@@ -126,248 +183,146 @@ export const PaymentExportModal = ({
     }
   };
 
-  // Check Approval Status
-  const checkStatus = async (trxToCheck) => {
-    const trx = trxToCheck || transactionId || submittedPayment?.transactionId;
-    if (!trx) return;
-
-    setIsChecking(true);
-    try {
-      const res = await paymentService.checkStatus({ transactionId: trx });
-      if (res.unlocked || res.status === 'approved') {
-        setStatusMessage({ text: 'Approved! Your export is unlocked 🎉', type: 'success' });
-        setTimeout(() => {
-          onSuccess && onSuccess();
-          onClose();
-        }, 1200);
-      } else if (res.status === 'pending') {
-        setStatusMessage({ text: 'Status: Pending Admin verification. Please wait a moment.', type: 'info' });
-      } else if (res.status === 'rejected') {
-        setStatusMessage({ text: 'Transaction was rejected. Please contact support.', type: 'error' });
-      }
-    } catch (err) {
-      console.warn('Status check error:', err.message);
-    } finally {
-      setIsChecking(false);
-    }
-  };
-
-  // Apply Coupon Code (Private VIP Promo)
-  const handleApplyCoupon = async (e) => {
-    e.preventDefault();
-    if (!couponCode.trim()) {
-      setStatusMessage({ text: 'Please enter a coupon code.', type: 'error' });
-      return;
-    }
-
-    setIsApplyingCoupon(true);
-    setStatusMessage({ text: '', type: '' });
-
-    try {
-      const res = await paymentService.applyCoupon(couponCode.trim(), {
-        customerName: customerName.trim(),
-        customerEmail: customerEmail.trim(),
-        phone: phone.trim(),
-      });
-
-      if (res.unlocked) {
-        setStatusMessage({ text: 'Coupon applied successfully! Lifetime download unlocked 🎉', type: 'success' });
-        setTimeout(() => {
-          onSuccess && onSuccess();
-          onClose();
-        }, 1000);
-      }
-    } catch (err) {
-      setStatusMessage({
-        text: err.response?.data?.message || 'Invalid coupon code. Please verify your code or pay 10 Tk via bKash.',
-        type: 'error',
-      });
-    } finally {
-      setIsApplyingCoupon(false);
-    }
-  };
+  const formatLabel = exportType === 'docx' ? 'Word (.docx)' : 'PDF';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in select-none">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[90vh]">
-        {/* 1. macOS Window Titlebar */}
-        <div className="px-4 sm:px-5 py-3 sm:py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80">
-          <div className="flex items-center gap-2">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[94vh]">
+        {/* macOS Titlebar */}
+        <div className="px-4 sm:px-5 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
             <button
               type="button"
               onClick={onClose}
-              className="w-3.5 h-3.5 rounded-full bg-[#ff5f56] border border-[#e0443e] hover:opacity-80 active:scale-95 transition-all shadow-sm cursor-pointer"
+              className="w-3.5 h-3.5 rounded-full bg-[#ff5f56] border border-[#e0443e] hover:opacity-80 cursor-pointer shrink-0"
+              aria-label="Close payment window"
             />
-            <div className="w-3.5 h-3.5 rounded-full bg-[#ffbd2e] border border-[#dea123] opacity-60" />
-            <div className="w-3.5 h-3.5 rounded-full bg-[#27c93f] border border-[#1aab29] opacity-60" />
+            <div className="w-3.5 h-3.5 rounded-full bg-[#ffbd2e] border border-[#dea123] opacity-60 shrink-0" />
+            <div className="w-3.5 h-3.5 rounded-full bg-[#27c93f] border border-[#1aab29] opacity-60 shrink-0" />
             <span className="ml-2 text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">
-              ResumeCraft • Export Authorization
+              Unlock Additional CV Export • bKash
             </span>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* 2. Scrollable Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-5">
-          {/* Hero Banner: 10 Taka bKash */}
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#E2136E] to-[#b80c54] p-5 text-white shadow-lg shadow-[#e2136e]/20">
-            {/* Background Decorative Rings */}
+        {/* Body */}
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-4">
+          {/* Hero Card */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#E2136E] to-[#a90a4c] p-5 text-white shadow-lg shadow-[#e2136e]/20">
             <div className="absolute -right-6 -bottom-6 w-32 h-32 rounded-full bg-white/10 pointer-events-none" />
-            <div className="absolute right-12 -top-8 w-24 h-24 rounded-full bg-white/10 pointer-events-none" />
-
-            <div className="relative z-10 flex items-start justify-between">
+            <div className="relative z-10 flex items-start justify-between gap-3">
               <div>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 text-[11px] font-bold tracking-wide uppercase">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  Official Export Access
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 text-[10px] font-bold tracking-wide uppercase">
+                  <ShieldCheck className="w-3 h-3" />
+                  1st CV Free • Additional CV ৳{config.amountBdt || 10}
                 </span>
                 <h3 className="text-xl sm:text-2xl font-black mt-2 tracking-tight">
-                  Only 10 Taka (১০ টাকা)
+                  ৳{config.amountBdt || 10} via bKash
                 </h3>
-                <p className="text-xs text-pink-100 mt-1 max-w-xs leading-relaxed">
-                  Pay 10 Tk in bKash to export your {exportType === 'docx' ? 'Microsoft Word (.docx)' : 'Vector PDF'} document, or use the promo code.
+                <p className="text-xs text-pink-100 mt-1 leading-relaxed">
+                  Pay ৳{config.amountBdt || 10} once to unlock {formatLabel} &amp; Word exports permanently for{' '}
+                  <strong className="text-white">{cvTitle || 'this new CV'}</strong>. Future edits and re-downloads stay free.
                 </p>
               </div>
-
-              {/* bKash Icon / Badge */}
               <div className="w-12 h-12 rounded-2xl bg-white text-[#E2136E] flex items-center justify-center font-black text-xs shadow-md shrink-0">
                 bKash
               </div>
             </div>
 
-            {/* Recipient Number Card with Copy */}
             <div className="mt-4 pt-3 border-t border-white/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="text-xs">
                 <span className="text-pink-200 block text-[10px] uppercase font-semibold">
-                  Personal bKash (Send Money)
+                  Send Money (Personal bKash Number)
                 </span>
                 <span className="font-mono font-bold text-base tracking-wider text-white">
-                  {BKASH_NUMBER}
+                  {config.bkashNumber || (isLoadingData ? 'Loading...' : 'Not configured')}
                 </span>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleCopyNumber}
-                  className="px-3 py-1.5 rounded-xl bg-white text-[#E2136E] text-xs font-bold shadow-sm hover:bg-pink-50 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy Number</span>
-                    </>
-                  )}
-                </button>
-
-                <a
-                  href={`${WHATSAPP_URL}${transactionId || ''}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white transition-all"
-                  title="WhatsApp Chat for Instant Verification"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-              </div>
+              <button
+                type="button"
+                onClick={handleCopyNumber}
+                disabled={!config.bkashNumber}
+                className="px-3 py-1.5 rounded-xl bg-white text-[#E2136E] text-xs font-bold shadow-sm hover:bg-pink-50 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer self-start sm:self-auto disabled:opacity-50"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy Number</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
-          {/* Segmented Option Selector: bKash vs Coupon */}
-          <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => setActiveTab('bkash')}
-              className={`py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === 'bkash'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm font-bold'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
-              }`}
-            >
-              <Smartphone className="w-3.5 h-3.5 text-[#E2136E]" />
-              <span>1. Pay via bKash (10 Tk)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('coupon')}
-              className={`py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === 'coupon'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm font-bold'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
-              }`}
-            >
-              <Tag className="w-3.5 h-3.5 text-blue-600" />
-              <span>2. Promo / Coupon Code</span>
-            </button>
+          {/* Step-by-step instructions */}
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/70 text-[11px] text-slate-600 dark:text-slate-300 space-y-1">
+            <div className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+              <Info className="w-3.5 h-3.5 text-[#E2136E]" />
+              <span>How Manual Verification Works</span>
+            </div>
+            <p>1. Open your bKash app and tap <strong>Send Money</strong> to the number above for <strong>৳{config.amountBdt || 10}</strong>.</p>
+            <p>2. Enter your bKash mobile number and the <strong>Transaction ID (TrxID)</strong> below.</p>
+            <p>3. Admin verifies your TrxID and grants <strong>+1 CV export credit</strong> to <strong>{user?.email}</strong>.</p>
           </div>
 
-          {/* Notification status message if any */}
+          {/* Feedback message */}
           {statusMessage.text && (
             <div
-              className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+              className={`p-3 rounded-xl border text-xs flex items-start gap-2 leading-relaxed ${
                 statusMessage.type === 'success'
-                  ? 'bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
-                  : statusMessage.type === 'error'
-                  ? 'bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300'
-                  : 'bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+                  : statusMessage.type === 'info'
+                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200'
+                    : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200'
               }`}
             >
               {statusMessage.type === 'success' ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              ) : statusMessage.type === 'error' ? (
-                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+              ) : statusMessage.type === 'info' ? (
+                <Clock className="w-4 h-4 shrink-0 mt-0.5" />
               ) : (
-                <Clock className="w-4 h-4 text-blue-600 shrink-0 animate-spin" />
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               )}
               <span>{statusMessage.text}</span>
             </div>
           )}
 
-          {/* TAB 1: BKASH FORM */}
-          {activeTab === 'bkash' && (
-            <form onSubmit={handleSubmitBkash} className="space-y-3.5">
-              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-1">
-                <div className="font-semibold text-slate-800 dark:text-slate-200">
-                  Quick Steps to Pay 10 Tk:
-                </div>
-                <ol className="list-decimal list-inside space-y-0.5 text-[11px]">
-                  <li>Send Money <strong>10 Tk</strong> to <strong>01816550751</strong> via bKash.</li>
-                  <li>Copy the <strong>Transaction ID (TrxID)</strong> from your bKash SMS.</li>
-                  <li>Paste below and click submit. Admin approves your request!</li>
-                </ol>
-              </div>
-
-              {/* Sender Phone */}
+          {/* Payment Request Form */}
+          <form onSubmit={handleSubmitBkash} className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Your bKash Sender Phone Number *
+                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Your bKash Mobile Number *
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="e.g. 01712345678"
-                  className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-[#E2136E]"
-                />
+                <div className="relative">
+                  <Smartphone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="tel"
+                    required
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="017XXXXXXXX"
+                    className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#E2136E]"
+                  />
+                </div>
               </div>
 
-              {/* Transaction ID */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   bKash Transaction ID (TrxID) *
                 </label>
                 <input
@@ -375,137 +330,103 @@ export const PaymentExportModal = ({
                   required
                   value={transactionId}
                   onChange={(e) => setTransactionId(e.target.value.toUpperCase())}
-                  placeholder="e.g. 9J24K9L8"
-                  className="w-full text-xs font-mono uppercase bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-[#E2136E]"
+                  placeholder="e.g. BL93K8X2MP"
+                  className="w-full px-3 py-2 text-xs font-mono uppercase tracking-wider rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#E2136E] placeholder:normal-case placeholder:font-sans placeholder:tracking-normal"
                 />
               </div>
+            </div>
 
-              {/* Name & Email (optional) */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                    Your Name (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Full Name"
-                    className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-slate-900 dark:text-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                    Your Email (Optional)
-                  </label>
-                  <input
-                    type="email"
-                    value={customerEmail}
-                    onChange={(e) => setCustomerEmail(e.target.value)}
-                    placeholder="email@example.com"
-                    className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-slate-900 dark:text-white focus:outline-none"
-                  />
-                </div>
-              </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Optional Note
+              </label>
+              <input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Reference or note for admin (optional)"
+                className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#E2136E]"
+              />
+            </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#E2136E] to-[#c70f5e] hover:opacity-95 active:scale-95 text-white font-bold text-xs shadow-md shadow-[#e2136e]/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Submitting Payment...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Submit Payment (10 Tk)</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </>
-                  )}
-                </button>
-
-                {transactionId && (
-                  <button
-                    type="button"
-                    onClick={() => checkStatus()}
-                    disabled={isChecking}
-                    className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 transition-all"
-                    title="Check if admin has approved your payment"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isChecking ? 'animate-spin text-blue-600' : ''}`} />
-                    <span>Check Status</span>
-                  </button>
-                )}
-              </div>
-            </form>
-          )}
-
-          {/* TAB 2: COUPON FORM */}
-          {activeTab === 'coupon' && (
-            <form onSubmit={handleApplyCoupon} className="space-y-4">
-              <div className="bg-blue-50/70 dark:bg-blue-950/40 p-3.5 rounded-xl border border-blue-200 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-300 space-y-1">
-                <div className="font-bold flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                  Instant Download Promo Code
-                </div>
-                <p className="text-[11px] leading-relaxed">
-                  Enter your private authorization promo code to immediately unlock instant PDF and Word downloads without waiting for approval.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Enter Coupon Code *
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    placeholder="Enter your coupon code"
-                    className="w-full text-sm font-mono tracking-wider uppercase bg-white dark:bg-slate-800 border-2 border-blue-500 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-white focus:outline-none placeholder:normal-case placeholder:font-sans placeholder:tracking-normal placeholder:text-slate-400"
-                  />
-                </div>
-              </div>
-
+            <div className="flex items-center gap-2 pt-1">
               <button
                 type="submit"
-                disabled={isApplyingCoupon}
-                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                disabled={isSubmitting}
+                className="flex-1 py-2.5 rounded-xl bg-[#E2136E] hover:bg-[#c91060] active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-[#e2136e]/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
               >
-                {isApplyingCoupon ? (
+                {isSubmitting ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Verifying Code...</span>
+                    <span>Submitting Request...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Apply Coupon & Unlock Download</span>
+                    <span>Submit bKash TrxID (৳{config.amountBdt || 10})</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </>
                 )}
               </button>
-            </form>
-          )}
 
-          {/* WhatsApp Support Notice */}
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
-            <span>Any issues? Message admin on WhatsApp:</span>
-            <a
-              href={`${WHATSAPP_URL}${transactionId || ''}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#25D366] font-bold hover:underline flex items-center gap-1"
-            >
-              <span>01816550751</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-          </div>
+              <button
+                type="button"
+                onClick={handleManualRefresh}
+                disabled={isChecking}
+                className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Refresh approval status"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isChecking ? 'animate-spin text-[#E2136E]' : ''}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
+          </form>
+
+          {/* Recent Payment Requests & Status Tracking */}
+          {myPayments.length > 0 && (
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                <span>Your Recent Payment Requests</span>
+                {entitlements && (
+                  <span className="text-emerald-600 dark:text-emerald-400 normal-case font-semibold">
+                    Credits Available: {entitlements.availableNewCvExports || 0}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                {myPayments.slice(0, 5).map((p) => {
+                  const meta = STATUS_BADGE[p.status] || STATUS_BADGE.pending;
+                  const Icon = meta.icon;
+                  return (
+                    <div
+                      key={p._id}
+                      className="p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 text-xs space-y-1"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-mono font-bold text-slate-800 dark:text-slate-100">
+                          {p.transactionId}{' '}
+                          <span className="font-sans font-normal text-[11px] text-slate-500">
+                            • ৳{p.amount || 10}
+                          </span>
+                        </div>
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold ${meta.cls}`}
+                        >
+                          <Icon className="w-3 h-3" />
+                          {meta.label}
+                        </span>
+                      </div>
+                      {p.status === 'rejected' && p.rejectionReason && (
+                        <div className="text-[11px] text-rose-600 dark:text-rose-400">
+                          Reason: {p.rejectionReason}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -513,4 +434,3 @@ export const PaymentExportModal = ({
 };
 
 export default PaymentExportModal;
-

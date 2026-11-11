@@ -261,522 +261,171 @@ export const TAHMIDUR_RAHMAN_CV = {
   customSections: []
 };
 
-export const INITIAL_CV_DATA = {
-  ...TAHMIDUR_RAHMAN_CV,
-  title: "Professional Resume",
+import {
+  TEMPLATES_REGISTRY,
+  TEMPLATE_CATEGORIES,
+  TEMPLATE_ID_ALIASES,
+  TEMPLATE_ALIAS_COLORS,
+  PREFERRED_CATEGORY_ORDER,
+  resolveTemplateId,
+  resolveTemplateMeta,
+  templateMatchesCategory,
+  getDynamicCategories,
+} from './templatesCatalog.js';
+
+export const FRESHER_ONE_PAGE_CV = {
+  templateId: "onepage-fresher-clean",
+  title: "One-Page Graduate CV",
+  design: {
+    primaryColor: "#2563eb",
+    accentColor: "#0ea5e9",
+    textColor: "#0f172a",
+    fontFamily: "Inter",
+    fontSize: "medium",
+    sectionSpacing: "compact",
+    layout: "single-column",
+    pageSize: "A4",
+    showPhoto: true,
+    photoSize: "md",
+    sectionOrder: ["summary", "education", "experience", "projects", "skills", "certifications", "languages", "references", "declaration"]
+  },
+  personalInfo: {
+    fullName: "Nafis Ahmed",
+    jobTitle: "Junior Software Engineer & CS Graduate",
+    email: "nafis.ahmed@example.com",
+    phone: "+880 1712-345678",
+    location: "Dhanmondi, Dhaka",
+    linkedin: "linkedin.com/in/nafisahmed",
+    github: "github.com/nafisahmed",
+    website: "nafisahmed.dev",
+    summary: "Computer Science graduate (CGPA 3.78/4.00) with hands-on internship experience building responsive React and Node.js web applications. Eager to contribute clean, maintainable code to a collaborative engineering team.",
+    photo: "",
+    photoStyle: "circle"
+  },
+  personalDetails: {
+    nationality: "Bangladeshi",
+    presentAddress: "Dhanmondi 15, Dhaka 1209",
+    dateOfBirth: "2002-05-14"
+  },
+  experience: [
+    {
+      id: "exp-f1",
+      jobTitle: "Software Engineering Intern",
+      company: "Pathao Tech (Product Lab)",
+      location: "Dhaka, Bangladesh",
+      startDate: "Jan 2025",
+      endDate: "Jun 2025",
+      current: false,
+      description: "Contributed to merchant dashboard features in React, TypeScript, and REST APIs.",
+      highlights: [
+        "Reduced checkout form validation latency by 28% across key onboarding screens.",
+        "Wrote automated unit tests achieving 85% coverage for new billing utility modules."
+      ]
+    },
+    {
+      id: "exp-f2",
+      jobTitle: "Undergraduate Teaching Assistant",
+      company: "North South University (Dept. of ECE)",
+      location: "Dhaka, Bangladesh",
+      startDate: "Sep 2024",
+      endDate: "Dec 2024",
+      current: false,
+      description: "Guided 60+ sophomore students during weekly Data Structures & Algorithms lab sessions.",
+      highlights: [
+        "Evaluated programming assignments and conducted review clinics before midterms."
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-f1",
+      degree: "B.Sc. in Computer Science & Engineering",
+      institution: "North South University, Dhaka",
+      location: "Dhaka",
+      startDate: "2021",
+      endDate: "2025",
+      grade: "CGPA 3.78 / 4.00",
+      highlights: ["Dean's Honor List recipient across 4 semesters."]
+    },
+    {
+      id: "edu-f2",
+      degree: "Higher Secondary Certificate (HSC - Science)",
+      institution: "Dhaka City College",
+      location: "Dhaka",
+      startDate: "2018",
+      endDate: "2020",
+      grade: "GPA 5.00 / 5.00",
+      highlights: []
+    }
+  ],
+  skills: [
+    { id: "sk-f1", name: "JavaScript / React.js", level: "Advanced", category: "Frontend" },
+    { id: "sk-f2", name: "Node.js & Express", level: "Intermediate", category: "Backend" },
+    { id: "sk-f3", name: "MongoDB & PostgreSQL", level: "Intermediate", category: "Database" },
+    { id: "sk-f4", name: "Tailwind CSS", level: "Advanced", category: "Frontend" },
+    { id: "sk-f5", name: "Git & GitHub Actions", level: "Intermediate", category: "Tools" },
+    { id: "sk-f6", name: "Python & Problem Solving", level: "Advanced", category: "Core" }
+  ],
+  projects: [
+    {
+      id: "proj-f1",
+      name: "CampusRide Carpool Matcher",
+      role: "Full Stack Lead",
+      technologies: ["React", "Node.js", "MongoDB"],
+      url: "github.com/nafis/campusride",
+      description: "Real-time student commute sharing app matching verified university commuters along Dhaka routes."
+    },
+    {
+      id: "proj-f2",
+      name: "SmartInvoice BD Generator",
+      role: "Creator",
+      technologies: ["TypeScript", "Vite", "PDFKit"],
+      url: "github.com/nafis/smartinvoice",
+      description: "Lightweight invoice and tax receipt builder tailored for local SMEs and freelancers."
+    }
+  ],
+  certifications: [
+    { id: "cert-f1", name: "Meta Front-End Developer Professional Certificate", issuer: "Coursera", date: "2024" },
+    { id: "cert-f2", name: "ICPC Dhaka Regional Contestant", issuer: "ICPC Foundation", date: "2024" }
+  ],
+  languages: [
+    { id: "lang-f1", name: "Bengali", proficiency: "Native" },
+    { id: "lang-f2", name: "English", proficiency: "Fluent (IELTS 7.5)" }
+  ],
+  references: [
+    {
+      id: "ref-f1",
+      name: "Dr. Tania Rahman",
+      designation: "Associate Professor, Dept. of ECE",
+      company: "North South University",
+      phone: "+880 1711-000111",
+      email: "tania.rahman@northsouth.edu"
+    }
+  ],
+  declaration: {
+    text: "I hereby declare that the above information is accurate to the best of my knowledge.",
+    date: "",
+    signedBy: "Nafis Ahmed"
+  },
+  customSections: []
 };
 
-export const TEMPLATES_REGISTRY = [
-  // --- MACOS REFERENCE & MODERN DESIGNS ---
-  {
-    id: "modern-blue",
-    name: "Modern Blue",
-    category: "Modern Minimal",
-    description: "Featured flagship design from ResumeCraft. Two-column layout with circular profile headshot, 2-column contact grid, skill pill badges, and clean chronological experience.",
-    badge: "Featured",
-    isPremium: false,
-    thumbnailColor: "#2563eb",
-    photoFormat: "circle",
-    features: ["Circular Headshot", "Two-Column Balance", "Skill Pills", "ATS Optimized"]
-  },
-  {
-    id: "elegant-minimal",
-    name: "Elegant Minimal",
-    category: "Modern Minimal",
-    description: "Refined dark slate accents, clean lines, and crisp typography for senior professionals and executives.",
-    badge: "Minimal",
-    isPremium: false,
-    thumbnailColor: "#334155",
-    photoFormat: "circle",
-    features: ["Slate Tones", "Executive Clarity", "Skill Badges"]
-  },
-  {
-    id: "professional",
-    name: "Professional",
-    category: "Classic Formal",
-    description: "Timeless corporate standard with midnight blue accents and structured career achievements.",
-    badge: "Formal",
-    isPremium: false,
-    thumbnailColor: "#0f172a",
-    photoFormat: "circle",
-    features: ["Formal Header", "High Readability", "Chronological"]
-  },
-  {
-    id: "creative-design",
-    name: "Creative Design",
-    category: "Creative & Design",
-    description: "Vibrant coral accents, asymmetric layouts, and standout typography for designers, marketers, and creators.",
-    badge: "Creative",
-    isPremium: false,
-    thumbnailColor: "#f97316",
-    photoFormat: "circle",
-    features: ["Coral Accent", "Portfolio Ready", "Dynamic"]
-  },
-  {
-    id: "clean-layout",
-    name: "Clean Layout",
-    category: "Modern Minimal",
-    description: "Apple-inspired pure whitespace, hairline dividers, and San Francisco style typography.",
-    badge: "Apple Style",
-    isPremium: false,
-    thumbnailColor: "#1e293b",
-    photoFormat: "circle",
-    features: ["Pure Whitespace", "Hairline Dividers", "Crisp Text"]
-  },
-  {
-    id: "bold-style",
-    name: "Bold Style",
-    category: "Classic Formal",
-    description: "Strong high-contrast headings and clear hierarchy for technical leadership.",
-    badge: "Bold",
-    isPremium: false,
-    thumbnailColor: "#0f172a",
-    photoFormat: "circle",
-    features: ["High Contrast", "Strong Headers", "Leadership"]
-  },
-  {
-    id: "simple-white",
-    name: "Simple White",
-    category: "Modern Minimal",
-    description: "Monochrome elegance with zero distractions and maximum ATS parser compatibility.",
-    badge: "Simple",
-    isPremium: false,
-    thumbnailColor: "#475569",
-    photoFormat: "circle",
-    features: ["Monochrome", "100% ATS Safe", "Clean"]
-  },
-  {
-    id: "dark-mode",
-    name: "Dark Mode",
-    category: "Tech & IT",
-    description: "Linear Obsidian dark mode theme for software engineers, product builders, and designers.",
-    badge: "Dark",
-    isPremium: false,
-    thumbnailColor: "#6366f1",
-    photoFormat: "circle",
-    features: ["Dark Theme", "Tech Stack Focus", "Modern"]
-  },
-  {
-    id: "minimal-blue",
-    name: "Minimal Blue",
-    category: "Modern Minimal",
-    description: "Electric cyan and sky blue accents with light and airy structure.",
-    badge: "Fresh",
-    isPremium: false,
-    thumbnailColor: "#0284c7",
-    photoFormat: "circle",
-    features: ["Sky Blue", "Modern Balance", "Compact"]
-  },
+export const INITIAL_CV_DATA = {
+  ...FRESHER_ONE_PAGE_CV,
+  title: "One-Page Resume",
+};
 
-  // --- BANGLADESH & BDJOBS CORPORATE STANDARDS ---
-  {
-    id: "bd-corporate-standard",
-    name: "BD Corporate Standard (BDJobs)",
-    category: "Bangladesh Standard",
-    description: "The gold standard for Bangladeshi recruiters, multinationals, and Bdjobs. Features formal header, portrait passport photo on top-right, academic qualifications table, personal details, 2 references, and declaration.",
-    badge: "BD Recruiter #1",
-    isPremium: false,
-    thumbnailColor: "#059669",
-    photoFormat: "portrait",
-    features: ["Portrait Passport Photo", "Academic Table (SSC/HSC/Degree)", "Personal Details Box", "References & Declaration"]
-  },
-  {
-    id: "bd-bank-officer",
-    name: "BD Banking & Finance Executive",
-    category: "Bangladesh Standard",
-    description: "Designed specifically for commercial banks in Bangladesh (BRAC Bank, EBL, City Bank, Sonali Bank). Structured table layout, CGPA emphasis, and formal tone.",
-    badge: "Banking Standard",
-    isPremium: false,
-    thumbnailColor: "#0369a1",
-    photoFormat: "portrait",
-    features: ["Banking Grid", "CGPA Highlighting", "Portrait Photo", "Dual Academic References"]
-  },
-  {
-    id: "bd-dhaka-executive",
-    name: "Dhaka Executive Professional",
-    category: "Bangladesh Standard",
-    description: "Prestigious corporate CV with dual-tone green and charcoal accents, executive summary, comprehensive milestone history, and formal credentials.",
-    badge: "Executive BD",
-    isPremium: false,
-    thumbnailColor: "#0f766e",
-    photoFormat: "portrait",
-    features: ["Executive Styling", "Passport Photo Frame", "BD Contact Strip", "Formal Declaration"]
-  },
-  {
-    id: "bd-fresher-graduate",
-    name: "BD University Fresh Graduate",
-    category: "Bangladesh Standard",
-    description: "Tailored for fresh graduates from DU, BUET, NSU, BRACU, IBA, and other universities. Highlights academic excellence, projects, internships, and extracurricular leadership.",
-    badge: "Freshers / Entry",
-    isPremium: false,
-    thumbnailColor: "#b45309",
-    photoFormat: "portrait",
-    features: ["Education-First", "Academic Projects", "Extracurriculars", "Passport Photo"]
-  },
-  {
-    id: "bd-it-engineer",
-    name: "BD IT & Software Engineer",
-    category: "Bangladesh Standard",
-    description: "Built for Bangladeshi software engineers applying to Brain Station 23, BJIT, Enosis, and international remote teams. Highlights tech stack, projects, and academic pedigree.",
-    badge: "Tech BD",
-    isPremium: false,
-    thumbnailColor: "#4338ca",
-    photoFormat: "portrait",
-    features: ["Tech Stack Matrix", "GitHub / Portfolio", "Passport Photo", "Academic Credentials"]
-  },
-  {
-    id: "bd-medical-clinical",
-    name: "BD Medical & Clinical Doctor",
-    category: "Bangladesh Standard",
-    description: "Tailored for BMDC-registered doctors, clinical officers, and healthcare professionals applying to BSMMU, Square, Evercare, and United Hospital.",
-    badge: "Healthcare",
-    isPremium: false,
-    thumbnailColor: "#0d9488",
-    photoFormat: "portrait",
-    features: ["BMDC Registration", "Clinical Rotations", "Passport Photo", "Academic Table"]
-  },
-  {
-    id: "bd-academic-lecturer",
-    name: "BD Academic Lecturer / Faculty",
-    category: "Bangladesh Standard",
-    description: "Formally organized for faculty positions at public and private universities in Bangladesh. Highlighting research publications, degrees with CGPA, and department references.",
-    badge: "Academic BD",
-    isPremium: false,
-    thumbnailColor: "#991b1b",
-    photoFormat: "portrait",
-    features: ["Publications", "Serif Credentials Table", "Faculty Referees", "Passport Photo"]
-  },
-  {
-    id: "bd-corporate-navy",
-    name: "BD Corporate Royal Navy",
-    category: "Bangladesh Standard",
-    description: "Deep royal blue corporate format for senior management and conglomerate leadership (Beximco, Square, Summit, PRAN-RFL).",
-    badge: "Corporate Elite",
-    isPremium: false,
-    thumbnailColor: "#1e3a8a",
-    photoFormat: "portrait",
-    features: ["Royal Navy Palette", "Board Qualifications", "Portrait Photo", "Full BD Compliance"]
-  },
-  {
-    id: "bd-corporate-maroon",
-    name: "BD Executive Maroon",
-    category: "Bangladesh Standard",
-    description: "Distinguished deep maroon design popular with supply chain, manufacturing, and textile sector managers in Bangladesh.",
-    badge: "Industrial BD",
-    isPremium: false,
-    thumbnailColor: "#881337",
-    photoFormat: "portrait",
-    features: ["Industrial Hierarchy", "Portrait Photo", "Dual References", "Formal Declaration"]
-  },
-
-  // --- MODERN & APPLE MINIMALIST ---
-  {
-    id: "apple-clean",
-    name: "Apple Silicon Clean",
-    category: "Modern Minimal",
-    description: "Inspired by Apple's native software design. Clean SF Pro typography, generous whitespace, refined hairline dividers, and optional portrait photo.",
-    badge: "Apple Design",
-    isPremium: false,
-    thumbnailColor: "#1e293b",
-    photoFormat: "portrait",
-    features: ["Minimalist Layout", "Portrait or Circle Photo", "Refined Typography", "High Readability"]
-  },
-  {
-    id: "apple-silicon-light",
-    name: "Apple Cupertino Light",
-    category: "Modern Minimal",
-    description: "Clean, ultra-light slate tones with subtle typography and razor-sharp margins. Flawless aesthetic simplicity.",
-    badge: "Minimalist",
-    isPremium: false,
-    thumbnailColor: "#334155",
-    photoFormat: "portrait",
-    features: ["Ultra Clean", "Hairline Dividers", "Portrait Photo", "SF Style"]
-  },
-  {
-    id: "apple-dark",
-    name: "Apple Space Black",
-    category: "Modern Minimal",
-    description: "Deep midnight charcoal aesthetics with pure white typography and refined contrast for modern tech builders.",
-    badge: "Space Black",
-    isPremium: false,
-    thumbnailColor: "#09090b",
-    photoFormat: "portrait",
-    features: ["Dark Aesthetics", "High Contrast", "Portrait Photo", "Precision Spacing"]
-  },
-  {
-    id: "zurich-clean",
-    name: "Zurich Swiss Minimal",
-    category: "Modern Minimal",
-    description: "Inspired by Swiss typography rules: stark geometric grids, asymmetric balance, and crisp black lettering.",
-    badge: "Swiss Style",
-    isPremium: false,
-    thumbnailColor: "#18181b",
-    photoFormat: "portrait",
-    features: ["Grid Layout", "Clean Geometry", "Portrait Photo", "Timeless"]
-  },
-  {
-    id: "nordic-minimal",
-    name: "Nordic Minimalist Frost",
-    category: "Modern Minimal",
-    description: "Cool blue Nordic color palette with clean modern headings and spacious paragraph flow.",
-    badge: "Nordic",
-    isPremium: false,
-    thumbnailColor: "#0284c7",
-    photoFormat: "portrait",
-    features: ["Frost Blue Palette", "Minimalist Clean", "Portrait Photo", "High Readability"]
-  },
-  {
-    id: "modern-minimal",
-    name: "Modern Indigo Minimal",
-    category: "Modern Minimal",
-    description: "Ultra-clean layout with refined typography, balanced whitespace, and subtle indigo accent lines. Highly ATS-friendly.",
-    badge: "Popular",
-    isPremium: false,
-    thumbnailColor: "#4f46e5",
-    photoFormat: "both",
-    features: ["Single or Multi-page", "ATS Friendly", "Optional Photo", "Compact Header"]
-  },
-  {
-    id: "breeze-compact",
-    name: "Breeze 1-Pager",
-    category: "Modern Minimal",
-    description: "One-page powerhouse with streamlined spacing and horizontal contact ribbon. Perfect for concise, high-impact profiles.",
-    badge: "1-Pager",
-    isPremium: false,
-    thumbnailColor: "#0d9488",
-    photoFormat: "circle",
-    features: ["Guaranteed 1-Page Fit", "Contact Ribbon", "Compact Spacing", "Quick Scan"]
-  },
-  {
-    id: "forest-professional",
-    name: "Forest Green Minimal",
-    category: "Modern Minimal",
-    description: "Subtle forest emerald accents with balanced typography and organized sections for natural elegance.",
-    badge: "Forest Eco",
-    isPremium: false,
-    thumbnailColor: "#059669",
-    photoFormat: "both",
-    features: ["Emerald Green", "Clean Dividers", "Portrait Photo", "Compact"]
-  },
-  {
-    id: "sun-graduate",
-    name: "Sunbeam Warm Amber",
-    category: "Modern Minimal",
-    description: "Warm amber tones that bring energy and optimism to career starters, students, and creative freelancers.",
-    badge: "Warm Sun",
-    isPremium: false,
-    thumbnailColor: "#d97706",
-    photoFormat: "both",
-    features: ["Warm Amber", "Friendly Layout", "Portrait Photo", "Youthful"]
-  },
-
-  // --- TECH & IT ---
-  {
-    id: "linear-dark",
-    name: "Linear Obsidian",
-    category: "Tech & IT",
-    description: "Sleek dark theme header with high-contrast monochrome body. Perfect for tech leads, software engineers, and product builders.",
-    badge: "Tech Pro",
-    isPremium: false,
-    thumbnailColor: "#6366f1",
-    photoFormat: "portrait",
-    features: ["Dark Accent", "Tech Stack Focus", "Compact Spacing", "Code-inspired"]
-  },
-  {
-    id: "tech-flow",
-    name: "TechFlow Cyan Terminal",
-    category: "Tech & IT",
-    description: "Monospace coding typography, terminal badges, and clean project highlights designed for DevOps and cloud architects.",
-    badge: "DevOps",
-    isPremium: false,
-    thumbnailColor: "#06b6d4",
-    photoFormat: "portrait",
-    features: ["Terminal Styling", "Monospace Font", "Portrait Photo", "Cloud Stack"]
-  },
-  {
-    id: "wall-street-fintech",
-    name: "FinTech Quant Green",
-    category: "Tech & IT",
-    description: "High-precision layout for quantitative engineers, blockchain developers, and algorithmic traders.",
-    badge: "FinTech",
-    isPremium: false,
-    thumbnailColor: "#10b981",
-    photoFormat: "portrait",
-    features: ["Quant Focus", "Metrics Badges", "Portrait Photo", "Clean Code"]
-  },
-  {
-    id: "silicon-valley-tech",
-    name: "Silicon Valley Violet",
-    category: "Tech & IT",
-    description: "Vibrant violet headers and modern project metric cards tailored for Silicon Valley startups and venture teams.",
-    badge: "Startup Ready",
-    isPremium: false,
-    thumbnailColor: "#8b5cf6",
-    photoFormat: "portrait",
-    features: ["Startup Vibe", "Vibrant Violet", "Portrait Photo", "Metrics"]
-  },
-
-  // --- EXECUTIVE & LEADERSHIP ---
-  {
-    id: "executive-slate",
-    name: "Executive Slate Prestige",
-    category: "Executive",
-    description: "Prestigious corporate design with dark header banner, serif headings, portrait photo, and structured chronological timelines.",
-    badge: "Recommended",
-    isPremium: false,
-    thumbnailColor: "#0f172a",
-    photoFormat: "portrait",
-    features: ["Distinguished Header", "Executive Summary Focus", "Portrait Photo", "Corporate Styling"]
-  },
-  {
-    id: "corporate-royal",
-    name: "Royal Navy Corporate",
-    category: "Executive",
-    description: "Deep navy banner with gold foil accent lines. Tailored for directors, general managers, and management consultants.",
-    badge: "Director Standard",
-    isPremium: false,
-    thumbnailColor: "#1e3a8a",
-    photoFormat: "portrait",
-    features: ["Royal Navy Theme", "Milestone Badges", "Formal Grid", "Portrait Photo"]
-  },
-  {
-    id: "harvard-executive",
-    name: "Harvard Crimson Executive",
-    category: "Executive",
-    description: "Classic crimson and serif typography inspired by Ivy League executive leadership programs and boardroom CVs.",
-    badge: "Ivy Standard",
-    isPremium: false,
-    thumbnailColor: "#881337",
-    photoFormat: "portrait",
-    features: ["Crimson Banner", "Serif Hierarchy", "Portrait Photo", "Executive Board"]
-  },
-  {
-    id: "director-standard",
-    name: "Global Managing Director",
-    category: "Executive",
-    description: "Sleek charcoal and slate layout for C-level executives, VP of Engineering, and Board Members.",
-    badge: "C-Level",
-    isPremium: false,
-    thumbnailColor: "#0f172a",
-    photoFormat: "portrait",
-    features: ["Boardroom Layout", "Strategic Summary", "Portrait Photo", "Executive Referees"]
-  },
-
-  // --- DUAL-COLUMN & MODERN SPLIT ---
-  {
-    id: "ocean-split",
-    name: "Ocean Split Dual-Column",
-    category: "Modern Minimal",
-    description: "Dual-column layout featuring a cool navy left sidebar for portrait photo, contact, and skills alongside an expansive career timeline.",
-    badge: "Top Rated",
-    isPremium: false,
-    thumbnailColor: "#0284c7",
-    photoFormat: "portrait",
-    features: ["Dual-Column", "Skill Visualizers", "Portrait Photo", "High Visual Impact"]
-  },
-  {
-    id: "emerald-split",
-    name: "Emerald Forest Split",
-    category: "Modern Minimal",
-    description: "Deep emerald sidebar with clean geometric borders and prominent skill tags. Ideal for management, healthcare, and finance.",
-    badge: "Emerald Pro",
-    isPremium: false,
-    thumbnailColor: "#047857",
-    photoFormat: "portrait",
-    features: ["Emerald Sidebar", "Portrait Photo", "Structured Timeline", "Skill Meters"]
-  },
-  {
-    id: "violet-split",
-    name: "Violet Modern Split",
-    category: "Creative",
-    description: "Striking violet sidebar with high visual contrast for creators, marketing managers, and product leads.",
-    badge: "Violet Vibe",
-    isPremium: false,
-    thumbnailColor: "#7c3aed",
-    photoFormat: "portrait",
-    features: ["Violet Sidebar", "Skill Meters", "Portrait Photo", "Portfolio"]
-  },
-
-  // --- ATS FRIENDLY 100% ---
-  {
-    id: "ats-classic",
-    name: "ATS Pure Recruiter",
-    category: "ATS Friendly",
-    description: "Optimized specifically to pass Applicant Tracking Systems with a 100% parse rate. Standard margins and clean typography without complex columns.",
-    badge: "ATS 100%",
-    isPremium: false,
-    thumbnailColor: "#000000",
-    photoFormat: "none",
-    features: ["Zero Parsing Errors", "No Columns", "Standard Heading Tags", "Recruiter Standard"]
-  },
-  {
-    id: "ats-academic",
-    name: "ATS Scholarly Clean",
-    category: "ATS Friendly",
-    description: "Scholarly serif typography, linear order, and dedicated publication / research sections for educators, scientists, and academics.",
-    badge: "Academic ATS",
-    isPremium: false,
-    thumbnailColor: "#1e293b",
-    photoFormat: "none",
-    features: ["Serif Typography", "Academic Hierarchy", "Single Column", "100% ATS"]
-  },
-  {
-    id: "academic-elegance",
-    name: "Academic Classical ATS",
-    category: "ATS Friendly",
-    description: "Traditional academic format with classic headings, formal margin ratios, and flawless plain-text ATS parseability.",
-    badge: "Classic ATS",
-    isPremium: false,
-    thumbnailColor: "#334155",
-    photoFormat: "none",
-    features: ["Traditional Format", "100% Parseable", "Linear Flow", "Full Credentials"]
-  },
-
-  // --- CREATIVE & DESIGNER ---
-  {
-    id: "creative-coral",
-    name: "Creative Coral Studio",
-    category: "Creative",
-    description: "Designed for UX designers, frontend engineers, and creative directors. Features warm coral accents, portrait photo, and project showcases.",
-    badge: "Creative",
-    isPremium: false,
-    thumbnailColor: "#f43f5e",
-    photoFormat: "portrait",
-    features: ["Creative Accent Bars", "Portfolio Focus", "Custom Badges", "Dynamic Layout"]
-  },
-  {
-    id: "sunset-gradient",
-    name: "Sunset Studio Warm",
-    category: "Creative",
-    description: "Warm sunset gradient accents with modern typography and creative skill badges.",
-    badge: "Portfolio",
-    isPremium: false,
-    thumbnailColor: "#ea580c",
-    photoFormat: "portrait",
-    features: ["Warm Sunset Styling", "Portrait Photo", "Project Gallery", "Modern Badges"]
-  },
-  {
-    id: "horizon-purple",
-    name: "Horizon Purple Studio",
-    category: "Creative",
-    description: "Vibrant royal purple accents with modern layout cards and prominent project thumbnails.",
-    badge: "Visual Art",
-    isPremium: false,
-    thumbnailColor: "#9333ea",
-    photoFormat: "portrait",
-    features: ["Purple Header", "Portfolio Grid", "Portrait Photo", "Modern Badges"]
-  }
-];
-
-export const TEMPLATE_CATEGORIES = [
-  "All",
-  "Bangladesh Standard",
-  "Modern Minimal",
-  "Executive",
-  "Tech & IT",
-  "ATS Friendly",
-  "Creative"
-];
+export {
+  TEMPLATES_REGISTRY,
+  TEMPLATE_CATEGORIES,
+  TEMPLATE_ID_ALIASES,
+  TEMPLATE_ALIAS_COLORS,
+  PREFERRED_CATEGORY_ORDER,
+  resolveTemplateId,
+  resolveTemplateMeta,
+  templateMatchesCategory,
+  getDynamicCategories,
+};
 
 export const FONT_OPTIONS = [
   { name: "Inter (Apple Modern)", value: "Inter", class: "font-sans" },

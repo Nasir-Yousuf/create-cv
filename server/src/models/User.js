@@ -7,7 +7,8 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Please provide a name'],
       trim: true,
-      maxlength: [50, 'Name cannot exceed 50 characters'],
+      minlength: [2, 'Name must be at least 2 characters'],
+      maxlength: [80, 'Name cannot exceed 80 characters'],
     },
     email: {
       type: String,
@@ -16,7 +17,7 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
       match: [
-        /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
+        /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/,
         'Please provide a valid email address',
       ],
     },
@@ -24,12 +25,34 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Please provide a password'],
       minlength: [6, 'Password must be at least 6 characters'],
-      select: false, // Don't return password by default in queries
+      select: false,
     },
     role: {
       type: String,
       enum: ['user', 'admin'],
       default: 'user',
+    },
+    status: {
+      type: String,
+      enum: ['active', 'suspended'],
+      default: 'active',
+      index: true,
+    },
+    // Entitlement Model: First CV export is free, additional CVs unlock via ৳10 payment credits
+    freeExportsRemaining: {
+      type: Number,
+      default: 1,
+      min: 0,
+    },
+    paidExportCredits: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    totalExports: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     plan: {
       type: String,
@@ -40,27 +63,38 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    lastLoginAt: {
+      type: Date,
+      default: null,
+    },
+    resetPasswordToken: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    resetPasswordExpires: {
+      type: Date,
+      select: false,
+      default: null,
+    },
   },
   {
     timestamps: true,
   }
 );
 
-// Hash password before saving if modified
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) {
     return next();
   }
-  const salt = await bcrypt.genSalt(10);
+  const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
   next();
 });
 
-// Compare candidate password with stored hash
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
 export const User = mongoose.model('User', userSchema);
 export default User;
-

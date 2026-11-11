@@ -1,60 +1,70 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import { setTemplateId, setCVData } from '../store/cvSlice';
-import {
-  showToast,
-  openExportModal,
-  updateExportState,
-  closeExportModal,
-} from '../store/uiSlice';
-import exportService from '../services/exportService';
-import paymentService from '../services/paymentService';
+import { useDispatch, useSelector, useStore } from 'react-redux';
+import { setTemplateId } from '../store/cvSlice';
+import { showToast } from '../store/uiSlice';
+import templateService from '../services/templateService';
+import { runProtectedExport } from '../utils/runProtectedExport';
 import PaymentExportModal from '../components/common/PaymentExportModal';
-import ExportStatusModal from '../components/common/ExportStatusModal';
 import { RenderCVTemplate } from '../templates';
 import {
   Search,
-  Filter,
-  Check,
   Star,
   Eye,
   ArrowRight,
-  Sparkles,
   Layout,
   Layers,
   Download,
+  FileText,
   X,
   Edit3,
 } from 'lucide-react';
 import {
   TEMPLATES_REGISTRY,
   TEMPLATE_CATEGORIES,
-  INITIAL_CV_DATA,
+  FRESHER_ONE_PAGE_CV,
   DANIEL_CARTER_CV,
   TAHMIDUR_RAHMAN_CV,
+  resolveTemplateId,
+  templateMatchesCategory,
 } from '@shared/constants/cvDefaults.js';
 
 export const TemplateGalleryPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const store = useStore();
 
   const { currentCV } = useSelector((state) => state.cv);
-  const { user } = useSelector((state) => state.auth);
 
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [templatesList, setTemplatesList] = useState(TEMPLATES_REGISTRY);
+  const [categoriesList, setCategoriesList] = useState(TEMPLATE_CATEGORIES);
+  const [selectedCategory, setSelectedCategory] = useState('One-Page CVs');
   const [searchQuery, setSearchQuery] = useState('');
   const [previewTemplate, setPreviewTemplate] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
-  const [downloadType, setDownloadType] = useState('pdf');
-  const [favorites, setFavorites] = useState(['modern-blue', 'bd-corporate-standard']);
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [pendingExportTemplate, setPendingExportTemplate] = useState(null);
-  const [pendingExportType, setPendingExportType] = useState('pdf');
-  const [lastExportTemplate, setLastExportTemplate] = useState(null);
+  const [downloadType, setDownloadType] = useState(null);
+  const [favorites, setFavorites] = useState(['onepage-fresher-clean', 'onepage-bd-compact', 'bd-corporate-standard']);
+  const [galleryCvIds, setGalleryCvIds] = useState({});
+  const [paymentModalState, setPaymentModalState] = useState({
+    isOpen: false,
+    exportType: 'pdf',
+    cvId: null,
+    cvTitle: '',
+    retryExport: null,
+  });
   const [windowWidth, setWindowWidth] = useState(
     typeof window !== 'undefined' ? window.innerWidth : 1024
   );
+
+  useEffect(() => {
+    templateService
+      .getTemplatesCatalog()
+      .then(({ templates, categories }) => {
+        if (Array.isArray(templates) && templates.length > 0) setTemplatesList(templates);
+        if (Array.isArray(categories) && categories.length > 0) setCategoriesList(categories);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -74,196 +84,99 @@ export const TemplateGalleryPage = () => {
   };
 
   const filteredTemplates = useMemo(() => {
-    return TEMPLATES_REGISTRY.filter((tpl) => {
-      const matchesCategory =
-        selectedCategory === 'All' ||
-        tpl.category.toLowerCase() === selectedCategory.toLowerCase() ||
-        (selectedCategory === 'Modern Minimal' && tpl.category === 'Modern Minimal') ||
-        (selectedCategory === 'Bangladesh Standard' && tpl.category === 'Bangladesh Standard');
-
+    return templatesList.filter((tpl) => {
+      const matchesCategory = templateMatchesCategory(tpl, selectedCategory);
+      const q = searchQuery.trim().toLowerCase();
       const matchesSearch =
-        tpl.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        tpl.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        tpl.features?.some((f) => f.toLowerCase().includes(searchQuery.toLowerCase()));
+        !q ||
+        tpl.name.toLowerCase().includes(q) ||
+        tpl.description.toLowerCase().includes(q) ||
+        tpl.features?.some((f) => f.toLowerCase().includes(q)) ||
+        tpl.categories?.some((c) => c.toLowerCase().includes(q));
 
       return matchesCategory && matchesSearch;
     });
-  }, [selectedCategory, searchQuery]);
+  }, [templatesList, selectedCategory, searchQuery]);
 
   // Handle template selection and launch editor
   const handleSelectTemplate = (id) => {
-    dispatch(setTemplateId(id));
+    const canonicalId = resolveTemplateId(id);
+    dispatch(setTemplateId(canonicalId));
     dispatch(
       showToast({
-        message: `Template selected: ${TEMPLATES_REGISTRY.find((t) => t.id === id)?.name || id}`,
+        message: `Template selected: ${templatesList.find((t) => t.id === canonicalId)?.name || canonicalId}`,
         type: 'success',
       })
     );
     navigate('/builder');
   };
 
-  // Execute Instant PDF Download
-  const executeDownloadPDF = async (template) => {
+  const triggerCardExport = async (template, format) => {
     if (!template || downloadingId) return;
-    try {
-      setLastExportTemplate(template);
-      setDownloadingId(template.id);
-      setDownloadType('pdf');
-      dispatch(
-        openExportModal({
-          format: 'pdf',
-          stage: 'preparing',
-          progress: 15,
-          statusMessage: `Preparing vector PDF for ${template.name}...`,
-        })
-      );
+    setDownloadingId(template.id);
+    setDownloadType(format);
 
+    try {
       const cvToExport = getCardCVData(template);
       const elementId = `gallery-preview-sheet-${template.id}`;
-      await exportService.exportPDF(cvToExport, '', elementId, (update) => {
-        if (typeof update === 'object') {
-          dispatch(
-            updateExportState({
-              stage: update.stage || 'rendering',
-              progress: update.progress || 50,
-              statusMessage: update.message || 'Processing...',
-            })
-          );
-        } else {
-          dispatch(updateExportState({ statusMessage: String(update) }));
-        }
+      await runProtectedExport({
+        dispatch,
+        getState: store.getState,
+        cvData: cvToExport,
+        cvId: galleryCvIds[template.id] || null,
+        format,
+        elementId,
+        onSyncCV: (createdDoc) => {
+          if (createdDoc?._id) {
+            setGalleryCvIds((prev) => ({ ...prev, [template.id]: createdDoc._id }));
+          }
+        },
+        openPaymentModal: ({ cvId, cvTitle, format: payFormat, retryExport }) => {
+          setPaymentModalState({
+            isOpen: true,
+            exportType: payFormat,
+            cvId,
+            cvTitle,
+            retryExport,
+          });
+        },
       });
-
-      dispatch(
-        updateExportState({
-          stage: 'ready',
-          progress: 100,
-          isGenerating: false,
-          statusMessage: 'PDF downloaded successfully!',
-        })
-      );
-      setTimeout(() => {
-        dispatch(closeExportModal());
-      }, 1500);
-    } catch (err) {
-      console.error('Template PDF export error:', err);
-      dispatch(
-        updateExportState({
-          stage: 'error',
-          isGenerating: false,
-          error: {
-            title: 'PDF Generation Interrupted',
-            message: `We encountered an issue preparing the PDF for ${template.name}. You can try again or download as Word (.docx).`,
-          },
-        })
-      );
     } finally {
       setDownloadingId(null);
       setDownloadType(null);
     }
   };
 
-  // Instant PDF Download with Payment / Coupon Check
-  const handleDownloadPDF = async (template) => {
-    if (!paymentService.isExportUnlocked(user)) {
-      setPendingExportTemplate(template);
-      setPendingExportType('pdf');
-      setPaymentModalOpen(true);
-      return;
-    }
-    executeDownloadPDF(template);
-  };
+  const handleDownloadPDF = (template) => triggerCardExport(template, 'pdf');
 
-  // Execute Instant DOCX Download
-  const executeDownloadDOCX = async (template) => {
-    if (!template || downloadingId) return;
-    try {
-      setLastExportTemplate(template);
-      setDownloadingId(template.id);
-      setDownloadType('docx');
-      dispatch(
-        openExportModal({
-          format: 'docx',
-          stage: 'preparing',
-          progress: 20,
-          statusMessage: `Compiling Word document for ${template.name}...`,
-        })
-      );
-
-      const cvToExport = getCardCVData(template);
-      await exportService.exportDOCX(cvToExport, (update) => {
-        if (typeof update === 'object') {
-          dispatch(
-            updateExportState({
-              stage: update.stage || 'generating',
-              progress: update.progress || 50,
-              statusMessage: update.message || 'Processing...',
-            })
-          );
-        } else {
-          dispatch(updateExportState({ statusMessage: String(update) }));
-        }
-      });
-
-      dispatch(
-        updateExportState({
-          stage: 'ready',
-          progress: 100,
-          isGenerating: false,
-          statusMessage: 'Word document downloaded successfully!',
-        })
-      );
-      setTimeout(() => {
-        dispatch(closeExportModal());
-      }, 1500);
-    } catch (err) {
-      console.error('Template DOCX export error:', err);
-      dispatch(
-        updateExportState({
-          stage: 'error',
-          isGenerating: false,
-          error: {
-            title: 'Word Export Interrupted',
-            message: `We encountered an issue compiling the Word document for ${template.name}. You can try again or download as PDF.`,
-          },
-        })
-      );
-    } finally {
-      setDownloadingId(null);
-      setDownloadType(null);
-    }
-  };
-
-  // Instant DOCX Download with Payment / Coupon Check
-  const handleDownloadDOCX = async (template) => {
-    if (!paymentService.isExportUnlocked(user)) {
-      setPendingExportTemplate(template);
-      setPendingExportType('docx');
-      setPaymentModalOpen(true);
-      return;
-    }
-    executeDownloadDOCX(template);
-  };
+  const handleDownloadDOCX = (template) => triggerCardExport(template, 'docx');
 
   // Get realistic CV Data for template preview card
   const getCardCVData = (template) => {
-    // If template is BDJobs standard, show BD data
-    if (template.category === 'Bangladesh Standard' || template.id.startsWith('bd-')) {
-      return {
-        ...TAHMIDUR_RAHMAN_CV,
-        templateId: template.id,
-        design: {
-          ...TAHMIDUR_RAHMAN_CV.design,
-          primaryColor: template.thumbnailColor || TAHMIDUR_RAHMAN_CV.design.primaryColor,
-        },
-      };
-    }
+    const isOnePage = template.isOnePage !== false;
+    const isBD =
+      template.category === 'Bangladesh CVs' ||
+      template.categories?.includes('Bangladesh CVs') ||
+      template.id?.startsWith('bd-') ||
+      template.id === 'onepage-bd-compact';
 
-    // Default to Daniel Carter or current CV data
-    const baseData =
-      currentCV?.personalInfo?.fullName
-        ? currentCV
-        : DANIEL_CARTER_CV;
+    const defaultSampleNames = new Set([
+      'Nafis Ahmed',
+      'Daniel Carter',
+      'Tahmidur Rahman Dipto',
+      'Tahmidur Rahman',
+    ]);
+    const userHasCustomData =
+      currentCV?.personalInfo?.fullName &&
+      !defaultSampleNames.has(currentCV.personalInfo.fullName.trim());
+
+    const baseData = userHasCustomData
+      ? currentCV
+      : isOnePage
+        ? FRESHER_ONE_PAGE_CV
+        : isBD
+          ? TAHMIDUR_RAHMAN_CV
+          : DANIEL_CARTER_CV;
 
     return {
       ...baseData,
@@ -282,13 +195,13 @@ export const TemplateGalleryPage = () => {
         <div className="text-center max-w-3xl mx-auto space-y-3">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200/80 dark:border-blue-800/80 text-xs font-semibold text-blue-700 dark:text-blue-300 shadow-sm">
             <Layout className="w-3.5 h-3.5 text-blue-600" />
-            <span>50+ Recruiter-Approved Resume Templates</span>
+            <span>{templatesList.length} Curated One-Page &amp; Multi-Page Templates</span>
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
             Select Your Resume Template
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-            Browse authentic live previews of each template below. Click any design to preview in fullscreen or launch directly in the full editor.
+            Explore our default One-Page Collection for students and fresh graduates, or filter by Multiple-Page, Bangladesh, Tech, Executive, and Academic styles.
           </p>
         </div>
 
@@ -300,7 +213,7 @@ export const TemplateGalleryPage = () => {
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
               <input
                 type="text"
-                placeholder="Search templates (e.g. Modern, BDJobs, ATS)..."
+                placeholder="Search templates (e.g. One-Page, Bangladesh, Tech)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -313,19 +226,23 @@ export const TemplateGalleryPage = () => {
             </div>
           </div>
 
-          {/* Category Chips */}
+          {/* Dynamic Category Chips */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-none">
-            {TEMPLATE_CATEGORIES.map((category) => (
+            {categoriesList.map((category) => (
               <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                   selectedCategory === category
-                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    ? category === 'One-Page CVs'
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                      : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm'
+                    : category === 'Multiple-Page CVs'
+                      ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/70 dark:border-purple-800 hover:bg-purple-100'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
-                {category === 'Bangladesh Standard' ? '🇧🇩 BD Standard' : category}
+                {category === 'Bangladesh CVs' ? '🇧🇩 Bangladesh CVs' : category}
               </button>
             ))}
           </div>
@@ -343,8 +260,8 @@ export const TemplateGalleryPage = () => {
                 key={tpl.id}
                 className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col justify-between"
               >
-                {/* Header bar with Template Name & Badge */}
-                <div className="px-4 py-3 bg-slate-50 dark:bg-slate-950/80 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                {/* Header bar with Template Name & Badges */}
+                <div className="px-4 py-3 bg-slate-50 dark:bg-slate-950/80 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span
                       className="w-3 h-3 rounded-full shrink-0"
@@ -355,16 +272,25 @@ export const TemplateGalleryPage = () => {
                     </h3>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+                        tpl.isOnePage !== false
+                          ? 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200/60 dark:border-blue-800'
+                          : 'bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border-purple-200/60 dark:border-purple-800'
+                      }`}
+                    >
+                      {tpl.isOnePage !== false ? '1-Page' : 'Multi-Page'}
+                    </span>
                     {tpl.badge && (
-                      <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-[10px] font-bold border border-blue-200/60 dark:border-blue-800">
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold border border-emerald-200/60 dark:border-emerald-800">
                         {tpl.badge}
                       </span>
                     )}
                     <button
                       type="button"
                       onClick={() => toggleFavorite(tpl.id)}
-                      className="text-slate-400 hover:text-amber-500 p-0.5 transition-colors"
+                      className="text-slate-400 hover:text-amber-500 p-0.5 transition-colors cursor-pointer"
                       title="Save to favorites"
                     >
                       <Star
@@ -462,7 +388,7 @@ export const TemplateGalleryPage = () => {
               type="button"
               onClick={() => {
                 setSearchQuery('');
-                setSelectedCategory('All');
+                setSelectedCategory('All CVs');
               }}
               className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white text-xs font-semibold rounded-xl hover:bg-slate-200"
             >
@@ -571,38 +497,18 @@ export const TemplateGalleryPage = () => {
 
       {/* Payment & Export Authorization Modal */}
       <PaymentExportModal
-        isOpen={paymentModalOpen}
-        onClose={() => setPaymentModalOpen(false)}
-        exportType={pendingExportType}
+        isOpen={paymentModalState.isOpen}
+        onClose={() =>
+          setPaymentModalState((prev) => ({ ...prev, isOpen: false }))
+        }
+        exportType={paymentModalState.exportType}
+        cvId={paymentModalState.cvId}
+        cvTitle={paymentModalState.cvTitle}
         onSuccess={() => {
-          if (pendingExportTemplate) {
-            if (pendingExportType === 'docx') {
-              executeDownloadDOCX(pendingExportTemplate);
-            } else {
-              executeDownloadPDF(pendingExportTemplate);
-            }
-          }
-        }}
-      />
-
-      {/* Modern macOS Export Status & Error Modal */}
-      <ExportStatusModal
-        onRetry={() => {
-          if (lastExportTemplate) {
-            if (downloadType === 'docx') {
-              executeDownloadDOCX(lastExportTemplate);
-            } else {
-              executeDownloadPDF(lastExportTemplate);
-            }
-          }
-        }}
-        onAlternativeExport={(altFormat) => {
-          if (lastExportTemplate) {
-            if (altFormat === 'docx') {
-              executeDownloadDOCX(lastExportTemplate);
-            } else {
-              executeDownloadPDF(lastExportTemplate);
-            }
+          const retry = paymentModalState.retryExport;
+          setPaymentModalState((prev) => ({ ...prev, isOpen: false }));
+          if (typeof retry === 'function') {
+            retry();
           }
         }}
       />

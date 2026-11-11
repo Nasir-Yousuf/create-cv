@@ -1,32 +1,20 @@
 import express from 'express';
 import {
+  getPaymentConfig,
+  getMyEntitlements,
   submitPayment,
-  checkPaymentStatus,
-  applyCoupon,
-  adminGetPayments,
-  adminApprovePayment,
-  adminRejectPayment,
-  adminDeletePayment,
-  adminVerifyPasskey,
-  adminGetUsers,
-  adminUpdateUserPlan,
+  getMyPayments,
 } from '../controllers/paymentController.js';
+import { authGuard } from '../middleware/authGuard.js';
 
 const router = express.Router();
 
-// Public user endpoints
-router.post('/submit', submitPayment);
-router.get('/check-status', checkPaymentStatus);
-router.post('/coupon', applyCoupon);
+// Public non-sensitive checkout metadata (bKash number & ৳10 fee info)
+router.get('/config', getPaymentConfig);
 
-// Admin endpoints
-router.post('/admin/verify-passkey', adminVerifyPasskey);
-router.get('/admin/all', adminGetPayments);
-router.patch('/admin/:id/approve', adminApprovePayment);
-router.patch('/admin/:id/reject', adminRejectPayment);
-router.delete('/admin/:id', adminDeletePayment);
-router.get('/admin/users', adminGetUsers);
-router.patch('/admin/users/:id/plan', adminUpdateUserPlan);
+// Authenticated user payment & entitlement endpoints
+router.get('/entitlements', authGuard, getMyEntitlements);
+router.post('/submit', authGuard, submitPayment);
+router.get('/my-payments', authGuard, getMyPayments);
 
 export default router;
-

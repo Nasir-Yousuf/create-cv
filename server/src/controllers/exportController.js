@@ -1,130 +1,330 @@
+import mongoose from 'mongoose';
 import { generatePDF } from '../services/pdf/pdfService.js';
 import { generateDOCX } from '../services/docx/docxService.js';
+import CV from '../models/CV.js';
+import User from '../models/User.js';
+import CVActivity from '../models/CVActivity.js';
+import { pickAllowedCVData } from './cvController.js';
+import { computeUserEntitlements, getPaymentConfigValues } from './paymentController.js';
 
-/**
- * Validates baseline CV data required for export.
- */
-const validateCvData = (cvData) => {
+const validateCvPayload = (cvData) => {
   if (!cvData || typeof cvData !== 'object') {
-    return { valid: false, message: 'Invalid CV data payload: Expected a JSON object.' };
+    return 'Invalid CV data payload: Expected a JSON object.';
   }
-  return { valid: true };
+  const hasPersonal =
+    cvData.personalInfo &&
+    (cvData.personalInfo.fullName ||
+      cvData.personalInfo.email ||
+      cvData.personalInfo.phone);
+  const hasContent =
+    hasPersonal ||
+    (Array.isArray(cvData.experience) && cvData.experience.length > 0) ||
+    (Array.isArray(cvData.education) && cvData.education.length > 0) ||
+    (Array.isArray(cvData.skills) && cvData.skills.length > 0);
+  if (!hasContent) {
+    return 'CV data appears empty. Please fill in at least a name, contact, or content section before exporting.';
+  }
+  return null;
 };
 
-/**
- * Generates a safe file attachment name.
- */
-const getSafeFilename = (cvData, extension) => {
-  const rawName = (cvData?.personalInfo?.fullName || cvData?.title || 'Resume').trim();
-  const cleanName = rawName.replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_') || 'Resume';
-  return `${cleanName}.${extension}`;
+const verifyExportEligibility = async ({ userId, role, cvId }) => {
+  const user = await User.findById(userId).select('role status freeExportsRemaining paidExportCredits totalExports');
+  if (!user) {
+    return { errorStatus: 401, code: 'AUTH_REQUIRED', message: 'User account not found.' };
+  }
+  if (user.status === 'suspended') {
+    return { errorStatus: 403, code: 'ACCOUNT_SUSPENDED', message: 'Your account is suspended.' };
+  }
+
+  let existingCv = null;
+  if (cvId) {
+    if (!mongoose.Types.ObjectId.isValid(cvId)) {
+      return { errorStatus: 404, code: 'CV_NOT_FOUND', message: 'Invalid CV document ID.' };
+    }
+    existingCv = await CV.findOne({ _id: cvId, userId, isDeleted: { $ne: true } });
+    if (!existingCv) {
+      return { errorStatus: 404, code: 'CV_NOT_FOUND', message: 'CV document not found for your account.' };
+    }
+    if (existingCv.isExportUnlocked) {
+      return { authorized: true, user, cv: existingCv, unlockSource: existingCv.unlockType || 'unlocked' };
+    }
+  }
+
+  if (role === 'admin' || user.role === 'admin') {
+    return { authorized: true, user, cv: existingCv, unlockSource: 'admin' };
+  }
+
+  if ((user.freeExportsRemaining || 0) > 0) {
+    return { authorized: true, user, cv: existingCv, unlockSource: 'free' };
+  }
+
+  if ((user.paidExportCredits || 0) > 0) {
+    return { authorized: true, user, cv: existingCv, unlockSource: 'paid' };
+  }
+
+  const cfg = getPaymentConfigValues();
+  const entitlements = await computeUserEntitlements(userId);
+  return {
+    errorStatus: 402,
+    code: 'PAYMENT_REQUIRED',
+    message: `Your free CV export has been used. Pay ৳${cfg.amountBdt} via bKash to unlock an additional CV export.`,
+    entitlements,
+  };
 };
 
-export const exportPDF = async (req, res, next) => {
+const commitExportConsumptionAndLog = async ({
+  user,
+  cv,
+  cvData,
+  unlockSource,
+  format,
+  previewOnly,
+}) => {
+  if (previewOnly) return { cvId: cv?._id ? String(cv._id) : null, unlockType: unlockSource };
+
+  let targetCv = cv;
+  if (!targetCv) {
+    const clean = pickAllowedCVData(cvData);
+    targetCv = await CV.create({
+      ...clean,
+      userId: user._id,
+      version: 1,
+    });
+  }
+
+  let appliedUnlock = targetCv.unlockType || 'none';
+
+  if (!targetCv.isExportUnlocked) {
+    if (user.role === 'admin' || unlockSource === 'admin') {
+      appliedUnlock = 'admin';
+    } else {
+      // Atomic entitlement decrement so concurrent requests cannot double-spend free/paid credit
+      const freeUpdated = await User.findOneAndUpdate(
+        { _id: user._id, freeExportsRemaining: { $gt: 0 } },
+        { $inc: { freeExportsRemaining: -1, totalExports: 1 } },
+        { new: true }
+      );
+      if (freeUpdated) {
+        appliedUnlock = 'free';
+      } else {
+        const paidUpdated = await User.findOneAndUpdate(
+          { _id: user._id, paidExportCredits: { $gt: 0 } },
+          { $inc: { paidExportCredits: -1, totalExports: 1 } },
+          { new: true }
+        );
+        if (!paidUpdated) {
+          throw Object.assign(new Error('No remaining CV export credits available.'), {
+            status: 402,
+            code: 'PAYMENT_REQUIRED',
+          });
+        }
+        appliedUnlock = 'paid';
+      }
+    }
+
+    targetCv.isExportUnlocked = true;
+    targetCv.unlockType = appliedUnlock;
+    targetCv.unlockedAt = new Date();
+  } else {
+    await User.updateOne({ _id: user._id }, { $inc: { totalExports: 1 } });
+  }
+
+  if (format === 'pdf') {
+    targetCv.pdfExportCount = (targetCv.pdfExportCount || 0) + 1;
+  } else {
+    targetCv.docxExportCount = (targetCv.docxExportCount || 0) + 1;
+  }
+  targetCv.lastExportedAt = new Date();
+  await targetCv.save();
+
+  await CVActivity.create({
+    userId: user._id,
+    cvId: targetCv._id,
+    cvTitle: targetCv.title,
+    action: format === 'pdf' ? 'exported_pdf' : 'exported_docx',
+    details: `Exported ${format.toUpperCase()} (${appliedUnlock})`,
+    actorRole: user.role,
+    actorId: user._id,
+  }).catch(() => {});
+
+  return {
+    cvId: String(targetCv._id),
+    unlockType: appliedUnlock,
+  };
+};
+
+// @desc    Export CV to High-Resolution Vector PDF (Authenticated + Entitlement Checked)
+// @route   POST /api/export/pdf
+// @access  Private
+export const exportPDF = async (req, res) => {
   const requestId = `pdf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-  const startTime = Date.now();
 
   try {
-    const { cvData, html } = req.body || {};
-
-    const validation = validateCvData(cvData);
-    if (!validation.valid) {
-      console.warn(`[${requestId}] Validation Error: ${validation.message}`);
-      return res.status(400).json({
+    if (!req.user?.id) {
+      return res.status(401).json({
         success: false,
-        message: validation.message,
+        code: 'AUTH_REQUIRED',
+        message: 'Please log in or register before exporting your CV.',
       });
     }
 
-    const templateId = cvData.templateId || 'bd-corporate-standard';
-    console.log(
-      `[${requestId}] Starting PDF generation (Template: ${templateId}, HasClientHtml: ${Boolean(
-        html && html.length > 50
-      )})`
-    );
-
-    const pdfBuffer = await generatePDF(cvData, html || '');
-
-    if (!pdfBuffer || pdfBuffer.length < 5000) {
-      throw new Error(`Generated PDF validation failed: Buffer is too small (${pdfBuffer ? pdfBuffer.length : 0} bytes).`);
+    const { cvData, html, cvId, previewOnly } = req.body || {};
+    const validationErr = validateCvPayload(cvData);
+    if (validationErr) {
+      return res.status(400).json({
+        success: false,
+        message: validationErr,
+      });
     }
 
-    const filename = getSafeFilename(cvData, 'pdf');
-    const duration = Date.now() - startTime;
-    console.log(
-      `[${requestId}] PDF generated successfully in ${duration}ms (${(pdfBuffer.length / 1024).toFixed(1)} KB)`
-    );
+    const gate = await verifyExportEligibility({
+      userId: req.user.id,
+      role: req.user.role,
+      cvId: cvId || cvData?._id || null,
+    });
+
+    if (gate.errorStatus) {
+      return res.status(gate.errorStatus).json({
+        success: false,
+        code: gate.code,
+        message: gate.message,
+        entitlements: gate.entitlements,
+      });
+    }
+
+    const safeHtml =
+      typeof html === 'string' && html.length > 50 && html.length < 3000000 ? html : null;
+
+    const pdfBuffer = await generatePDF(cvData, safeHtml);
+
+    if (!pdfBuffer || pdfBuffer.length < 5000) {
+      throw new Error('Generated PDF buffer is invalid or too small.');
+    }
+
+    const meta = await commitExportConsumptionAndLog({
+      user: gate.user,
+      cv: gate.cv,
+      cvData,
+      unlockSource: gate.unlockSource,
+      format: 'pdf',
+      previewOnly: Boolean(previewOnly),
+    });
+
+    const rawName = (cvData.personalInfo?.fullName || cvData.title || 'Resume').trim();
+    const safeName =
+      rawName.replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_') || 'Resume';
+    const filename = `${safeName}.pdf`;
 
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+      'Content-Disposition': `attachment; filename="${filename}"`,
       'Content-Length': pdfBuffer.length,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
       'X-Export-Request-Id': requestId,
-      'X-Export-Duration-Ms': duration.toString(),
+      ...(meta?.cvId ? { 'X-CV-Id': meta.cvId } : {}),
+      ...(meta?.unlockType ? { 'X-Unlock-Type': meta.unlockType } : {}),
     });
 
-    res.end(pdfBuffer);
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`[${requestId}] PDF Export Error after ${duration}ms:`, error.message);
-    res.status(500).json({
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error(`[${requestId}] Export PDF Error:`, err.message);
+    if (err.status === 402) {
+      return res.status(402).json({
+        success: false,
+        code: 'PAYMENT_REQUIRED',
+        message: err.message,
+      });
+    }
+    return res.status(500).json({
       success: false,
-      message: 'Failed to generate PDF document. Please try again.',
-      requestId,
+      message: `PDF Export failed: ${err.message || 'Internal engine error'}.`,
     });
   }
 };
 
-export const exportDOCX = async (req, res, next) => {
+// @desc    Export CV to Editable Word (.docx) (Authenticated + Entitlement Checked)
+// @route   POST /api/export/docx
+// @access  Private
+export const exportDOCX = async (req, res) => {
   const requestId = `docx-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-  const startTime = Date.now();
 
   try {
-    const { cvData } = req.body || {};
-
-    const validation = validateCvData(cvData);
-    if (!validation.valid) {
-      console.warn(`[${requestId}] Validation Error: ${validation.message}`);
-      return res.status(400).json({
+    if (!req.user?.id) {
+      return res.status(401).json({
         success: false,
-        message: validation.message,
+        code: 'AUTH_REQUIRED',
+        message: 'Please log in or register before exporting your CV.',
       });
     }
 
-    const templateId = cvData.templateId || 'bd-corporate-standard';
-    console.log(`[${requestId}] Starting DOCX generation (Template: ${templateId})`);
+    const { cvData, cvId } = req.body || {};
+    const validationErr = validateCvPayload(cvData);
+    if (validationErr) {
+      return res.status(400).json({
+        success: false,
+        message: validationErr,
+      });
+    }
+
+    const gate = await verifyExportEligibility({
+      userId: req.user.id,
+      role: req.user.role,
+      cvId: cvId || cvData?._id || null,
+    });
+
+    if (gate.errorStatus) {
+      return res.status(gate.errorStatus).json({
+        success: false,
+        code: gate.code,
+        message: gate.message,
+        entitlements: gate.entitlements,
+      });
+    }
 
     const docxBuffer = await generateDOCX(cvData);
 
-    if (!docxBuffer || docxBuffer.length < 3000) {
-      throw new Error(`Generated DOCX validation failed: Buffer is too small (${docxBuffer ? docxBuffer.length : 0} bytes).`);
+    if (!docxBuffer || docxBuffer.length < 2000) {
+      throw new Error('Generated DOCX buffer is empty or corrupted.');
     }
 
-    const filename = getSafeFilename(cvData, 'docx');
-    const duration = Date.now() - startTime;
-    console.log(
-      `[${requestId}] DOCX generated successfully in ${duration}ms (${(docxBuffer.length / 1024).toFixed(1)} KB)`
-    );
+    const meta = await commitExportConsumptionAndLog({
+      user: gate.user,
+      cv: gate.cv,
+      cvData,
+      unlockSource: gate.unlockSource,
+      format: 'docx',
+      previewOnly: false,
+    });
+
+    const rawName = (cvData.personalInfo?.fullName || cvData.title || 'Resume').trim();
+    const safeName =
+      rawName.replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_') || 'Resume';
+    const filename = `${safeName}.docx`;
 
     res.set({
       'Content-Type':
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+      'Content-Disposition': `attachment; filename="${filename}"`,
       'Content-Length': docxBuffer.length,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
       'X-Export-Request-Id': requestId,
-      'X-Export-Duration-Ms': duration.toString(),
+      ...(meta?.cvId ? { 'X-CV-Id': meta.cvId } : {}),
+      ...(meta?.unlockType ? { 'X-Unlock-Type': meta.unlockType } : {}),
     });
 
-    res.end(docxBuffer);
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`[${requestId}] DOCX Export Error after ${duration}ms:`, error.message);
-    res.status(500).json({
+    return res.end(docxBuffer);
+  } catch (err) {
+    console.error(`[${requestId}] Export DOCX Error:`, err.message);
+    if (err.status === 402) {
+      return res.status(402).json({
+        success: false,
+        code: 'PAYMENT_REQUIRED',
+        message: err.message,
+      });
+    }
+    return res.status(500).json({
       success: false,
-      message: 'Failed to generate DOCX document. Please try again.',
-      requestId,
+      message: `Word Export failed: ${err.message || 'Internal engine error'}.`,
     });
   }
 };
-
-export default { exportPDF, exportDOCX };
