@@ -235,9 +235,82 @@ export const exportPDF = async (req, res) => {
         message: err.message,
       });
     }
+    if (err.status === 503 || err.code === 'PDF_ENGINE_UNAVAILABLE') {
+      return res.status(503).json({
+        success: false,
+        code: 'PDF_ENGINE_UNAVAILABLE',
+        fallbackAllowed: true,
+        message: err.message,
+      });
+    }
     return res.status(500).json({
       success: false,
       message: `PDF Export failed: ${err.message || 'Internal engine error'}.`,
+    });
+  }
+};
+
+// @desc    Verify & record PDF export entitlement when client fallback PDF engine is used (e.g. serverless without Chromium)
+// @route   POST /api/export/pdf/record-fallback
+// @access  Private
+export const exportPDFFallbackRecord = async (req, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({
+        success: false,
+        code: 'AUTH_REQUIRED',
+        message: 'Please log in or register before exporting your CV.',
+      });
+    }
+
+    const { cvData, cvId, previewOnly } = req.body || {};
+    const validationErr = validateCvPayload(cvData);
+    if (validationErr) {
+      return res.status(400).json({
+        success: false,
+        message: validationErr,
+      });
+    }
+
+    const gate = await verifyExportEligibility({
+      userId: req.user.id,
+      role: req.user.role,
+      cvId: cvId || cvData?._id || null,
+    });
+
+    if (gate.errorStatus) {
+      return res.status(gate.errorStatus).json({
+        success: false,
+        code: gate.code,
+        message: gate.message,
+        entitlements: gate.entitlements,
+      });
+    }
+
+    const meta = await commitExportConsumptionAndLog({
+      user: gate.user,
+      cv: gate.cv,
+      cvData,
+      unlockSource: gate.unlockSource,
+      format: 'pdf',
+      previewOnly: Boolean(previewOnly),
+    });
+
+    return res.status(200).json({
+      success: true,
+      ...meta,
+    });
+  } catch (err) {
+    if (err.status === 402) {
+      return res.status(402).json({
+        success: false,
+        code: 'PAYMENT_REQUIRED',
+        message: err.message,
+      });
+    }
+    return res.status(500).json({
+      success: false,
+      message: err.message || 'Failed to record PDF export.',
     });
   }
 };

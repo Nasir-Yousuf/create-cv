@@ -668,6 +668,21 @@ export const exportService = {
           throw new Error('Generated PDF blob is empty.');
         }
 
+        // Enforce & record server entitlement/unlock in MongoDB when using client PDF fallback
+        try {
+          await api.post('/export/pdf/record-fallback', {
+            cvData,
+            cvId,
+            previewOnly: Boolean(options?.previewOnly),
+          });
+        } catch (recordErr) {
+          const parsedRecordErr = await extractExportError(recordErr);
+          if (isHardPolicyReject(parsedRecordErr.status)) {
+            throw parsedRecordErr;
+          }
+          console.warn('Could not sync fallback export log:', parsedRecordErr.message);
+        }
+
         generatedBlob = pdfBlob;
       } catch (clientErr) {
         console.error('All automated PDF export strategies failed:', clientErr);

@@ -1,13 +1,27 @@
 {
   "version": 2,
-  "buildCommand": "npm --prefix client install && npm --prefix client run build",
+  "installCommand": "npm install --ignore-scripts && PUPPETEER_SKIP_DOWNLOAD=true npm --prefix server install --omit=dev && npm --prefix client install",
+  "buildCommand": "npm --prefix client run build",
   "outputDirectory": "client/dist",
   "framework": "vite",
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 60,
+      "includeFiles": "{server/**,shared/**}"
+    }
+  },
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/api",
+      "destination": "/api/index.js"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
 }
-

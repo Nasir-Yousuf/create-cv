@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { generatePDF } from '../src/services/pdf/pdfService.js';
 import { generateDOCX } from '../src/services/docx/docxService.js';
-import { exportPDF, exportDOCX } from '../src/controllers/exportController.js';
+import { exportPDF, exportDOCX, exportPDFFallbackRecord } from '../src/controllers/exportController.js';
 
 // 1. Minimal CV Data
 const MINIMAL_CV = {
@@ -424,6 +424,44 @@ describe('Export Controller Validation & Auth Guard Test Suite', () => {
       },
     };
     await exportDOCX(req, res);
+    assert.strictEqual(statusCode, 400);
+    assert.strictEqual(jsonBody.success, false);
+  });
+
+  it('should return 401 AUTH_REQUIRED when req.user is missing in exportPDFFallbackRecord', async () => {
+    let statusCode = null;
+    let jsonBody = null;
+    const req = { body: { cvData: MINIMAL_CV } };
+    const res = {
+      status(code) {
+        statusCode = code;
+        return this;
+      },
+      json(data) {
+        jsonBody = data;
+        return this;
+      },
+    };
+    await exportPDFFallbackRecord(req, res);
+    assert.strictEqual(statusCode, 401);
+    assert.strictEqual(jsonBody.code, 'AUTH_REQUIRED');
+  });
+
+  it('should return 400 when authenticated and cvData is empty in exportPDFFallbackRecord', async () => {
+    let statusCode = null;
+    let jsonBody = null;
+    const req = { user: { id: '000000000000000000000001', role: 'user' }, body: { cvData: {} } };
+    const res = {
+      status(code) {
+        statusCode = code;
+        return this;
+      },
+      json(data) {
+        jsonBody = data;
+        return this;
+      },
+    };
+    await exportPDFFallbackRecord(req, res);
     assert.strictEqual(statusCode, 400);
     assert.strictEqual(jsonBody.success, false);
   });

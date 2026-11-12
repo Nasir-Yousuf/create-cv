@@ -1025,19 +1025,38 @@ export const generatePDF = async (cvData, renderedHtml = '') => {
   `;
 
   const executablePath = getExecutablePath();
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--font-render-hinting=medium',
-      '--disable-web-security',
-      '--allow-running-insecure-content',
-    ],
-  });
+  if (!executablePath && (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME)) {
+    throw Object.assign(
+      new Error('Headless Chromium binary is not available in this serverless environment.'),
+      { status: 503, code: 'PDF_ENGINE_UNAVAILABLE' }
+    );
+  }
+
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      executablePath,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--font-render-hinting=medium',
+        '--disable-web-security',
+        '--allow-running-insecure-content',
+      ],
+    });
+  } catch (launchErr) {
+    const msg = String(launchErr?.message || '');
+    if (/Could not find Chrome|executable|Failed to launch|shared libraries|libnss/i.test(msg)) {
+      throw Object.assign(new Error(`PDF browser unavailable: ${msg}`), {
+        status: 503,
+        code: 'PDF_ENGINE_UNAVAILABLE',
+      });
+    }
+    throw launchErr;
+  }
 
   try {
     const page = await browser.newPage();

@@ -11,8 +11,12 @@ import exportRoutes from './routes/exportRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
+import { isDBConnected } from './config/db.js';
 
 const app = express();
+
+// Trust reverse proxies (Vercel / Render / Cloudflare) so IP & protocol headers work reliably
+app.set('trust proxy', 1);
 
 // Security HTTP headers
 app.use(
@@ -21,24 +25,44 @@ app.use(
   })
 );
 
-// CORS configuration
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  process.env.CLIENT_URL,
-].filter(Boolean);
+// Dynamic CORS configuration supporting localhost, CLIENT_URL, and Vercel preview/production hosts
+const staticAllowedOrigins = new Set(
+  [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    process.env.CLIENT_URL,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+    process.env.VERCEL_BRANCH_URL ? `https://${process.env.VERCEL_BRANCH_URL}` : null,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : null,
+  ]
+    .filter(Boolean)
+    .map((u) => u.trim().replace(/\/+$/, ''))
+);
 
-app.use(
+app.use((req, res, next) =>
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+      if (!origin || process.env.NODE_ENV !== 'production') {
         return callback(null, true);
       }
-      return callback(new Error('Origin not allowed by CORS policy'));
+      const normalizedOrigin = origin.replace(/\/+$/, '');
+      if (staticAllowedOrigins.has(normalizedOrigin)) {
+        return callback(null, true);
+      }
+      try {
+        const originHost = new URL(origin).host;
+        const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
+        if (reqHost && originHost === reqHost) {
+          return callback(null, true);
+        }
+      } catch (_) {}
+      return callback(Object.assign(new Error('Origin not allowed by CORS policy'), { status: 403 }));
     },
     credentials: true,
     exposedHeaders: ['X-CV-Id', 'X-Unlock-Type', 'X-Export-Request-Id'],
-  })
+  })(req, res, next)
 );
 
 // Logging
@@ -55,18 +79,30 @@ app.use(cookieParser());
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
+    dbConnected: isDBConnected(),
     timestamp: new Date().toISOString(),
     service: 'NovaCV Backend API',
   });
 });
 
+// Clear 503 response on database-backed endpoints when MongoDB is not connected
+const requireDatabase = (req, res, next) => {
+  if (isDBConnected()) return next();
+  return res.status(503).json({
+    success: false,
+    code: 'DB_UNAVAILABLE',
+    message:
+      'Database connection is unavailable on the server. Ensure MONGODB_URI is configured and MongoDB Atlas Network Access permits 0.0.0.0/0.',
+  });
+};
+
 // Mount Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/cvs', cvRoutes);
+app.use('/api/auth', requireDatabase, authRoutes);
+app.use('/api/cvs', requireDatabase, cvRoutes);
 app.use('/api/templates', templateRoutes);
-app.use('/api/export', exportRoutes);
-app.use('/api/payment', paymentRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/export', requireDatabase, exportRoutes);
+app.use('/api/payment', requireDatabase, paymentRoutes);
+app.use('/api/admin', requireDatabase, adminRoutes);
 
 // 404 Handler for undefined routes
 app.use('/api/*', (req, res) => {
@@ -80,4 +116,3 @@ app.use('/api/*', (req, res) => {
 app.use(errorHandler);
 
 export default app;
-
