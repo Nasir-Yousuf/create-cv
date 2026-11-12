@@ -168,7 +168,7 @@ export const exportPDF = async (req, res) => {
       });
     }
 
-    const { cvData, html, cvId, previewOnly } = req.body || {};
+    const { cvData, html, css, cvId, previewOnly } = req.body || {};
     const validationErr = validateCvPayload(cvData);
     if (validationErr) {
       return res.status(400).json({
@@ -194,8 +194,10 @@ export const exportPDF = async (req, res) => {
 
     const safeHtml =
       typeof html === 'string' && html.length > 50 && html.length < 3000000 ? html : null;
+    const safeCss =
+      typeof css === 'string' && css.length > 50 && css.length < 1500000 ? css : '';
 
-    const pdfBuffer = await generatePDF(cvData, safeHtml);
+    const pdfBuffer = await generatePDF(cvData, safeHtml, safeCss);
 
     if (!pdfBuffer || pdfBuffer.length < 5000) {
       throw new Error('Generated PDF buffer is invalid or too small.');

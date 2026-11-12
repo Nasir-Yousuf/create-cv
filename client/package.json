@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "postbuild": "node scripts/build-ssr.mjs",
+    "build:ssr": "node scripts/build-ssr.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

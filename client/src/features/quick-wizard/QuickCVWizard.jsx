@@ -548,11 +548,6 @@ export const QuickCVWizard = () => {
     try {
       const targetCVData = getTemplateCVData(template);
       const elementId = `preview-sheet-${template.id}`;
-      const cardEl = document.getElementById(elementId);
-      const sheetEl = cardEl
-        ? cardEl.querySelector("#cv-export-sheet") || cardEl
-        : null;
-      const html = sheetEl ? sheetEl.outerHTML : "";
 
       await runProtectedExport({
         dispatch,
@@ -560,7 +555,7 @@ export const QuickCVWizard = () => {
         cvData: targetCVData,
         format,
         elementId,
-        customHtml: html,
+        customHtml: '',
         isActiveEditorCV: true,
         openPaymentModal: ({ cvId, cvTitle, format: payFormat, retryExport }) => {
           setPaymentModalState({

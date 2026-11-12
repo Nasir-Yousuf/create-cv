@@ -4,7 +4,47 @@ import { jsPDF } from 'jspdf';
 import { saveAs } from 'file-saver';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { Provider } from 'react-redux';
 import { RenderCVTemplate } from '../templates';
+
+const exportStaticStore = {
+  getState: () => ({
+    ui: { activeSection: null, activeField: null },
+  }),
+  subscribe: () => () => {},
+  dispatch: () => {},
+};
+
+const formatFontStack = (rawFontFamily) => {
+  const cleaned = String(rawFontFamily || 'Inter').trim();
+  if (!cleaned) return "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
+  if (cleaned.includes(',')) return cleaned;
+  return `'${cleaned}', -apple-system, BlinkMacSystemFont, sans-serif`;
+};
+
+const extractDocumentCssText = () => {
+  try {
+    const origin = window.location.origin;
+    const chunks = [];
+    for (const sheet of Array.from(document.styleSheets || [])) {
+      if (sheet.href && !sheet.href.startsWith(origin)) continue;
+      let rules;
+      try {
+        rules = sheet.cssRules;
+      } catch (_) {
+        continue;
+      }
+      if (!rules) continue;
+      for (const rule of Array.from(rules)) {
+        chunks.push(rule.cssText);
+      }
+    }
+    const css = chunks.join('\n');
+    return css.includes('resume-sheet-a4') ? css : '';
+  } catch (_) {
+    return '';
+  }
+};
 import {
   Document,
   Packer,
@@ -217,7 +257,47 @@ export const invalidatePdfCache = () => {
 export const getCachedPdf = () => cachedPdf;
 
 /**
- * Extracts and prepares clean HTML for the target CV template.
+ * Cleans a cloned CV sheet element without altering template typography or layout classes.
+ */
+const sanitizeSheetClone = (clone, cvData) => {
+  clone.style.transform = 'none';
+  clone.style.webkitTransform = 'none';
+  clone.style.margin = '0';
+  clone.style.boxShadow = 'none';
+  clone.style.borderRadius = '0';
+  clone.style.width = cvData?.design?.pageSize === 'Letter' ? '8.5in' : '210mm';
+  clone.style.minHeight = cvData?.design?.pageSize === 'Letter' ? '11in' : '297mm';
+
+  // Remove interactive editor chrome only (never delete editable content nodes!)
+  const editorChrome = clone.querySelectorAll('.cv-editor-pip, .cv-placeholder, .no-print');
+  editorChrome.forEach((el) => el.remove());
+
+  // Strip editor selection rings/hover utility classes while keeping the text elements intact
+  const decoratedNodes = clone.querySelectorAll('[class*="ring-"], [title="Click to edit directly"]');
+  decoratedNodes.forEach((node) => {
+    node.classList.remove(
+      'ring-2',
+      'ring-indigo-500',
+      'ring-offset-1',
+      'bg-indigo-50/30',
+      'hover:outline-dashed',
+      'hover:outline-1',
+      'hover:outline-indigo-400/80',
+      'hover:bg-indigo-50/10'
+    );
+  });
+
+  // Remove empty upload-photo button box when user has not uploaded a photo
+  if (!cvData?.personalInfo?.photo) {
+    const cameraBoxes = clone.querySelectorAll('.cv-photo-placeholder');
+    cameraBoxes.forEach((b) => b.remove());
+  }
+
+  return clone.outerHTML;
+};
+
+/**
+ * Extracts and prepares clean HTML for the target CV template when mounted in the DOM.
  */
 const extractCleanTemplateHtml = (cvData, elementId) => {
   let sheetEl = null;
@@ -245,55 +325,70 @@ const extractCleanTemplateHtml = (cvData, elementId) => {
     sheetEl = document.getElementById('cv-export-sheet');
   }
 
-  let rawHtml = '';
+  if (!sheetEl) return '';
 
-  if (sheetEl) {
-    const clone = sheetEl.cloneNode(true);
-    clone.style.transform = 'none';
-    clone.style.webkitTransform = 'none';
-    clone.style.margin = '0';
-    clone.style.boxShadow = 'none';
-    clone.style.borderRadius = '0';
-    clone.style.overflow = 'visible';
-    clone.style.width = cvData?.design?.pageSize === 'Letter' ? '8.5in' : '210mm';
-    clone.style.minHeight = cvData?.design?.pageSize === 'Letter' ? '11in' : '297mm';
+  const clone = sheetEl.cloneNode(true);
+  return sanitizeSheetClone(clone, cvData);
+};
 
-    // Remove editor UI artifacts
-    const pips = clone.querySelectorAll('.cv-editor-pip, .cv-placeholder, [class*="ring-"], .no-print');
-    pips.forEach((p) => p.remove());
+/**
+ * Renders the canonical React CV template off-screen at exact desktop dimensions (for Dashboard / mobile viewports).
+ */
+const renderOffscreenDesktopHtml = async (cvData) => {
+  const isLetter = cvData?.design?.pageSize === 'Letter';
+  const stageWidth = isLetter ? 816 : 794;
+  const stageMinHeight = isLetter ? 1056 : 1123;
 
-    // Remove photo placeholder dashed box if no photo
-    if (!cvData?.personalInfo?.photo) {
-      const cameraBoxes = clone.querySelectorAll('.cv-photo-placeholder');
-      cameraBoxes.forEach((b) => b.remove());
+  const container = document.createElement('div');
+  container.style.cssText = `
+    position: fixed;
+    left: -15000px;
+    top: 0;
+    width: ${stageWidth}px;
+    min-height: ${stageMinHeight}px;
+    pointer-events: none;
+    opacity: 0;
+  `;
+  document.body.appendChild(container);
+
+  let root = null;
+  try {
+    await new Promise((resolve) => {
+      root = ReactDOM.createRoot(container);
+      root.render(
+        React.createElement(
+          Provider,
+          { store: exportStaticStore },
+          React.createElement(RenderCVTemplate, { cvData, scale: 1 })
+        )
+      );
+      setTimeout(resolve, 120);
+    });
+
+    const sheetEl = container.querySelector('#cv-export-sheet');
+    if (!sheetEl) return '';
+    return sanitizeSheetClone(sheetEl.cloneNode(true), cvData);
+  } finally {
+    if (root) {
+      try {
+        root.unmount();
+      } catch (_) {}
     }
-
-    // SANITIZER: Eliminate any truncate or clipping overflow that could squish or cut text
-    const truncateEls = clone.querySelectorAll('.truncate, [class*="truncate"]');
-    truncateEls.forEach((el) => {
-      el.classList.remove('truncate');
-      el.style.overflow = 'visible';
-      el.style.textOverflow = 'clip';
-      el.style.whiteSpace = 'normal';
-      el.style.wordBreak = 'break-word';
-    });
-
-    const allNodes = clone.querySelectorAll('*');
-    allNodes.forEach((node) => {
-      if (
-        node.style &&
-        node.style.overflow === 'hidden' &&
-        !node.classList.contains('rounded-full') &&
-        !node.classList.contains('cv-photo-frame')
-      ) {
-        node.style.overflow = 'visible';
-      }
-    });
-
-    rawHtml = clone.outerHTML;
+    if (container.parentNode) {
+      container.remove();
+    }
   }
+};
 
-  return rawHtml;
+const ensureCleanExportHtml = async (cvData, customHtml = '', elementId = 'cv-export-sheet') => {
+  if (typeof customHtml === 'string' && customHtml.trim().length > 50) {
+    return customHtml;
+  }
+  const extracted = extractCleanTemplateHtml(cvData, elementId);
+  if (extracted) {
+    return extracted;
+  }
+  return renderOffscreenDesktopHtml(cvData);
 };
 
 /**
@@ -474,7 +569,8 @@ export const exportService = {
     }
 
     notifyProgress(onProgress, 'preparing', 20, 'Preparing document & layout data...');
-    const cleanHtml = customHtml || extractCleanTemplateHtml(cvData, elementId);
+    const cleanHtml = await ensureCleanExportHtml(cvData, customHtml, elementId);
+    const cssText = extractDocumentCssText();
 
     let generatedBlob = null;
 
@@ -485,7 +581,7 @@ export const exportService = {
 
       const response = await api.post(
         '/export/pdf',
-        { cvData, html: cleanHtml, cvId, previewOnly: Boolean(options?.previewOnly) },
+        { cvData, html: cleanHtml, css: cssText, cvId, previewOnly: Boolean(options?.previewOnly) },
         {
           responseType: 'blob',
           timeout: 45000,
@@ -554,7 +650,7 @@ export const exportService = {
           overflow: visible;
           margin: 0;
           padding: 0;
-          font-family: ${cvData?.design?.fontFamily || 'Inter, -apple-system, sans-serif'};
+          font-family: ${formatFontStack(cvData?.design?.fontFamily)};
         `;
         document.body.appendChild(stageContainer);
 
@@ -564,14 +660,18 @@ export const exportService = {
           stageContainer.innerHTML = cleanHtml;
           captureEl = stageContainer.firstElementChild || stageContainer;
         } else {
-          // Mount React Template directly
+          // Mount React Template directly inside Redux Provider
           await new Promise((resolve) => {
             tempRoot = ReactDOM.createRoot(stageContainer);
             tempRoot.render(
-              React.createElement(RenderCVTemplate, {
-                cvData,
-                scale: 1,
-              })
+              React.createElement(
+                Provider,
+                { store: exportStaticStore },
+                React.createElement(RenderCVTemplate, {
+                  cvData,
+                  scale: 1,
+                })
+              )
             );
             setTimeout(resolve, 350);
           });
@@ -644,10 +744,10 @@ export const exportService = {
         });
 
         const pdfHeight = (canvas.height * pageWidth) / canvas.width;
-        const singlePageThreshold = pageHeight * 1.15;
 
-        if (pdfHeight <= singlePageThreshold) {
-          pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, Math.min(pageHeight, pdfHeight), undefined, 'FAST');
+        // Only place on a single page when content genuinely fits A4/Letter without vertical squishing
+        if (pdfHeight <= pageHeight + 2) {
+          pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, pdfHeight, undefined, 'FAST');
         } else {
           let heightLeft = pdfHeight;
           let position = 0;
@@ -737,10 +837,11 @@ export const exportService = {
    * Generates 100% genuine vector text, preserving crisp fonts and CSS page breaks.
    */
   async printDocument(cvData, customHtml = '', elementId = 'cv-export-sheet') {
-    const cleanHtml = customHtml || extractCleanTemplateHtml(cvData, elementId);
+    const cleanHtml = await ensureCleanExportHtml(cvData, customHtml, elementId);
+    const cssText = extractDocumentCssText().replace(/<\/style/gi, '<\\/style');
     const isLetter = cvData?.design?.pageSize === 'Letter';
     const pageSize = isLetter ? 'letter' : 'A4';
-    const fontFamily = cvData?.design?.fontFamily || 'Inter';
+    const fontStack = formatFontStack(cvData?.design?.fontFamily);
 
     const printIframe = document.createElement('iframe');
     printIframe.style.position = 'fixed';
@@ -763,30 +864,26 @@ export const exportService = {
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-        <script src="https://cdn.tailwindcss.com"></script>
+        ${cssText ? `<style>${cssText}</style>` : '<script src="https://cdn.tailwindcss.com"></script>'}
         <style>
           @page { size: ${pageSize}; margin: 0; }
-          *, *::before, *::after { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          html, body { margin: 0; padding: 0; background: #ffffff; font-family: '${fontFamily}', sans-serif; -webkit-font-smoothing: antialiased; }
-          .resume-sheet-a4 { width: 210mm !important; min-height: 297mm !important; box-sizing: border-box !important; margin: 0 auto !important; box-shadow: none !important; border: none !important; }
-          .resume-sheet-letter { width: 8.5in !important; min-height: 11in !important; box-sizing: border-box !important; margin: 0 auto !important; box-shadow: none !important; border: none !important; }
-          .resume-sheet-a4 .md\\:grid-cols-12, .resume-sheet-letter .md\\:grid-cols-12, .grid-cols-12 { display: grid !important; grid-template-columns: repeat(12, minmax(0, 1fr)) !important; }
-          .resume-sheet-a4 .md\\:col-span-4, .resume-sheet-letter .md\\:col-span-4, .col-span-4 { grid-column: span 4 / span 4 !important; }
-          .resume-sheet-a4 .md\\:col-span-8, .resume-sheet-letter .md\\:col-span-8, .col-span-8 { grid-column: span 8 / span 8 !important; }
-          .resume-sheet-a4 .sm\\:grid-cols-2, .resume-sheet-letter .sm\\:grid-cols-2 { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-          .avoid-break, [class*="space-y-"] > div, [class*="space-y-"] > section, tr, li, .break-inside-avoid { break-inside: avoid !important; page-break-inside: avoid !important; }
-          h1, h2, h3, h4, h5, h6 { break-after: avoid !important; page-break-after: avoid !important; }
-          .truncate, [class*="truncate"] { overflow: visible !important; text-overflow: clip !important; white-space: normal !important; word-break: break-word !important; }
-          .no-print, .ring-2, [class*="ring-"], .cv-editor-pip, .cv-placeholder, .cv-photo-placeholder { display: none !important; }
-          .cv-icon-row { display: flex !important; align-items: center !important; min-width: 0; }
-          .cv-icon-row > svg, .cv-icon-svg { flex-shrink: 0 !important; display: block !important; vertical-align: middle !important; }
-          .cv-badge { display: inline-flex !important; align-items: center !important; justify-content: center !important; text-align: center !important; line-height: 1.25 !important; vertical-align: middle !important; max-width: 100%; box-sizing: border-box; }
-          .cv-photo-frame { overflow: hidden !important; flex-shrink: 0 !important; position: relative; }
-          .cv-photo-circle { border-radius: 9999px !important; aspect-ratio: 1 / 1 !important; }
-          .cv-photo-img { width: 100% !important; height: 100% !important; object-fit: cover !important; object-position: center !important; display: block !important; flex-shrink: 0 !important; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          html, body { margin: 0; padding: 0; background: #ffffff !important; font-family: ${fontStack}; -webkit-font-smoothing: antialiased; }
+          #cv-export-sheet, .resume-sheet-a4, .resume-sheet-letter {
+            width: ${isLetter ? '8.5in' : '210mm'} !important;
+            min-height: ${isLetter ? '10.95in' : '296.5mm'} !important;
+            margin: 0 auto !important;
+            box-shadow: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            transform: none !important;
+            overflow: visible !important;
+          }
+          .avoid-break, .break-inside-avoid, tr { break-inside: avoid; page-break-inside: avoid; }
+          .no-print, .cv-editor-pip, .cv-placeholder, .cv-photo-placeholder { display: none !important; }
         </style>
       </head>
-      <body>
+      <body class="bg-white">
         ${cleanHtml}
       </body>
       </html>
