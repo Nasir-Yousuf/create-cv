@@ -5,6 +5,7 @@ import { setTemplateId } from '../store/cvSlice';
 import { showToast } from '../store/uiSlice';
 import templateService from '../services/templateService';
 import { runProtectedExport } from '../utils/runProtectedExport';
+import { stripTransientCvMeta } from '@shared/utils/cvNormalize.js';
 import PaymentExportModal from '../components/common/PaymentExportModal';
 import { RenderCVTemplate } from '../templates';
 import {
@@ -178,14 +179,14 @@ export const TemplateGalleryPage = () => {
           ? TAHMIDUR_RAHMAN_CV
           : DANIEL_CARTER_CV;
 
-    return {
+    return stripTransientCvMeta({
       ...baseData,
       templateId: template.id,
       design: {
         ...baseData.design,
         primaryColor: template.thumbnailColor || baseData.design?.primaryColor || '#2563eb',
       },
-    };
+    });
   };
 
   return (
@@ -455,17 +456,29 @@ export const TemplateGalleryPage = () => {
               <div className="flex items-center gap-2 order-2 sm:order-1">
                 <button
                   type="button"
+                  disabled={Boolean(downloadingId)}
                   onClick={() => handleDownloadPDF(previewTemplate)}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow transition-all cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow transition-all cursor-pointer"
                 >
-                  <Download className="w-3.5 h-3.5" /> <span>Download PDF</span>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>
+                    {downloadingId === previewTemplate.id && downloadType === 'pdf'
+                      ? 'Generating...'
+                      : 'Download PDF'}
+                  </span>
                 </button>
                 <button
                   type="button"
+                  disabled={Boolean(downloadingId)}
                   onClick={() => handleDownloadDOCX(previewTemplate)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
-                  <FileText className="w-3.5 h-3.5 text-blue-600" /> <span>Download Word</span>
+                  <FileText className="w-3.5 h-3.5 text-blue-600" />
+                  <span>
+                    {downloadingId === previewTemplate.id && downloadType === 'docx'
+                      ? 'Generating...'
+                      : 'Download Word'}
+                  </span>
                 </button>
               </div>
 

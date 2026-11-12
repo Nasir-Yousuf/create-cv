@@ -5,7 +5,32 @@ import { saveAs } from 'file-saver';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  HeadingLevel,
+  AlignmentType,
+  BorderStyle,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  ImageRun,
+} from 'docx';
 import { RenderCVTemplate } from '../templates';
+import {
+  normalizeCvData,
+  toDocxHex,
+  stripXmlUnsafeChars,
+  detectImageFormatFromBytes,
+} from '@shared/utils/cvNormalize.js';
+import {
+  compressImageSourceToDataUrl,
+  optimizeCvPhotoForExport,
+  fetchExternalImageAsDataUrl,
+} from '../utils/imageOptimize';
 
 const exportStaticStore = {
   getState: () => ({
@@ -45,20 +70,6 @@ const extractDocumentCssText = () => {
     return '';
   }
 };
-import {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  HeadingLevel,
-  AlignmentType,
-  BorderStyle,
-  Table,
-  TableRow,
-  TableCell,
-  WidthType,
-  ImageRun,
-} from 'docx';
 
 /**
  * Safely extracts structured JSON errors from axios Blob responses so auth/payment gates propagate properly.
@@ -82,7 +93,10 @@ const extractExportError = async (err) => {
   return wrapped;
 };
 
-const isHardPolicyReject = (status) => [400, 401, 402, 403, 429].includes(Number(status));
+const isHardPolicyReject = (status, code) =>
+  [400, 401, 402, 403, 429].includes(Number(status)) ||
+  code === 'CV_NOT_FOUND' ||
+  code === 'VERSION_CONFLICT';
 
 /**
  * Safely triggers file download without opening unwanted preview tabs.
@@ -124,40 +138,53 @@ const notifyProgress = (onProgress, stage, progress, message) => {
   }
 };
 
+const decodeDataUrlToBytes = (dataUrl) => {
+  const commaIndex = typeof dataUrl === 'string' ? dataUrl.indexOf(',') : -1;
+  if (commaIndex === -1) return null;
+  const base64Data = dataUrl.slice(commaIndex + 1);
+  const binaryString = window.atob(base64Data);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+};
+
 /**
- * Resolves an image ArrayBuffer in the browser for DOCX embedding.
+ * Resolves an image ArrayBuffer + explicit OpenXML image type in the browser for DOCX embedding.
  */
 const resolveClientImageBuffer = async (photoUri) => {
   if (!photoUri || typeof photoUri !== 'string') return null;
 
   try {
-    let bytes = null;
+    let resolvedDataUrl = null;
     if (photoUri.startsWith('data:image')) {
-      const commaIndex = photoUri.indexOf(',');
-      if (commaIndex !== -1) {
-        const base64Data = photoUri.slice(commaIndex + 1);
-        const binaryString = window.atob(base64Data);
-        const len = binaryString.length;
-        bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-      }
+      resolvedDataUrl = photoUri;
     } else if (photoUri.startsWith('http://') || photoUri.startsWith('https://')) {
-      const res = await fetch(photoUri, { mode: 'cors' });
-      if (res.ok) {
-        const ab = await res.arrayBuffer();
-        bytes = new Uint8Array(ab);
+      resolvedDataUrl = await fetchExternalImageAsDataUrl(photoUri, { asPng: true, timeoutMs: 4500 });
+    }
+
+    if (!resolvedDataUrl) return null;
+
+    let bytes = decodeDataUrlToBytes(resolvedDataUrl);
+    let type = detectImageFormatFromBytes(bytes);
+
+    // Convert WebP/AVIF/SVG uploads to PNG so docx@9 embeds reliably without crashing Word
+    if (!type) {
+      const converted = await compressImageSourceToDataUrl(resolvedDataUrl, {
+        maxDimension: 600,
+        quality: 0.9,
+        outputMime: 'image/png',
+      });
+      if (converted && converted.startsWith('data:image')) {
+        bytes = decodeDataUrlToBytes(converted);
+        type = detectImageFormatFromBytes(bytes);
       }
     }
 
-    if (bytes && bytes.length >= 8) {
-      const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
-      const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-      const isGif = bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46;
-      if (isPng || isJpeg || isGif) {
-        return bytes.buffer;
-      }
+    if (bytes && bytes.length >= 8 && type) {
+      return { buffer: bytes.buffer, type };
     }
   } catch (err) {
     console.warn('Could not resolve photo for client DOCX embed:', err.message);
@@ -362,7 +389,7 @@ const renderOffscreenDesktopHtml = async (cvData) => {
           React.createElement(RenderCVTemplate, { cvData, scale: 1 })
         )
       );
-      setTimeout(resolve, 120);
+      requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 160)));
     });
 
     const sheetEl = container.querySelector('#cv-export-sheet');
@@ -453,6 +480,46 @@ const cropImageElementToDataUrl = (sourceImg, targetW, targetH, objectFit, xFact
   }
 
   return canvas.toDataURL('image/png');
+};
+
+/**
+ * Converts cross-origin http(s) <img> nodes inside an offscreen capture container to inline
+ * data URLs before html2canvas runs so canvas.toDataURL never throws SecurityError.
+ */
+const inlineExternalImagesForCanvas = async (container) => {
+  if (!container) return;
+  const imgs = Array.from(container.querySelectorAll('img'));
+  await Promise.all(
+    imgs.map(async (img) => {
+      const src = img.getAttribute('src') || img.src || '';
+      if (!src || src.startsWith('data:') || src.startsWith('blob:')) return;
+      if (src.startsWith('http://') || src.startsWith('https://')) {
+        const inlined = await fetchExternalImageAsDataUrl(src, { asPng: true, timeoutMs: 4500 });
+        if (inlined) {
+          img.removeAttribute('crossorigin');
+          img.src = inlined;
+          await new Promise((resolve) => {
+            if (img.complete) {
+              resolve();
+              return;
+            }
+            const timer = setTimeout(resolve, 1500);
+            img.onload = () => {
+              clearTimeout(timer);
+              resolve();
+            };
+            img.onerror = () => {
+              clearTimeout(timer);
+              resolve();
+            };
+          });
+        } else {
+          // Remove unreadable external image inside offscreen clone so canvas stays untainted
+          img.remove();
+        }
+      }
+    })
+  );
 };
 
 const prepareImagesForCanvas = async (container) => {
@@ -560,8 +627,9 @@ export const exportService = {
   /**
    * Generates a validated PDF binary Blob, caching it for identical preview and download.
    */
-  async generatePDFBlob(cvData, customHtml = '', elementId = 'cv-export-sheet', onProgress = null, options = {}) {
-    const cvId = options?.cvId || cvData?._id || null;
+  async generatePDFBlob(rawCvData, customHtml = '', elementId = 'cv-export-sheet', onProgress = null, options = {}) {
+    const cvData = await optimizeCvPhotoForExport(normalizeCvData(rawCvData));
+    const cvId = options?.cvId || rawCvData?._id || cvData?._id || null;
     const currentHash = `${cvId || 'draft'}:${computeCvHash(cvData)}`;
     if (!options?.skipCache && options?.previewOnly && cachedPdf.blob && cachedPdf.hash === currentHash && cachedPdf.url) {
       notifyProgress(onProgress, 'ready', 100, 'Reusing verified PDF binary...');
@@ -573,20 +641,48 @@ export const exportService = {
     const cssText = extractDocumentCssText();
 
     let generatedBlob = null;
+    let resolvedCvId = cvId;
+    let resolvedUnlockType = null;
+
+    const fullPayload = {
+      cvData,
+      html: cleanHtml,
+      css: cssText,
+      cvId,
+      previewOnly: Boolean(options?.previewOnly),
+    };
+    let requestBody = fullPayload;
+    try {
+      // Keep well under Vercel's 4.5MB body cap; backend falls back cleanly to SSR + styles.css
+      if (JSON.stringify(fullPayload).length > 1_800_000) {
+        requestBody = {
+          cvData,
+          cvId,
+          previewOnly: Boolean(options?.previewOnly),
+        };
+      }
+    } catch {
+      requestBody = {
+        cvData,
+        cvId,
+        previewOnly: Boolean(options?.previewOnly),
+      };
+    }
 
     // 1. PRIMARY STRATEGY: High-Fidelity Server-Side Puppeteer Engine (enforces auth & entitlements)
     try {
       notifyProgress(onProgress, 'rendering', 45, 'Rendering vector typography & layout...');
       notifyProgress(onProgress, 'generating', 75, 'Generating vector PDF document...');
 
-      const response = await api.post(
-        '/export/pdf',
-        { cvData, html: cleanHtml, css: cssText, cvId, previewOnly: Boolean(options?.previewOnly) },
-        {
-          responseType: 'blob',
-          timeout: 45000,
-        }
-      );
+      const response = await api.post('/export/pdf', requestBody, {
+        responseType: 'blob',
+        timeout: 58000,
+      });
+
+      const headerCvId = response.headers?.['x-cv-id'];
+      const headerUnlockType = response.headers?.['x-unlock-type'];
+      if (headerCvId) resolvedCvId = headerCvId;
+      if (headerUnlockType) resolvedUnlockType = headerUnlockType;
 
       // Verify response is true binary PDF and not a JSON error
       if (response.data) {
@@ -609,7 +705,7 @@ export const exportService = {
       }
     } catch (serverErr) {
       const parsedErr = await extractExportError(serverErr);
-      if (isHardPolicyReject(parsedErr.status)) {
+      if (isHardPolicyReject(parsedErr.status, parsedErr.code)) {
         throw parsedErr;
       }
       console.warn('Backend PDF export error, attempting client-side fallback:', parsedErr.message);
@@ -673,10 +769,13 @@ export const exportService = {
                 })
               )
             );
-            setTimeout(resolve, 350);
+            requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 260)));
           });
           captureEl = stageContainer.querySelector('#cv-export-sheet') || stageContainer;
         }
+
+        // Convert remote images to inline CORS-safe data URIs first so html2canvas never taints
+        await inlineExternalImagesForCanvas(captureEl);
 
         // Ensure images decode
         const images = stageContainer.querySelectorAll('img');
@@ -713,7 +812,7 @@ export const exportService = {
           canvas = await html2canvas(captureEl, {
             scale: 2,
             useCORS: true,
-            allowTaint: true,
+            allowTaint: false,
             backgroundColor: '#ffffff',
             logging: false,
             width: stageWidth,
@@ -770,14 +869,16 @@ export const exportService = {
 
         // Enforce & record server entitlement/unlock in MongoDB when using client PDF fallback
         try {
-          await api.post('/export/pdf/record-fallback', {
+          const fallbackRes = await api.post('/export/pdf/record-fallback', {
             cvData,
             cvId,
             previewOnly: Boolean(options?.previewOnly),
           });
+          if (fallbackRes?.data?.cvId) resolvedCvId = fallbackRes.data.cvId;
+          if (fallbackRes?.data?.unlockType) resolvedUnlockType = fallbackRes.data.unlockType;
         } catch (recordErr) {
           const parsedRecordErr = await extractExportError(recordErr);
-          if (isHardPolicyReject(parsedRecordErr.status)) {
+          if (isHardPolicyReject(parsedRecordErr.status, parsedRecordErr.code)) {
             throw parsedRecordErr;
           }
           console.warn('Could not sync fallback export log:', parsedRecordErr.message);
@@ -799,6 +900,12 @@ export const exportService = {
       }
     }
 
+    if (typeof options?.onServerMeta === 'function' && (resolvedCvId || resolvedUnlockType)) {
+      try {
+        options.onServerMeta({ cvId: resolvedCvId, unlockType: resolvedUnlockType });
+      } catch (_) {}
+    }
+
     // Cache the verified blob for instant preview & download reuse
     if (cachedPdf.url) {
       try {
@@ -813,7 +920,13 @@ export const exportService = {
     };
 
     notifyProgress(onProgress, 'ready', 100, 'PDF binary verified and ready!');
-    return { blob: generatedBlob, url: blobUrl, fromCache: false };
+    return {
+      blob: generatedBlob,
+      url: blobUrl,
+      fromCache: false,
+      cvId: resolvedCvId,
+      unlockType: resolvedUnlockType,
+    };
   },
 
   /**
@@ -911,8 +1024,9 @@ export const exportService = {
    * 3. Fallback to client-side docx library
    * 4. Verify binary document and download
    */
-  async exportDOCX(cvData, onProgress = null, options = {}) {
-    const cvId = options?.cvId || cvData?._id || null;
+  async exportDOCX(rawCvData, onProgress = null, options = {}) {
+    const cvData = await optimizeCvPhotoForExport(normalizeCvData(rawCvData));
+    const cvId = options?.cvId || rawCvData?._id || cvData?._id || null;
     const rawName = (cvData?.personalInfo?.fullName || cvData?.title || 'Resume').trim();
     const cleanName = rawName.replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_') || 'Resume';
     const filename = `${cleanName}.docx`;
@@ -928,9 +1042,17 @@ export const exportService = {
         { cvData, cvId },
         {
           responseType: 'blob',
-          timeout: 30000,
+          timeout: 45000,
         }
       );
+
+      const headerCvId = response.headers?.['x-cv-id'];
+      const headerUnlockType = response.headers?.['x-unlock-type'];
+      if (typeof options?.onServerMeta === 'function' && (headerCvId || headerUnlockType)) {
+        try {
+          options.onServerMeta({ cvId: headerCvId || cvId, unlockType: headerUnlockType || null });
+        } catch (_) {}
+      }
 
       if (response.data) {
         if (response.data.type === 'application/json' || response.data.type === 'text/html') {
@@ -951,7 +1073,7 @@ export const exportService = {
       }
     } catch (serverErr) {
       const parsedErr = await extractExportError(serverErr);
-      if (isHardPolicyReject(parsedErr.status)) {
+      if (isHardPolicyReject(parsedErr.status, parsedErr.code)) {
         throw parsedErr;
       }
       console.warn('Backend DOCX export error, falling back to client-side docx:', parsedErr.message);
@@ -963,7 +1085,7 @@ export const exportService = {
       notifyProgress(onProgress, 'generating', 80, 'Compiling Word document locally...');
 
       const {
-        templateId = 'bd-corporate-standard',
+        templateId = 'onepage-fresher-clean',
         personalInfo = {},
         personalDetails = {},
         experience = [],
@@ -974,11 +1096,12 @@ export const exportService = {
         languages = [],
         references = [],
         declaration = {},
+        customSections = [],
         design = {},
-      } = cvData || {};
+      } = cvData;
 
       const isLetter = design?.pageSize === 'Letter';
-      const primaryHex = (design?.primaryColor || '#1E40AF').replace('#', '');
+      const primaryHex = toDocxHex(design?.primaryColor, '1E40AF');
       const darkTextHex = '1E293B';
       const grayHex = '475569';
       const lightGrayHex = '64748B';
@@ -990,15 +1113,22 @@ export const exportService = {
           ? 'Consolas'
           : 'Calibri';
 
+      const safeRun = (text, runOptions = {}) =>
+        new TextRun({
+          font: fontName,
+          ...runOptions,
+          text: stripXmlUnsafeChars(text),
+        });
+
       const paragraphs = [];
 
       // Resolve Photo (omitted for pure ATS-Classic)
-      let photoBuffer = null;
+      let photoResult = null;
       if (templateId !== 'ats-classic' && design?.showPhoto !== false && personalInfo?.photo) {
-        photoBuffer = await resolveClientImageBuffer(personalInfo.photo);
+        photoResult = await resolveClientImageBuffer(personalInfo.photo);
       }
 
-      if (photoBuffer) {
+      if (photoResult) {
         paragraphs.push(
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
@@ -1025,12 +1155,10 @@ export const exportService = {
                       new Paragraph({
                         spacing: { before: 0, after: 60 },
                         children: [
-                          new TextRun({
-                            text: personalInfo.fullName || 'CURRICULUM VITAE',
+                          safeRun(personalInfo.fullName || 'CURRICULUM VITAE', {
                             bold: true,
                             size: 44,
                             color: primaryHex,
-                            font: fontName,
                           }),
                         ],
                       }),
@@ -1039,12 +1167,10 @@ export const exportService = {
                             new Paragraph({
                               spacing: { before: 0, after: 80 },
                               children: [
-                                new TextRun({
-                                  text: personalInfo.jobTitle.toUpperCase(),
+                                safeRun(String(personalInfo.jobTitle).toUpperCase(), {
                                   bold: true,
                                   size: 22,
                                   color: grayHex,
-                                  font: fontName,
                                 }),
                               ],
                             }),
@@ -1053,8 +1179,8 @@ export const exportService = {
                       new Paragraph({
                         spacing: { before: 0, after: 120 },
                         children: [
-                          new TextRun({
-                            text: [
+                          safeRun(
+                            [
                               personalInfo.location,
                               personalInfo.phone,
                               personalInfo.email,
@@ -1062,10 +1188,8 @@ export const exportService = {
                             ]
                               .filter(Boolean)
                               .join('  •  '),
-                            size: 19,
-                            color: grayHex,
-                            font: fontName,
-                          }),
+                            { size: 19, color: grayHex }
+                          ),
                         ],
                       }),
                     ],
@@ -1084,7 +1208,8 @@ export const exportService = {
                         spacing: { before: 0, after: 120 },
                         children: [
                           new ImageRun({
-                            data: photoBuffer,
+                            data: photoResult.buffer,
+                            type: photoResult.type,
                             transformation: { width: 95, height: 120 },
                           }),
                         ],
@@ -1102,12 +1227,10 @@ export const exportService = {
             alignment: AlignmentType.CENTER,
             spacing: { before: 0, after: 60 },
             children: [
-              new TextRun({
-                text: personalInfo.fullName || 'CURRICULUM VITAE',
+              safeRun(personalInfo.fullName || 'CURRICULUM VITAE', {
                 bold: true,
                 size: 48,
                 color: primaryHex,
-                font: fontName,
               }),
             ],
           })
@@ -1119,12 +1242,10 @@ export const exportService = {
               alignment: AlignmentType.CENTER,
               spacing: { before: 0, after: 80 },
               children: [
-                new TextRun({
-                  text: personalInfo.jobTitle.toUpperCase(),
+                safeRun(String(personalInfo.jobTitle).toUpperCase(), {
                   bold: true,
                   size: 24,
                   color: grayHex,
-                  font: fontName,
                 }),
               ],
             })
@@ -1144,12 +1265,7 @@ export const exportService = {
               alignment: AlignmentType.CENTER,
               spacing: { before: 0, after: 200 },
               children: [
-                new TextRun({
-                  text: contactParts.join('   •   '),
-                  size: 19,
-                  color: grayHex,
-                  font: fontName,
-                }),
+                safeRun(contactParts.join('   •   '), { size: 19, color: grayHex }),
               ],
             })
           );
@@ -1169,12 +1285,10 @@ export const exportService = {
             },
           },
           children: [
-            new TextRun({
-              text: title.toUpperCase(),
+            safeRun(String(title || '').toUpperCase(), {
               bold: true,
               size: 22,
               color: primaryHex,
-              font: fontName,
             }),
           ],
         });
@@ -1184,14 +1298,7 @@ export const exportService = {
         paragraphs.push(
           new Paragraph({
             spacing: { after: 160, line: 260 },
-            children: [
-              new TextRun({
-                text: personalInfo.summary,
-                size: 20,
-                color: darkTextHex,
-                font: fontName,
-              }),
-            ],
+            children: [safeRun(personalInfo.summary, { size: 20, color: darkTextHex })],
           })
         );
       }
@@ -1207,21 +1314,17 @@ export const exportService = {
             new Paragraph({
               spacing: { before: 100, after: 30 },
               children: [
-                new TextRun({
-                  text: exp.jobTitle || 'Role',
+                safeRun(exp.jobTitle || 'Role', {
                   bold: true,
                   size: 21,
                   color: darkTextHex,
-                  font: fontName,
                 }),
                 ...(dateRange
                   ? [
-                      new TextRun({
-                        text: `   |   ${dateRange}`,
+                      safeRun(`   |   ${dateRange}`, {
                         bold: true,
                         size: 18,
                         color: lightGrayHex,
-                        font: fontName,
                       }),
                     ]
                   : []),
@@ -1234,15 +1337,7 @@ export const exportService = {
             paragraphs.push(
               new Paragraph({
                 spacing: { after: 50 },
-                children: [
-                  new TextRun({
-                    text: compLoc,
-                    italics: true,
-                    size: 19,
-                    color: grayHex,
-                    font: fontName,
-                  }),
-                ],
+                children: [safeRun(compLoc, { italics: true, size: 19, color: grayHex })],
               })
             );
           }
@@ -1251,16 +1346,23 @@ export const exportService = {
             paragraphs.push(
               new Paragraph({
                 spacing: { after: 50, line: 240 },
-                children: [
-                  new TextRun({
-                    text: exp.description,
-                    size: 20,
-                    color: darkTextHex,
-                    font: fontName,
-                  }),
-                ],
+                children: [safeRun(exp.description, { size: 20, color: darkTextHex })],
               })
             );
+          }
+
+          if (Array.isArray(exp.highlights) && exp.highlights.length > 0) {
+            exp.highlights.forEach((h) => {
+              if (typeof h === 'string' && h.trim()) {
+                paragraphs.push(
+                  new Paragraph({
+                    bullet: { level: 0 },
+                    spacing: { after: 30, line: 240 },
+                    children: [safeRun(h.replace(/^•\s*/, ''), { size: 19, color: darkTextHex })],
+                  })
+                );
+              }
+            });
           }
         });
       }
@@ -1268,25 +1370,22 @@ export const exportService = {
       if (education && education.length > 0) {
         paragraphs.push(createHeading('Academic Qualifications'));
         education.forEach((edu) => {
+          const dateRange = [edu.startDate, edu.endDate].filter(Boolean).join(' – ');
           paragraphs.push(
             new Paragraph({
               spacing: { before: 80, after: 20 },
               children: [
-                new TextRun({
-                  text: edu.degree || 'Degree',
+                safeRun(edu.degree || 'Degree', {
                   bold: true,
                   size: 21,
                   color: darkTextHex,
-                  font: fontName,
                 }),
-                ...(edu.endDate
+                ...(dateRange
                   ? [
-                      new TextRun({
-                        text: `   |   ${edu.startDate || ''} – ${edu.endDate}`,
+                      safeRun(`   |   ${dateRange}`, {
                         bold: true,
                         size: 18,
                         color: lightGrayHex,
-                        font: fontName,
                       }),
                     ]
                   : []),
@@ -1302,15 +1401,7 @@ export const exportService = {
             paragraphs.push(
               new Paragraph({
                 spacing: { after: 50 },
-                children: [
-                  new TextRun({
-                    text: eduDetails,
-                    italics: true,
-                    size: 19,
-                    color: grayHex,
-                    font: fontName,
-                  }),
-                ],
+                children: [safeRun(eduDetails, { italics: true, size: 19, color: grayHex })],
               })
             );
           }
@@ -1318,27 +1409,226 @@ export const exportService = {
       }
 
       if (skills && skills.length > 0) {
-        paragraphs.push(createHeading('Skills & Competencies'));
         const skillList = skills
-          .map((s) => (typeof s === 'string' ? s : s.name))
+          .map((s) => (typeof s === 'string' ? s : s?.name))
           .filter(Boolean);
 
         if (skillList.length > 0) {
+          paragraphs.push(createHeading('Skills & Competencies'));
           paragraphs.push(
             new Paragraph({
               spacing: { after: 140, line: 260 },
               children: [
-                new TextRun({
-                  text: skillList.join('   •   '),
+                safeRun(skillList.join('   •   '), {
                   bold: true,
                   size: 20,
                   color: darkTextHex,
-                  font: fontName,
                 }),
               ],
             })
           );
         }
+      }
+
+      if (projects && projects.length > 0) {
+        paragraphs.push(createHeading('Key Projects'));
+        projects.forEach((proj) => {
+          const hasTech = Array.isArray(proj.technologies) && proj.technologies.length > 0;
+          paragraphs.push(
+            new Paragraph({
+              spacing: { before: 80, after: 20 },
+              children: [
+                safeRun(proj.title || proj.name || 'Project Name', {
+                  bold: true,
+                  size: 20,
+                  color: darkTextHex,
+                }),
+                ...(hasTech
+                  ? [
+                      safeRun(`   [${proj.technologies.join(', ')}]`, {
+                        italics: true,
+                        size: 18,
+                        color: lightGrayHex,
+                      }),
+                    ]
+                  : []),
+              ],
+            })
+          );
+          if (proj.description) {
+            paragraphs.push(
+              new Paragraph({
+                spacing: { after: 50, line: 240 },
+                children: [safeRun(proj.description, { size: 19, color: darkTextHex })],
+              })
+            );
+          }
+        });
+      }
+
+      if (certifications && certifications.length > 0) {
+        paragraphs.push(createHeading('Certifications & Licenses'));
+        certifications.forEach((cert) => {
+          const certInfo = [cert.issuer, cert.date || cert.year].filter(Boolean).join(' • ');
+          paragraphs.push(
+            new Paragraph({
+              bullet: { level: 0 },
+              spacing: { after: 30 },
+              children: [
+                safeRun(cert.name || 'Certification', {
+                  bold: true,
+                  size: 19,
+                  color: darkTextHex,
+                }),
+                ...(certInfo
+                  ? [safeRun(` (${certInfo})`, { italics: true, size: 18, color: lightGrayHex })]
+                  : []),
+              ],
+            })
+          );
+        });
+      }
+
+      if (languages && languages.length > 0) {
+        const langItems = languages
+          .map((lang) => {
+            if (typeof lang === 'string') return lang;
+            return `${lang.language || lang.name || ''} ${lang.proficiency ? `(${lang.proficiency})` : ''}`.trim();
+          })
+          .filter(Boolean);
+        if (langItems.length > 0) {
+          paragraphs.push(createHeading('Languages'));
+          paragraphs.push(
+            new Paragraph({
+              spacing: { after: 120 },
+              children: [safeRun(langItems.join('   •   '), { size: 20, color: darkTextHex })],
+            })
+          );
+        }
+      }
+
+      const isBdTemplate = String(templateId).includes('bd') || String(templateId).includes('bangladesh');
+      const bdFields = [
+        { label: "Father's Name", value: personalDetails.fatherName },
+        { label: "Mother's Name", value: personalDetails.motherName },
+        { label: 'Date of Birth', value: personalDetails.dob || personalDetails.dateOfBirth },
+        { label: 'Gender', value: personalDetails.gender },
+        { label: 'Marital Status', value: personalDetails.maritalStatus },
+        { label: 'Nationality', value: personalDetails.nationality || (isBdTemplate ? 'Bangladeshi' : '') },
+        { label: 'National ID (NID)', value: personalDetails.nid || personalDetails.nationalId },
+        { label: 'Blood Group', value: personalDetails.bloodGroup },
+        { label: 'Present Address', value: personalDetails.presentAddress },
+        { label: 'Permanent Address', value: personalDetails.permanentAddress },
+      ].filter((f) => Boolean(f.value));
+
+      if (bdFields.length > 0) {
+        paragraphs.push(createHeading('Personal Details'));
+        bdFields.forEach((field) => {
+          paragraphs.push(
+            new Paragraph({
+              spacing: { before: 20, after: 30 },
+              children: [
+                safeRun(`${field.label}: `, { bold: true, size: 19, color: grayHex }),
+                safeRun(field.value, { size: 19, color: darkTextHex }),
+              ],
+            })
+          );
+        });
+      }
+
+      if (references && references.length > 0) {
+        paragraphs.push(createHeading('References'));
+        references.forEach((ref) => {
+          paragraphs.push(
+            new Paragraph({
+              spacing: { before: 60, after: 20 },
+              children: [safeRun(ref.name || 'Reference Person', { bold: true, size: 20, color: darkTextHex })],
+            })
+          );
+          const refDetails = [
+            ref.designation,
+            ref.company,
+            ref.phone ? `Phone: ${ref.phone}` : null,
+            ref.email ? `Email: ${ref.email}` : null,
+          ]
+            .filter(Boolean)
+            .join('   |   ');
+          if (refDetails) {
+            paragraphs.push(
+              new Paragraph({
+                spacing: { after: 50 },
+                children: [safeRun(refDetails, { size: 18, color: grayHex })],
+              })
+            );
+          }
+        });
+      }
+
+      if (customSections && customSections.length > 0) {
+        customSections.forEach((sec) => {
+          if (!sec || (!sec.content && (!Array.isArray(sec.items) || sec.items.length === 0))) {
+            return;
+          }
+          paragraphs.push(createHeading(sec.title || 'Additional Information'));
+          if (sec.content) {
+            paragraphs.push(
+              new Paragraph({
+                spacing: { after: 80, line: 240 },
+                children: [safeRun(sec.content, { size: 19, color: darkTextHex })],
+              })
+            );
+          }
+          if (Array.isArray(sec.items) && sec.items.length > 0) {
+            sec.items.forEach((item) => {
+              const headline = [item.title, item.subtitle, item.date].filter(Boolean).join(' • ');
+              if (headline) {
+                paragraphs.push(
+                  new Paragraph({
+                    bullet: { level: 0 },
+                    spacing: { after: 30, line: 240 },
+                    children: [safeRun(headline, { bold: true, size: 19, color: darkTextHex })],
+                  })
+                );
+              }
+              if (item.description) {
+                paragraphs.push(
+                  new Paragraph({
+                    spacing: { after: 40, line: 240 },
+                    children: [safeRun(item.description, { size: 18, color: grayHex })],
+                  })
+                );
+              }
+            });
+          }
+        });
+      }
+
+      if (declaration && (declaration.signedBy || declaration.text)) {
+        paragraphs.push(createHeading('Declaration'));
+        paragraphs.push(
+          new Paragraph({
+            spacing: { after: 120, line: 240 },
+            children: [
+              safeRun(
+                declaration.text || 'I hereby declare that all information provided above is true and correct.',
+                { italics: true, size: 19, color: darkTextHex }
+              ),
+            ],
+          })
+        );
+        paragraphs.push(
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            spacing: { before: 120, after: 60 },
+            children: [
+              safeRun(declaration.signedBy || personalInfo.fullName || 'Authorized Signature', {
+                bold: true,
+                size: 20,
+                color: primaryHex,
+              }),
+            ],
+          })
+        );
       }
 
       const doc = new Document({

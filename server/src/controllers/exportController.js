@@ -6,23 +6,14 @@ import User from '../models/User.js';
 import CVActivity from '../models/CVActivity.js';
 import { pickAllowedCVData } from './cvController.js';
 import { computeUserEntitlements, getPaymentConfigValues } from './paymentController.js';
+import { hasExportableCvContent, normalizeCvData } from '../../../shared/utils/cvNormalize.js';
 
-const validateCvPayload = (cvData) => {
-  if (!cvData || typeof cvData !== 'object') {
+export const validateCvPayload = (cvData) => {
+  if (!cvData || typeof cvData !== 'object' || Array.isArray(cvData)) {
     return 'Invalid CV data payload: Expected a JSON object.';
   }
-  const hasPersonal =
-    cvData.personalInfo &&
-    (cvData.personalInfo.fullName ||
-      cvData.personalInfo.email ||
-      cvData.personalInfo.phone);
-  const hasContent =
-    hasPersonal ||
-    (Array.isArray(cvData.experience) && cvData.experience.length > 0) ||
-    (Array.isArray(cvData.education) && cvData.education.length > 0) ||
-    (Array.isArray(cvData.skills) && cvData.skills.length > 0);
-  if (!hasContent) {
-    return 'CV data appears empty. Please fill in at least a name, contact, or content section before exporting.';
+  if (!hasExportableCvContent(cvData)) {
+    return 'CV data appears empty. Please fill in at least a name, contact, summary, or content section before exporting.';
   }
   return null;
 };
@@ -168,14 +159,15 @@ export const exportPDF = async (req, res) => {
       });
     }
 
-    const { cvData, html, css, cvId, previewOnly } = req.body || {};
-    const validationErr = validateCvPayload(cvData);
+    const { cvData: rawCvData, html, css, cvId, previewOnly } = req.body || {};
+    const validationErr = validateCvPayload(rawCvData);
     if (validationErr) {
       return res.status(400).json({
         success: false,
         message: validationErr,
       });
     }
+    const cvData = normalizeCvData(rawCvData);
 
     const gate = await verifyExportEligibility({
       userId: req.user.id,
@@ -265,14 +257,15 @@ export const exportPDFFallbackRecord = async (req, res) => {
       });
     }
 
-    const { cvData, cvId, previewOnly } = req.body || {};
-    const validationErr = validateCvPayload(cvData);
+    const { cvData: rawCvData, cvId, previewOnly } = req.body || {};
+    const validationErr = validateCvPayload(rawCvData);
     if (validationErr) {
       return res.status(400).json({
         success: false,
         message: validationErr,
       });
     }
+    const cvData = normalizeCvData(rawCvData);
 
     const gate = await verifyExportEligibility({
       userId: req.user.id,
@@ -332,14 +325,15 @@ export const exportDOCX = async (req, res) => {
       });
     }
 
-    const { cvData, cvId } = req.body || {};
-    const validationErr = validateCvPayload(cvData);
+    const { cvData: rawCvData, cvId } = req.body || {};
+    const validationErr = validateCvPayload(rawCvData);
     if (validationErr) {
       return res.status(400).json({
         success: false,
         message: validationErr,
       });
     }
+    const cvData = normalizeCvData(rawCvData);
 
     const gate = await verifyExportEligibility({
       userId: req.user.id,

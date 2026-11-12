@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import paymentService from '../../services/paymentService';
 import authService from '../../services/authService';
@@ -65,6 +65,16 @@ export const PaymentExportModal = ({
   const [isChecking, setIsChecking] = useState(false);
   const [statusMessage, setStatusMessage] = useState({ text: '', type: '' });
 
+  const onCloseRef = useRef(onClose);
+  const onSuccessRef = useRef(onSuccess);
+  const hasTriggeredSuccessRef = useRef(false);
+  const successTimerRef = useRef(null);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    onSuccessRef.current = onSuccess;
+  }, [onClose, onSuccess]);
+
   const loadModalState = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setIsLoadingData(true);
     try {
@@ -83,32 +93,47 @@ export const PaymentExportModal = ({
       if (entRes?.data) {
         setEntitlements(entRes.data);
         const credits = Number(entRes.data.availableNewCvExports || 0);
-        if (credits > 0 && entRes.data.isAdmin !== true) {
-          // Credit was approved! Sync user profile & resume export automatically
+        if (credits > 0 && entRes.data.isAdmin !== true && !hasTriggeredSuccessRef.current) {
+          hasTriggeredSuccessRef.current = true;
+          // Credit was approved! Sync user profile & resume export automatically once
           const me = await authService.getMe().catch(() => null);
           if (me?.user) dispatch(syncUserProfile(me.user));
           setStatusMessage({
             text: 'Payment approved! Your new CV export credit is ready. Starting download...',
             type: 'success',
           });
-          setTimeout(() => {
-            if (typeof onSuccess === 'function') onSuccess();
-            if (typeof onClose === 'function') onClose();
+          successTimerRef.current = setTimeout(() => {
+            if (typeof onSuccessRef.current === 'function') onSuccessRef.current();
+            if (typeof onCloseRef.current === 'function') onCloseRef.current();
           }, 900);
         }
       }
     } finally {
       if (!silent) setIsLoadingData(false);
     }
-  }, [dispatch, onClose, onSuccess]);
+  }, [dispatch]);
 
   useEffect(() => {
     if (!isOpen) {
+      hasTriggeredSuccessRef.current = false;
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current);
+        successTimerRef.current = null;
+      }
       setStatusMessage({ text: '', type: '' });
       return;
     }
     loadModalState();
   }, [isOpen, loadModalState]);
+
+  useEffect(
+    () => () => {
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current);
+      }
+    },
+    []
+  );
 
   const hasPendingPayment = myPayments.some((p) => p.status === 'pending');
 

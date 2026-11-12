@@ -3,6 +3,7 @@ import {
   resolveTemplateId,
   TEMPLATE_ALIAS_COLORS,
 } from '@shared/constants/cvDefaults.js';
+import { normalizeCvData } from '@shared/utils/cvNormalize.js';
 
 // Multiple-Page Templates
 import { BangladeshStandard } from './BangladeshStandard';
@@ -60,20 +61,21 @@ export const RenderCVTemplate = ({ cvData, scale = 1, onOpenPhotoModal }) => {
   const rawTemplateId = cvData?.templateId || 'onepage-fresher-clean';
   const resolvedId = resolveTemplateId(rawTemplateId);
   const Component = TEMPLATE_COMPONENTS[resolvedId] || OnePageFresherClean;
+  const safeCvData = normalizeCvData(cvData);
 
   // Preserve custom palette if user loaded a legacy alias ID without custom design overrides
   const aliasColor = TEMPLATE_ALIAS_COLORS[rawTemplateId];
   const mergedCvData =
-    aliasColor && cvData && (!cvData.design?.primaryColor || cvData.design.primaryColor === '#2563eb' || cvData.design.primaryColor === '#059669')
+    aliasColor && safeCvData && (!safeCvData.design?.primaryColor || safeCvData.design.primaryColor === '#2563EB' || safeCvData.design.primaryColor === '#059669')
       ? {
-          ...cvData,
+          ...safeCvData,
           design: {
-            ...cvData.design,
+            ...safeCvData.design,
             primaryColor: aliasColor.primaryColor,
             accentColor: aliasColor.accentColor,
           },
         }
-      : cvData;
+      : safeCvData;
 
   return (
     <div

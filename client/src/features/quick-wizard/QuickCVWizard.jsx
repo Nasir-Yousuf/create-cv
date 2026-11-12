@@ -30,6 +30,8 @@ import { showToast } from "../../store/uiSlice";
 import templateService from "../../services/templateService";
 import { runProtectedExport } from "../../utils/runProtectedExport";
 import { analyzeOnePageFit } from "../../utils/onePageFit";
+import { stripTransientCvMeta } from "@shared/utils/cvNormalize.js";
+import { compressImageSourceToDataUrl } from "../../utils/imageOptimize";
 import PaymentExportModal from "../../components/common/PaymentExportModal";
 import {
   generateSmartBio,
@@ -246,6 +248,7 @@ export const QuickCVWizard = () => {
   const [activeCategory, setActiveCategory] = useState("One-Page CVs");
   const [downloadingTemplateId, setDownloadingTemplateId] = useState(null);
   const [downloadType, setDownloadType] = useState(null); // 'pdf' | 'docx'
+  const [wizardCvIds, setWizardCvIds] = useState({});
   const [isGeneratingBio, setIsGeneratingBio] = useState(false);
   const [showBDDetails, setShowBDDetails] = useState(true);
   const [fullscreenPreview, setFullscreenPreview] = useState(null);
@@ -363,7 +366,7 @@ export const QuickCVWizard = () => {
     const userPersonalInfo = { ...cvData.personalInfo };
     const userPersonalDetails = { ...cvData.personalDetails };
 
-    return {
+    return stripTransientCvMeta({
       ...fallback,
       ...cvData,
       templateId: template.id,
@@ -480,7 +483,7 @@ export const QuickCVWizard = () => {
           cvData.design?.primaryColor ||
           fallback.design?.primaryColor,
       },
-    };
+    });
   };
 
   const personalInfo = cvData.personalInfo || {};
@@ -498,25 +501,36 @@ export const QuickCVWizard = () => {
     templateId: "onepage-fresher-clean",
   });
 
-  // Handle Image Upload
-  const handlePhotoUpload = (e) => {
+  // Handle Image Upload (resize/compress oversized camera uploads to prevent 413 export failures)
+  const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        dispatch(
-          showToast({
-            message: "Please choose an image under 5MB.",
-            type: "warning",
-          })
-        );
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        dispatch(updatePersonalInfo({ photo: reader.result }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      dispatch(
+        showToast({
+          message: "Please choose an image under 5MB.",
+          type: "warning",
+        })
+      );
+      return;
     }
+
+    const compressed = await compressImageSourceToDataUrl(file, {
+      maxDimension: 720,
+      quality: 0.88,
+      outputMime: "image/jpeg",
+    });
+
+    if (compressed) {
+      dispatch(updatePersonalInfo({ photo: compressed }));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      dispatch(updatePersonalInfo({ photo: reader.result }));
+    };
+    reader.readAsDataURL(file);
   };
 
   // AI Bio Generation
@@ -553,10 +567,16 @@ export const QuickCVWizard = () => {
         dispatch,
         getState: store.getState,
         cvData: targetCVData,
+        cvId: wizardCvIds[template.id] || null,
         format,
         elementId,
         customHtml: '',
-        isActiveEditorCV: true,
+        isActiveEditorCV: false,
+        onSyncCV: (createdDoc) => {
+          if (createdDoc?._id) {
+            setWizardCvIds((prev) => ({ ...prev, [template.id]: createdDoc._id }));
+          }
+        },
         openPaymentModal: ({ cvId, cvTitle, format: payFormat, retryExport }) => {
           setPaymentModalState({
             isOpen: true,
@@ -1707,17 +1727,29 @@ export const QuickCVWizard = () => {
             <div className="p-3 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2 shrink-0">
               <button
                 type="button"
+                disabled={Boolean(downloadingTemplateId)}
                 onClick={() => handleDownloadPDF(fullscreenPreview)}
-                className="px-3.5 py-2.5 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow transition-all cursor-pointer"
+                className="px-3.5 py-2.5 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow transition-all cursor-pointer"
               >
-                <Download className="w-3.5 h-3.5" /> <span>Download PDF</span>
+                <Download className="w-3.5 h-3.5" />
+                <span>
+                  {downloadingTemplateId === fullscreenPreview.id && downloadType === "pdf"
+                    ? "Generating..."
+                    : "Download PDF"}
+                </span>
               </button>
               <button
                 type="button"
+                disabled={Boolean(downloadingTemplateId)}
                 onClick={() => handleDownloadDOCX(fullscreenPreview)}
-                className="px-3.5 py-2.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                className="px-3.5 py-2.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
               >
-                <FileText className="w-3.5 h-3.5" /> <span>Download Word</span>
+                <FileText className="w-3.5 h-3.5" />
+                <span>
+                  {downloadingTemplateId === fullscreenPreview.id && downloadType === "docx"
+                    ? "Generating..."
+                    : "Download Word"}
+                </span>
               </button>
               <button
                 type="button"

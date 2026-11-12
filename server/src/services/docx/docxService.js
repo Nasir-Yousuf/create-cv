@@ -13,41 +13,39 @@ import {
   ImageRun,
 } from 'docx';
 import { resolveTemplateId } from '../../../../shared/constants/cvDefaults.js';
+import {
+  normalizeCvData,
+  toDocxHex,
+  stripXmlUnsafeChars,
+  detectImageFormatFromBytes,
+} from '../../../../shared/utils/cvNormalize.js';
 
 /**
- * Validates image buffer magic bytes to ensure compatibility with Word OpenXML.
- */
-const isValidImageBuffer = (buf) => {
-  if (!buf || !Buffer.isBuffer(buf) || buf.length < 8) return false;
-  // PNG: 89 50 4E 47
-  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return true;
-  // JPEG: FF D8 FF
-  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true;
-  // GIF: 47 49 46
-  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return true;
-  return false;
-};
-
-/**
- * Resolves an image buffer from base64 data URI or remote HTTP URL safely.
+ * Resolves an image buffer + explicit OpenXML image type from base64 data URI or remote HTTP URL safely.
  */
 const resolveImageBuffer = async (photoUri) => {
   if (!photoUri || typeof photoUri !== 'string') return null;
 
   try {
+    let buf = null;
     if (photoUri.startsWith('data:image')) {
       const commaIndex = photoUri.indexOf(',');
       if (commaIndex !== -1) {
         const base64Data = photoUri.slice(commaIndex + 1);
-        const buf = Buffer.from(base64Data, 'base64');
-        return isValidImageBuffer(buf) ? buf : null;
+        buf = Buffer.from(base64Data, 'base64');
       }
     } else if (photoUri.startsWith('http://') || photoUri.startsWith('https://')) {
       const res = await fetch(photoUri, { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         const arrayBuf = await res.arrayBuffer();
-        const buf = Buffer.from(arrayBuf);
-        return isValidImageBuffer(buf) ? buf : null;
+        buf = Buffer.from(arrayBuf);
+      }
+    }
+
+    if (buf && Buffer.isBuffer(buf) && buf.length >= 8) {
+      const type = detectImageFormatFromBytes(buf);
+      if (type) {
+        return { buffer: buf, type };
       }
     }
   } catch (err) {
@@ -60,7 +58,8 @@ const resolveImageBuffer = async (photoUri) => {
  * Generates genuine, fully-editable Microsoft Word (.docx) document
  * with true headings, tables, bullet points, and embedded profile photos.
  */
-export const generateDOCX = async (cvData) => {
+export const generateDOCX = async (rawCvData) => {
+  const cvData = normalizeCvData(rawCvData);
   const {
     templateId: rawTemplateId = 'onepage-fresher-clean',
     personalInfo = {},
@@ -75,12 +74,12 @@ export const generateDOCX = async (cvData) => {
     declaration = {},
     customSections = [],
     design = {},
-  } = cvData || {};
+  } = cvData;
 
   const templateId = resolveTemplateId(rawTemplateId);
 
   const isLetter = design?.pageSize === 'Letter';
-  const primaryHex = (design?.primaryColor || '#1E40AF').replace('#', '');
+  const primaryHex = toDocxHex(design?.primaryColor, '1E40AF');
   const darkTextHex = '1E293B';
   const grayHex = '475569';
   const lightGrayHex = '64748B';
@@ -92,16 +91,23 @@ export const generateDOCX = async (cvData) => {
       ? 'Consolas'
       : 'Calibri';
 
+  const safeRun = (text, options = {}) =>
+    new TextRun({
+      font: fontName,
+      ...options,
+      text: stripXmlUnsafeChars(text),
+    });
+
   const paragraphs = [];
 
   // 1. Resolve photo for embedding (omitted for ATS-compliant templates)
-  let photoBuffer = null;
+  let photoResult = null;
   if (templateId !== 'ats-classic' && design?.showPhoto !== false && personalInfo?.photo) {
-    photoBuffer = await resolveImageBuffer(personalInfo.photo);
+    photoResult = await resolveImageBuffer(personalInfo.photo);
   }
 
   // 2. HEADER
-  if (photoBuffer) {
+  if (photoResult) {
     // Header with Photo (Table with 2 cells: Name & Info on left, Photo on right)
     paragraphs.push(
       new Table({
@@ -129,12 +135,10 @@ export const generateDOCX = async (cvData) => {
                   new Paragraph({
                     spacing: { before: 0, after: 60 },
                     children: [
-                      new TextRun({
-                        text: personalInfo.fullName || 'CURRICULUM VITAE',
+                      safeRun(personalInfo.fullName || 'CURRICULUM VITAE', {
                         bold: true,
                         size: 44, // 22pt
                         color: primaryHex,
-                        font: fontName,
                       }),
                     ],
                   }),
@@ -143,12 +147,10 @@ export const generateDOCX = async (cvData) => {
                         new Paragraph({
                           spacing: { before: 0, after: 80 },
                           children: [
-                            new TextRun({
-                              text: personalInfo.jobTitle.toUpperCase(),
+                            safeRun(String(personalInfo.jobTitle).toUpperCase(), {
                               bold: true,
                               size: 22,
                               color: grayHex,
-                              font: fontName,
                             }),
                           ],
                         }),
@@ -157,8 +159,8 @@ export const generateDOCX = async (cvData) => {
                   new Paragraph({
                     spacing: { before: 0, after: 120 },
                     children: [
-                      new TextRun({
-                        text: [
+                      safeRun(
+                        [
                           personalInfo.location,
                           personalInfo.phone,
                           personalInfo.email,
@@ -166,10 +168,8 @@ export const generateDOCX = async (cvData) => {
                         ]
                           .filter(Boolean)
                           .join('  •  '),
-                        size: 19,
-                        color: grayHex,
-                        font: fontName,
-                      }),
+                        { size: 19, color: grayHex }
+                      ),
                     ],
                   }),
                 ],
@@ -188,7 +188,8 @@ export const generateDOCX = async (cvData) => {
                     spacing: { before: 0, after: 120 },
                     children: [
                       new ImageRun({
-                        data: photoBuffer,
+                        data: photoResult.buffer,
+                        type: photoResult.type,
                         transformation: { width: 95, height: 120 },
                       }),
                     ],
@@ -207,12 +208,10 @@ export const generateDOCX = async (cvData) => {
         alignment: AlignmentType.CENTER,
         spacing: { before: 0, after: 60 },
         children: [
-          new TextRun({
-            text: personalInfo.fullName || 'CURRICULUM VITAE',
+          safeRun(personalInfo.fullName || 'CURRICULUM VITAE', {
             bold: true,
             size: 48, // 24pt
             color: primaryHex,
-            font: fontName,
           }),
         ],
       })
@@ -224,12 +223,10 @@ export const generateDOCX = async (cvData) => {
           alignment: AlignmentType.CENTER,
           spacing: { before: 0, after: 80 },
           children: [
-            new TextRun({
-              text: personalInfo.jobTitle.toUpperCase(),
+            safeRun(String(personalInfo.jobTitle).toUpperCase(), {
               bold: true,
               size: 24,
               color: grayHex,
-              font: fontName,
             }),
           ],
         })
@@ -250,12 +247,7 @@ export const generateDOCX = async (cvData) => {
           alignment: AlignmentType.CENTER,
           spacing: { before: 0, after: 200 },
           children: [
-            new TextRun({
-              text: contactItems.join('   •   '),
-              size: 19,
-              color: grayHex,
-              font: fontName,
-            }),
+            safeRun(contactItems.join('   •   '), { size: 19, color: grayHex }),
           ],
         })
       );
@@ -276,12 +268,10 @@ export const generateDOCX = async (cvData) => {
         },
       },
       children: [
-        new TextRun({
-          text: title.toUpperCase(),
+        safeRun(String(title || '').toUpperCase(), {
           bold: true,
           size: 22, // 11pt
           color: primaryHex,
-          font: fontName,
         }),
       ],
     });
@@ -293,12 +283,7 @@ export const generateDOCX = async (cvData) => {
       new Paragraph({
         spacing: { after: 160, line: 260 },
         children: [
-          new TextRun({
-            text: personalInfo.summary,
-            size: 20,
-            color: darkTextHex,
-            font: fontName,
-          }),
+          safeRun(personalInfo.summary, { size: 20, color: darkTextHex }),
         ],
       })
     );
@@ -318,21 +303,17 @@ export const generateDOCX = async (cvData) => {
         new Paragraph({
           spacing: { before: 100, after: 30 },
           children: [
-            new TextRun({
-              text: exp.jobTitle || 'Role / Position',
+            safeRun(exp.jobTitle || 'Role / Position', {
               bold: true,
               size: 21,
               color: darkTextHex,
-              font: fontName,
             }),
             ...(dateRange
               ? [
-                  new TextRun({
-                    text: `   |   ${dateRange}`,
+                  safeRun(`   |   ${dateRange}`, {
                     bold: true,
                     size: 18,
                     color: lightGrayHex,
-                    font: fontName,
                   }),
                 ]
               : []),
@@ -346,13 +327,7 @@ export const generateDOCX = async (cvData) => {
           new Paragraph({
             spacing: { after: 50 },
             children: [
-              new TextRun({
-                text: compLoc,
-                italics: true,
-                size: 19,
-                color: grayHex,
-                font: fontName,
-              }),
+              safeRun(compLoc, { italics: true, size: 19, color: grayHex }),
             ],
           })
         );
@@ -363,31 +338,21 @@ export const generateDOCX = async (cvData) => {
           new Paragraph({
             spacing: { after: 50, line: 240 },
             children: [
-              new TextRun({
-                text: exp.description,
-                size: 20,
-                color: darkTextHex,
-                font: fontName,
-              }),
+              safeRun(exp.description, { size: 20, color: darkTextHex }),
             ],
           })
         );
       }
 
-      if (exp.highlights && exp.highlights.length > 0) {
+      if (Array.isArray(exp.highlights) && exp.highlights.length > 0) {
         exp.highlights.forEach((h) => {
-          if (h && h.trim()) {
+          if (typeof h === 'string' && h.trim()) {
             paragraphs.push(
               new Paragraph({
                 bullet: { level: 0 },
                 spacing: { after: 30, line: 240 },
                 children: [
-                  new TextRun({
-                    text: h.replace(/^•\s*/, ''),
-                    size: 19,
-                    color: darkTextHex,
-                    font: fontName,
-                  }),
+                  safeRun(h.replace(/^•\s*/, ''), { size: 19, color: darkTextHex }),
                 ],
               })
             );
@@ -402,7 +367,7 @@ export const generateDOCX = async (cvData) => {
     paragraphs.push(createHeading('Academic Qualifications'));
 
     // Check if Bangladesh Standard: Render Table
-    if (templateId.includes('bd') || templateId.includes('bangladesh')) {
+    if ((templateId.includes('bd') || templateId.includes('bangladesh')) && education.length > 0) {
       const headerRow = new TableRow({
         children: [
           new TableCell({
@@ -410,7 +375,7 @@ export const generateDOCX = async (cvData) => {
             shading: { fill: 'F1F5F9' },
             children: [
               new Paragraph({
-                children: [new TextRun({ text: 'Exam / Degree', bold: true, size: 19, font: fontName })],
+                children: [safeRun('Exam / Degree', { bold: true, size: 19 })],
               }),
             ],
           }),
@@ -419,7 +384,7 @@ export const generateDOCX = async (cvData) => {
             shading: { fill: 'F1F5F9' },
             children: [
               new Paragraph({
-                children: [new TextRun({ text: 'Institute / Board', bold: true, size: 19, font: fontName })],
+                children: [safeRun('Institute / Board', { bold: true, size: 19 })],
               }),
             ],
           }),
@@ -429,7 +394,7 @@ export const generateDOCX = async (cvData) => {
             children: [
               new Paragraph({
                 alignment: AlignmentType.CENTER,
-                children: [new TextRun({ text: 'Passing Year', bold: true, size: 19, font: fontName })],
+                children: [safeRun('Passing Year', { bold: true, size: 19 })],
               }),
             ],
           }),
@@ -439,7 +404,7 @@ export const generateDOCX = async (cvData) => {
             children: [
               new Paragraph({
                 alignment: AlignmentType.CENTER,
-                children: [new TextRun({ text: 'Result', bold: true, size: 19, font: fontName })],
+                children: [safeRun('Result', { bold: true, size: 19 })],
               }),
             ],
           }),
@@ -454,7 +419,7 @@ export const generateDOCX = async (cvData) => {
                 width: { size: 30, type: WidthType.PERCENTAGE },
                 children: [
                   new Paragraph({
-                    children: [new TextRun({ text: edu.degree || '', bold: true, size: 19, font: fontName })],
+                    children: [safeRun(edu.degree || '', { bold: true, size: 19 })],
                   }),
                 ],
               }),
@@ -462,7 +427,7 @@ export const generateDOCX = async (cvData) => {
                 width: { size: 35, type: WidthType.PERCENTAGE },
                 children: [
                   new Paragraph({
-                    children: [new TextRun({ text: edu.institution || '', size: 19, font: fontName })],
+                    children: [safeRun(edu.institution || '', { size: 19 })],
                   }),
                 ],
               }),
@@ -471,7 +436,7 @@ export const generateDOCX = async (cvData) => {
                 children: [
                   new Paragraph({
                     alignment: AlignmentType.CENTER,
-                    children: [new TextRun({ text: edu.endDate || edu.startDate || '', size: 19, font: fontName })],
+                    children: [safeRun(edu.endDate || edu.startDate || '', { size: 19 })],
                   }),
                 ],
               }),
@@ -480,7 +445,7 @@ export const generateDOCX = async (cvData) => {
                 children: [
                   new Paragraph({
                     alignment: AlignmentType.CENTER,
-                    children: [new TextRun({ text: edu.grade || '', bold: true, size: 19, font: fontName })],
+                    children: [safeRun(edu.grade || '', { bold: true, size: 19 })],
                   }),
                 ],
               }),
@@ -488,12 +453,14 @@ export const generateDOCX = async (cvData) => {
           })
       );
 
-      paragraphs.push(
-        new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          rows: [headerRow, ...dataRows],
-        })
-      );
+      if (dataRows.length > 0) {
+        paragraphs.push(
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [headerRow, ...dataRows],
+          })
+        );
+      }
     } else {
       // Standard List Style
       education.forEach((edu) => {
@@ -502,21 +469,17 @@ export const generateDOCX = async (cvData) => {
           new Paragraph({
             spacing: { before: 80, after: 20 },
             children: [
-              new TextRun({
-                text: edu.degree || 'Degree',
+              safeRun(edu.degree || 'Degree', {
                 bold: true,
                 size: 21,
                 color: darkTextHex,
-                font: fontName,
               }),
               ...(dateRange
                 ? [
-                    new TextRun({
-                      text: `   |   ${dateRange}`,
+                    safeRun(`   |   ${dateRange}`, {
                       bold: true,
                       size: 18,
                       color: lightGrayHex,
-                      font: fontName,
                     }),
                   ]
                 : []),
@@ -535,13 +498,7 @@ export const generateDOCX = async (cvData) => {
             new Paragraph({
               spacing: { after: 50 },
               children: [
-                new TextRun({
-                  text: eduDetails,
-                  italics: true,
-                  size: 19,
-                  color: grayHex,
-                  font: fontName,
-                }),
+                safeRun(eduDetails, { italics: true, size: 19, color: grayHex }),
               ],
             })
           );
@@ -552,22 +509,20 @@ export const generateDOCX = async (cvData) => {
 
   // 6. SKILLS
   if (skills && skills.length > 0) {
-    paragraphs.push(createHeading('Skills & Competencies'));
     const skillList = skills
-      .map((s) => (typeof s === 'string' ? s : s.name))
+      .map((s) => (typeof s === 'string' ? s : s?.name))
       .filter(Boolean);
 
     if (skillList.length > 0) {
+      paragraphs.push(createHeading('Skills & Competencies'));
       paragraphs.push(
         new Paragraph({
           spacing: { after: 140, line: 260 },
           children: [
-            new TextRun({
-              text: skillList.join('   •   '),
+            safeRun(skillList.join('   •   '), {
               bold: true,
               size: 20,
               color: darkTextHex,
-              font: fontName,
             }),
           ],
         })
@@ -580,25 +535,22 @@ export const generateDOCX = async (cvData) => {
     paragraphs.push(createHeading('Key Projects'));
 
     projects.forEach((proj) => {
+      const hasTech = Array.isArray(proj.technologies) && proj.technologies.length > 0;
       paragraphs.push(
         new Paragraph({
           spacing: { before: 80, after: 20 },
           children: [
-            new TextRun({
-              text: proj.title || proj.name || 'Project Name',
+            safeRun(proj.title || proj.name || 'Project Name', {
               bold: true,
               size: 20,
               color: darkTextHex,
-              font: fontName,
             }),
-            ...(proj.technologies
+            ...(hasTech
               ? [
-                  new TextRun({
-                    text: `   [${Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies}]`,
+                  safeRun(`   [${proj.technologies.join(', ')}]`, {
                     italics: true,
                     size: 18,
                     color: lightGrayHex,
-                    font: fontName,
                   }),
                 ]
               : []),
@@ -611,12 +563,7 @@ export const generateDOCX = async (cvData) => {
           new Paragraph({
             spacing: { after: 50, line: 240 },
             children: [
-              new TextRun({
-                text: proj.description,
-                size: 19,
-                color: darkTextHex,
-                font: fontName,
-              }),
+              safeRun(proj.description, { size: 19, color: darkTextHex }),
             ],
           })
         );
@@ -634,21 +581,17 @@ export const generateDOCX = async (cvData) => {
           bullet: { level: 0 },
           spacing: { after: 30 },
           children: [
-            new TextRun({
-              text: cert.name || 'Certification',
+            safeRun(cert.name || 'Certification', {
               bold: true,
               size: 19,
               color: darkTextHex,
-              font: fontName,
             }),
             ...(certInfo
               ? [
-                  new TextRun({
-                    text: ` (${certInfo})`,
+                  safeRun(` (${certInfo})`, {
                     italics: true,
                     size: 18,
                     color: lightGrayHex,
-                    font: fontName,
                   }),
                 ]
               : []),
@@ -659,35 +602,38 @@ export const generateDOCX = async (cvData) => {
   }
 
   if (languages && languages.length > 0) {
-    paragraphs.push(createHeading('Languages'));
-    const langItems = languages.map((lang) => {
-      if (typeof lang === 'string') return lang;
-      return `${lang.language || lang.name || ''} ${lang.proficiency ? `(${lang.proficiency})` : ''}`.trim();
-    }).filter(Boolean);
-
-    paragraphs.push(
-      new Paragraph({
-        spacing: { after: 120 },
-        children: [
-          new TextRun({
-            text: langItems.join('   •   '),
-            size: 20,
-            color: darkTextHex,
-            font: fontName,
-          }),
-        ],
+    const langItems = languages
+      .map((lang) => {
+        if (typeof lang === 'string') return lang;
+        return `${lang.language || lang.name || ''} ${lang.proficiency ? `(${lang.proficiency})` : ''}`.trim();
       })
-    );
+      .filter(Boolean);
+
+    if (langItems.length > 0) {
+      paragraphs.push(createHeading('Languages'));
+      paragraphs.push(
+        new Paragraph({
+          spacing: { after: 120 },
+          children: [
+            safeRun(langItems.join('   •   '), { size: 20, color: darkTextHex }),
+          ],
+        })
+      );
+    }
   }
 
   // 9. PERSONAL DETAILS (BD Standard)
+  const isBdTemplate = templateId.includes('bd') || templateId.includes('bangladesh');
   const bdFields = [
     { label: "Father's Name", value: personalDetails.fatherName },
     { label: "Mother's Name", value: personalDetails.motherName },
     { label: 'Date of Birth', value: personalDetails.dob || personalDetails.dateOfBirth },
     { label: 'Gender', value: personalDetails.gender },
     { label: 'Marital Status', value: personalDetails.maritalStatus },
-    { label: 'Nationality', value: personalDetails.nationality || 'Bangladeshi' },
+    {
+      label: 'Nationality',
+      value: personalDetails.nationality || (isBdTemplate ? 'Bangladeshi' : ''),
+    },
     { label: 'National ID (NID)', value: personalDetails.nid || personalDetails.nationalId },
     { label: 'Blood Group', value: personalDetails.bloodGroup },
     { label: 'Present Address', value: personalDetails.presentAddress },
@@ -713,12 +659,10 @@ export const generateDOCX = async (cvData) => {
                 new Paragraph({
                   spacing: { before: 20, after: 20 },
                   children: [
-                    new TextRun({
-                      text: `${field.label}:`,
+                    safeRun(`${field.label}:`, {
                       bold: true,
                       size: 19,
                       color: grayHex,
-                      font: fontName,
                     }),
                   ],
                 }),
@@ -736,12 +680,7 @@ export const generateDOCX = async (cvData) => {
                 new Paragraph({
                   spacing: { before: 20, after: 20 },
                   children: [
-                    new TextRun({
-                      text: String(field.value),
-                      size: 19,
-                      color: darkTextHex,
-                      font: fontName,
-                    }),
+                    safeRun(field.value, { size: 19, color: darkTextHex }),
                   ],
                 }),
               ],
@@ -775,12 +714,10 @@ export const generateDOCX = async (cvData) => {
         new Paragraph({
           spacing: { before: 60, after: 20 },
           children: [
-            new TextRun({
-              text: ref.name || 'Reference Person',
+            safeRun(ref.name || 'Reference Person', {
               bold: true,
               size: 20,
               color: darkTextHex,
-              font: fontName,
             }),
           ],
         })
@@ -798,12 +735,7 @@ export const generateDOCX = async (cvData) => {
           new Paragraph({
             spacing: { after: 50 },
             children: [
-              new TextRun({
-                text: refDetails,
-                size: 18,
-                color: grayHex,
-                font: fontName,
-              }),
+              safeRun(refDetails, { size: 18, color: grayHex }),
             ],
           })
         );
@@ -811,20 +743,65 @@ export const generateDOCX = async (cvData) => {
     });
   }
 
-  // 11. DECLARATION
+  // 11. CUSTOM SECTIONS
+  if (customSections && customSections.length > 0) {
+    customSections.forEach((sec) => {
+      if (!sec || (!sec.content && (!Array.isArray(sec.items) || sec.items.length === 0))) {
+        return;
+      }
+      paragraphs.push(createHeading(sec.title || 'Additional Information'));
+
+      if (sec.content) {
+        paragraphs.push(
+          new Paragraph({
+            spacing: { after: 80, line: 240 },
+            children: [
+              safeRun(sec.content, { size: 19, color: darkTextHex }),
+            ],
+          })
+        );
+      }
+
+      if (Array.isArray(sec.items) && sec.items.length > 0) {
+        sec.items.forEach((item) => {
+          const headline = [item.title, item.subtitle, item.date].filter(Boolean).join(' • ');
+          if (headline) {
+            paragraphs.push(
+              new Paragraph({
+                bullet: { level: 0 },
+                spacing: { after: 30, line: 240 },
+                children: [
+                  safeRun(headline, { bold: true, size: 19, color: darkTextHex }),
+                ],
+              })
+            );
+          }
+          if (item.description) {
+            paragraphs.push(
+              new Paragraph({
+                spacing: { after: 40, line: 240 },
+                children: [
+                  safeRun(item.description, { size: 18, color: grayHex }),
+                ],
+              })
+            );
+          }
+        });
+      }
+    });
+  }
+
+  // 12. DECLARATION
   if (declaration && (declaration.signedBy || declaration.text)) {
     paragraphs.push(createHeading('Declaration'));
     paragraphs.push(
       new Paragraph({
         spacing: { after: 120, line: 240 },
         children: [
-          new TextRun({
-            text: declaration.text || 'I hereby declare that all information provided above is true and correct.',
-            italics: true,
-            size: 19,
-            color: darkTextHex,
-            font: fontName,
-          }),
+          safeRun(
+            declaration.text || 'I hereby declare that all information provided above is true and correct.',
+            { italics: true, size: 19, color: darkTextHex }
+          ),
         ],
       })
     );
@@ -833,13 +810,10 @@ export const generateDOCX = async (cvData) => {
         alignment: AlignmentType.RIGHT,
         spacing: { before: 120, after: 60 },
         children: [
-          new TextRun({
-            text: declaration.signedBy || personalInfo.fullName || 'Authorized Signature',
-            bold: true,
-            size: 20,
-            color: primaryHex,
-            font: fontName,
-          }),
+          safeRun(
+            declaration.signedBy || personalInfo.fullName || 'Authorized Signature',
+            { bold: true, size: 20, color: primaryHex }
+          ),
         ],
       })
     );
@@ -871,7 +845,7 @@ export const generateDOCX = async (cvData) => {
   const buffer = await Packer.toBuffer(doc);
 
   // Validate generated DOCX buffer (magic header PK\x03\x04 for zip)
-  if (!buffer || buffer.length < 3000) {
+  if (!buffer || buffer.length < 2000) {
     throw new Error('DOCX generation produced an empty or corrupted document.');
   }
 

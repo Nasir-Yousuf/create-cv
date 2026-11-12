@@ -5,6 +5,7 @@ import {
   resolveTemplateId,
   resolveTemplateMeta,
 } from '../../../shared/constants/cvDefaults.js';
+import { normalizeCvData } from '../../../shared/utils/cvNormalize.js';
 
 const ALLOWED_CV_FIELDS = [
   'title',
@@ -23,13 +24,37 @@ const ALLOWED_CV_FIELDS = [
   'customSections',
 ];
 
+const DESIGN_ENUM_DEFAULTS = {
+  fontSize: ['small', 'medium', 'large'],
+  lineSpacing: ['compact', 'normal', 'relaxed'],
+  sectionSpacing: ['compact', 'normal', 'relaxed'],
+  margins: ['compact', 'normal', 'wide'],
+};
+
 export const pickAllowedCVData = (payload = {}) => {
+  const src = payload && typeof payload === 'object' ? payload : {};
   const clean = {};
   ALLOWED_CV_FIELDS.forEach((field) => {
-    if (payload[field] !== undefined) {
-      clean[field] = payload[field];
+    if (src[field] !== undefined) {
+      clean[field] = src[field];
     }
   });
+
+  // Coerce string/null subdocuments without injecting unrequested fields on partial updates
+  const normalized = normalizeCvData(clean);
+  ALLOWED_CV_FIELDS.forEach((field) => {
+    if (clean[field] !== undefined && normalized[field] !== undefined) {
+      clean[field] = normalized[field];
+    }
+  });
+
+  if (clean.design && typeof clean.design === 'object') {
+    Object.entries(DESIGN_ENUM_DEFAULTS).forEach(([key, allowed]) => {
+      if (clean.design[key] !== undefined && !allowed.includes(clean.design[key])) {
+        delete clean.design[key];
+      }
+    });
+  }
 
   if (clean.templateId) {
     const canonical = resolveTemplateId(clean.templateId);

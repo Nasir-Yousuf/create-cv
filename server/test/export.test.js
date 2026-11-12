@@ -1,8 +1,22 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { generatePDF } from '../src/services/pdf/pdfService.js';
+import zlib from 'zlib';
+import mongoose from 'mongoose';
+import { generatePDF, generateTemplateHtml } from '../src/services/pdf/pdfService.js';
 import { generateDOCX } from '../src/services/docx/docxService.js';
-import { exportPDF, exportDOCX, exportPDFFallbackRecord } from '../src/controllers/exportController.js';
+import {
+  exportPDF,
+  exportDOCX,
+  exportPDFFallbackRecord,
+  validateCvPayload,
+} from '../src/controllers/exportController.js';
+import { pickAllowedCVData } from '../src/controllers/cvController.js';
+import CV from '../src/models/CV.js';
+import {
+  toDocxHex,
+  stripTransientCvMeta,
+  hasExportableCvContent,
+} from '../../shared/utils/cvNormalize.js';
 
 // 1. Minimal CV Data
 const MINIMAL_CV = {
@@ -464,5 +478,184 @@ describe('Export Controller Validation & Auth Guard Test Suite', () => {
     await exportPDFFallbackRecord(req, res);
     assert.strictEqual(statusCode, 400);
     assert.strictEqual(jsonBody.success, false);
+  });
+});
+
+const extractDocxEntryText = (zipBuf, targetName) => {
+  let eocdOffset = -1;
+  for (let i = zipBuf.length - 22; i >= Math.max(0, zipBuf.length - 65558); i--) {
+    if (zipBuf.readUInt32LE(i) === 0x06054b50) {
+      eocdOffset = i;
+      break;
+    }
+  }
+  if (eocdOffset === -1) return '';
+  const cdOffset = zipBuf.readUInt32LE(eocdOffset + 16);
+  const cdSize = zipBuf.readUInt32LE(eocdOffset + 12);
+  let pos = cdOffset;
+  const cdEnd = cdOffset + cdSize;
+  while (pos + 46 <= cdEnd) {
+    if (zipBuf.readUInt32LE(pos) !== 0x02014b50) break;
+    const method = zipBuf.readUInt16LE(pos + 10);
+    const compressedSize = zipBuf.readUInt32LE(pos + 20);
+    const nameLen = zipBuf.readUInt16LE(pos + 28);
+    const extraLen = zipBuf.readUInt16LE(pos + 30);
+    const commentLen = zipBuf.readUInt16LE(pos + 32);
+    const localHeaderOffset = zipBuf.readUInt32LE(pos + 42);
+    const name = zipBuf.toString('utf8', pos + 46, pos + 46 + nameLen);
+    pos += 46 + nameLen + extraLen + commentLen;
+    if (name !== targetName) continue;
+    const lNameLen = zipBuf.readUInt16LE(localHeaderOffset + 26);
+    const lExtraLen = zipBuf.readUInt16LE(localHeaderOffset + 28);
+    const dataStart = localHeaderOffset + 30 + lNameLen + lExtraLen;
+    const slice = zipBuf.subarray(dataStart, dataStart + compressedSize);
+    return method === 8 ? zlib.inflateRawSync(slice).toString('utf8') : slice.toString('utf8');
+  }
+  return '';
+};
+
+describe('Export & Persistence Edge-Case Regression Suite', () => {
+  it('should normalize CSS colors to strict 6-char OpenXML hex in toDocxHex', () => {
+    assert.strictEqual(toDocxHex('rgb(37, 99, 235)'), '2563EB');
+    assert.strictEqual(toDocxHex('rgba(16, 185, 129, 0.85)'), '10B981');
+    assert.strictEqual(toDocxHex('#f6a'), 'FF66AA');
+    assert.strictEqual(toDocxHex('#2563eb'), '2563EB');
+    assert.strictEqual(toDocxHex('not-a-color', '1E40AF'), '1E40AF');
+  });
+
+  it('should generate valid DOCX with rgb() colors, null entries, string arrays, customSections, and control chars', async () => {
+    const dirtyCv = {
+      templateId: 'bd-corporate-standard',
+      personalInfo: {
+        fullName: 'Ariana\x00 Kabir\uFFFF',
+        jobTitle: 404,
+        summary: 'Summary\x0B with unsafe XML chars',
+      },
+      design: { primaryColor: 'rgb(37, 99, 235)' },
+      experience: [
+        null,
+        {
+          jobTitle: 'Analyst',
+          company: 'Dhaka FinTech',
+          highlights: 'Built dashboards, Automated ETL',
+        },
+      ],
+      education: [null],
+      skills: ['TypeScript', 'PostgreSQL'],
+      projects: ['OpenPay Gateway'],
+      certifications: null,
+      languages: ['Bengali', { name: 'English', proficiency: 'Fluent' }],
+      references: [null, 'Dr. Hasan'],
+      customSections: [
+        {
+          title: 'Honors & Awards',
+          content: 'Recipient of national Merit Scholarship.',
+          items: ['Dean List 2024'],
+        },
+      ],
+    };
+
+    const buffer = await generateDOCX(dirtyCv);
+    assert.ok(Buffer.isBuffer(buffer));
+    assert.ok(buffer.length > 3000, `Dirty DOCX size (${buffer.length}) must be valid`);
+    assert.strictEqual(buffer.subarray(0, 4).toString('hex'), '504b0304');
+    // Decompress word/document.xml inside DOCX ZIP to verify custom section text & normalized hex color
+    const docXml = extractDocxEntryText(buffer, 'word/document.xml');
+    assert.ok(docXml.includes('HONORS'), 'Custom section heading rendered in word/document.xml');
+    assert.ok(docXml.includes('Merit Scholarship'), 'Custom section content rendered in word/document.xml');
+    assert.ok(docXml.includes('2563EB'), 'Normalized 6-digit hex color applied in word/document.xml');
+    assert.ok(!docXml.includes('\u0000') && !docXml.includes('\uFFFF'), 'XML-unsafe control chars stripped');
+  });
+
+  it('should embed valid PNG photo cleanly and skip unsupported WebP or dead URLs without failing DOCX', async () => {
+    const withPng = await generateDOCX({
+      ...MINIMAL_CV,
+      personalInfo: { ...MINIMAL_CV.personalInfo, photo: CV_WITH_PHOTO.personalInfo.photo },
+    });
+    assert.strictEqual(withPng.subarray(0, 4).toString('hex'), '504b0304');
+    assert.ok(withPng.includes('word/media/'), 'Valid PNG photo should be embedded into word/media/');
+
+    const webpDataUri =
+      'data:image/webp;base64,UklGRh4AAABXRUJQVlA4TBEAAAAvAAAAAAfQ//73v/+BiOh/AAA=';
+    const withWebp = await generateDOCX({
+      ...MINIMAL_CV,
+      personalInfo: { ...MINIMAL_CV.personalInfo, photo: webpDataUri },
+    });
+    assert.strictEqual(withWebp.subarray(0, 4).toString('hex'), '504b0304');
+
+    const withDeadUrl = await generateDOCX({
+      ...MINIMAL_CV,
+      personalInfo: { ...MINIMAL_CV.personalInfo, photo: 'http://127.0.0.1:1/unreachable.jpg' },
+    });
+    assert.strictEqual(withDeadUrl.subarray(0, 4).toString('hex'), '504b0304');
+  });
+
+  it('should sanitize partial updates and mixed arrays cleanly for Mongoose CV schema validation', () => {
+    const partial = pickAllowedCVData({ title: 'Renamed Resume' });
+    assert.deepStrictEqual(partial, { title: 'Renamed Resume' });
+
+    const dirtyCreate = pickAllowedCVData({
+      title: 'Sparse Graduate CV',
+      templateId: 'onepage-fresher-clean',
+      personalInfo: { fullName: 'Tariqul Islam', photoStyle: 'octagon' },
+      design: { primaryColor: 'rgb(5, 150, 105)', fontSize: 'giant', pageSize: 'A4' },
+      experience: null,
+      skills: ['React', 'Node.js'],
+      projects: ['LMS Portal'],
+      customSections: [{ title: 'Activities', items: ['Robotics Club President'] }],
+    });
+
+    const doc = new CV({
+      ...dirtyCreate,
+      userId: new mongoose.Types.ObjectId(),
+    });
+    const validationErr = doc.validateSync();
+    assert.strictEqual(validationErr, undefined, `Expected clean validation, got: ${validationErr?.message}`);
+    assert.strictEqual(doc.personalInfo.photoStyle, 'circle');
+    assert.strictEqual(doc.design.primaryColor, '#059669');
+    assert.strictEqual(doc.skills.length, 2);
+    assert.strictEqual(doc.customSections[0].items[0].title, 'Robotics Club President');
+  });
+
+  it('should accept summary-only, project-only, and customSection-only CVs in validateCvPayload', () => {
+    assert.strictEqual(validateCvPayload({}), 'CV data appears empty. Please fill in at least a name, contact, summary, or content section before exporting.');
+    assert.strictEqual(validateCvPayload({ personalInfo: { summary: '3+ years backend dev' } }), null);
+    assert.strictEqual(validateCvPayload({ projects: [{ name: 'Analytics Engine' }] }), null);
+    assert.strictEqual(validateCvPayload({ customSections: [{ title: 'Publications', content: 'IEEE 2025' }] }), null);
+    assert.strictEqual(hasExportableCvContent({ certifications: ['AWS SAA'] }), true);
+  });
+
+  it('should render SSR HTML without crashing across all templates when section arrays are null or sparse', () => {
+    for (const templateId of ALL_TEMPLATE_IDS) {
+      const html = generateTemplateHtml({
+        templateId,
+        personalInfo: { fullName: 'Sparse Test User', jobTitle: 'Engineer' },
+        experience: null,
+        education: [null],
+        skills: ['JavaScript', null],
+        projects: null,
+        certifications: [null, 'AWS'],
+        languages: null,
+        references: null,
+        customSections: null,
+      });
+      assert.ok(typeof html === 'string' && html.length > 100, `SSR HTML must render for ${templateId}`);
+    }
+  });
+
+  it('should strip transient Mongo/entitlement metadata when cloning template cards', () => {
+    const cleaned = stripTransientCvMeta({
+      _id: '507f1f77bcf86cd799439011',
+      isExportUnlocked: true,
+      unlockType: 'paid',
+      version: 9,
+      templateId: 'onepage-fresher-clean',
+      personalInfo: { fullName: 'Kept User' },
+    });
+    assert.strictEqual(cleaned._id, undefined);
+    assert.strictEqual(cleaned.isExportUnlocked, undefined);
+    assert.strictEqual(cleaned.unlockType, undefined);
+    assert.strictEqual(cleaned.version, undefined);
+    assert.strictEqual(cleaned.personalInfo.fullName, 'Kept User');
   });
 });

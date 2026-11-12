@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium-min';
 import { resolveTemplateId } from '../../../../shared/constants/cvDefaults.js';
+import { normalizeCvData } from '../../../../shared/utils/cvNormalize.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,9 +14,13 @@ const require = createRequire(import.meta.url);
 
 // Match the Sparticuz chromium-min major version installed in server/package.json (v153.0.0)
 const SPARTICUZ_PACK_VERSION = 'v153.0.0';
+const GOOGLE_FONTS_CSS_URL =
+  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap';
 
 let cachedSSRModule = null;
 let cachedCompiledCss = null;
+let cachedChromiumPath = null;
+let pendingChromiumPathPromise = null;
 
 /**
  * Loads the Vite-compiled React SSR template renderer so Preview and PDF use
@@ -127,6 +132,35 @@ const findLocalBrowserExecutable = () => {
 };
 
 /**
+ * Singleton resolver for Sparticuz Chromium binary extraction/download so concurrent
+ * serverless invocations never race or corrupt the shared `/tmp/chromium` extraction.
+ */
+export const resolveServerlessChromiumExecutablePath = async () => {
+  if (cachedChromiumPath && fs.existsSync(cachedChromiumPath)) {
+    return cachedChromiumPath;
+  }
+  if (!pendingChromiumPathPromise) {
+    chromium.setGraphicsMode = false;
+    const archTag = process.arch === 'arm64' ? 'arm64' : 'x64';
+    const remotePackUrl =
+      process.env.CHROMIUM_PACK_URL ||
+      `https://github.com/Sparticuz/chromium/releases/download/${SPARTICUZ_PACK_VERSION}/chromium-${SPARTICUZ_PACK_VERSION}-pack.${archTag}.tar`;
+
+    pendingChromiumPathPromise = chromium
+      .executablePath(remotePackUrl)
+      .then((resolvedPath) => {
+        cachedChromiumPath = resolvedPath;
+        return resolvedPath;
+      })
+      .catch((err) => {
+        pendingChromiumPathPromise = null;
+        throw err;
+      });
+  }
+  return pendingChromiumPathPromise;
+};
+
+/**
  * Launches Puppeteer using @sparticuz/chromium-min in serverless runtimes (Vercel/AWS Lambda)
  * or local Chromium/Chrome/Edge on desktop/Docker environments.
  */
@@ -151,13 +185,7 @@ const launchPdfBrowser = async (viewport) => {
       });
     }
 
-    chromium.setGraphicsMode = false;
-    const archTag = process.arch === 'arm64' ? 'arm64' : 'x64';
-    const remotePackUrl =
-      process.env.CHROMIUM_PACK_URL ||
-      `https://github.com/Sparticuz/chromium/releases/download/${SPARTICUZ_PACK_VERSION}/chromium-${SPARTICUZ_PACK_VERSION}-pack.${archTag}.tar`;
-
-    const executablePath = await chromium.executablePath(remotePackUrl);
+    const executablePath = await resolveServerlessChromiumExecutablePath();
     const serverlessArgs = await puppeteer.defaultArgs({
       args: chromium.args,
       headless: 'shell',
@@ -220,12 +248,12 @@ const sanitizeCssForStyleTag = (css) => {
 /**
  * Single source of truth HTML generator using the compiled React template components.
  */
-export const generateTemplateHtml = (cvData) => {
+export const generateTemplateHtml = (rawCvData) => {
   const { renderCVToStaticHtml } = loadSSRTemplateModule();
-  const normalizedData = {
-    ...(cvData || {}),
-    templateId: resolveTemplateId(cvData?.templateId || 'onepage-fresher-clean'),
-  };
+  const normalizedData = normalizeCvData({
+    ...(rawCvData && typeof rawCvData === 'object' ? rawCvData : {}),
+    templateId: resolveTemplateId(rawCvData?.templateId || 'onepage-fresher-clean'),
+  });
   return renderCVToStaticHtml(normalizedData);
 };
 
@@ -260,7 +288,6 @@ const buildPrintableDocument = ({ cvData, renderedHtml = '', customCss = '' }) =
       <title>${safeName} - Resume</title>
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       ${shouldIncludeTailwindCdn ? '<script src="https://cdn.tailwindcss.com"></script>' : ''}
       ${compiledCss ? `<style>${compiledCss}</style>` : ''}
       <style>
@@ -325,8 +352,9 @@ const buildPrintableDocument = ({ cvData, renderedHtml = '', customCss = '' }) =
 /**
  * Main PDF generation engine rendering vector PDFs with Chromium from the exact React templates.
  */
-export const generatePDF = async (cvData, renderedHtml = '', customCss = '') => {
-  const { design = {} } = cvData || {};
+export const generatePDF = async (rawCvData, renderedHtml = '', customCss = '') => {
+  const cvData = normalizeCvData(rawCvData);
+  const { design = {} } = cvData;
   const isLetter = design?.pageSize === 'Letter';
   const pageSize = isLetter ? 'Letter' : 'A4';
   const viewport = {
@@ -348,24 +376,32 @@ export const generatePDF = async (cvData, renderedHtml = '', customCss = '') => 
 
     await page.setContent(fullHtml, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // Wait briefly for external Google Fonts stylesheets + font faces without stalling offline runtimes
-    await page.evaluate(async () => {
+    // Load Google Fonts non-blockingly so slow/offline networks never hang setContent()
+    await page.evaluate(async (fontsUrl) => {
       try {
-        const links = Array.from(document.querySelectorAll('link[rel="stylesheet"]'));
-        if (links.length > 0) {
-          await Promise.race([
-            Promise.all(
-              links.map((link) => {
-                if (link.sheet) return Promise.resolve();
-                return new Promise((resolve) => {
-                  link.addEventListener('load', resolve, { once: true });
-                  link.addEventListener('error', resolve, { once: true });
-                });
-              })
-            ),
-            new Promise((resolve) => setTimeout(resolve, 3000)),
-          ]);
-        }
+        await new Promise((resolve) => {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = fontsUrl;
+          const timer = setTimeout(resolve, 2500);
+          link.addEventListener(
+            'load',
+            () => {
+              clearTimeout(timer);
+              resolve();
+            },
+            { once: true }
+          );
+          link.addEventListener(
+            'error',
+            () => {
+              clearTimeout(timer);
+              resolve();
+            },
+            { once: true }
+          );
+          document.head.appendChild(link);
+        });
         if (document.fonts && document.fonts.ready) {
           await Promise.race([
             document.fonts.ready,
@@ -376,18 +412,22 @@ export const generatePDF = async (cvData, renderedHtml = '', customCss = '') => 
 
       const imgs = Array.from(document.querySelectorAll('img'));
       if (imgs.length > 0) {
-        await Promise.all(
-          imgs.map((img) => {
-            if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-            return new Promise((resolve) => {
-              img.addEventListener('load', resolve, { once: true });
-              img.addEventListener('error', resolve, { once: true });
-              setTimeout(resolve, 1500);
-            });
-          })
-        );
+        await Promise.race([
+          Promise.all(
+            imgs.map((img) => {
+              if (img.complete) return Promise.resolve();
+              return new Promise((resolve) => {
+                img.addEventListener('load', resolve, { once: true });
+                img.addEventListener('error', resolve, { once: true });
+                img.addEventListener('abort', resolve, { once: true });
+                setTimeout(resolve, 2500);
+              });
+            })
+          ),
+          new Promise((resolve) => setTimeout(resolve, 3000)),
+        ]);
       }
-    });
+    }, GOOGLE_FONTS_CSS_URL);
 
     const pdfBuffer = await page.pdf({
       format: pageSize,

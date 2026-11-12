@@ -5,6 +5,8 @@ import paymentService from '../services/paymentService';
 import { openAuthModal, syncUserProfile, logout } from '../store/authSlice';
 import { markExportUnlocked, setCVSyncMeta } from '../store/cvSlice';
 import { resolveTemplateId, resolveTemplateMeta } from '@shared/constants/cvDefaults.js';
+import { isValidMongoObjectId, normalizeCvData } from '@shared/utils/cvNormalize.js';
+import { optimizeCvPhotoForExport } from './imageOptimize';
 import { setPendingAuthAction } from './authPendingAction';
 import { notifyExportSuccess, notifyExportError } from './exportFeedback';
 
@@ -63,22 +65,29 @@ export async function runProtectedExport({
 
   const canonicalTemplateId = resolveTemplateId(cvData?.templateId);
   const templateMeta = resolveTemplateMeta(canonicalTemplateId);
-  const normalizedCV = {
+  const normalizedBaseCV = normalizeCvData({
     ...cvData,
     templateId: canonicalTemplateId,
-  };
+  });
 
-  let activeCvId = explicitCvId || normalizedCV._id || (isActiveEditorCV ? cvState.cvId : null) || null;
+  const candidateId =
+    explicitCvId || cvData?._id || (isActiveEditorCV ? cvState.cvId : null) || null;
+  let activeCvId = isValidMongoObjectId(candidateId) ? String(candidateId).trim() : null;
   let activeCvDoc = activeCvId
     ? {
         _id: activeCvId,
-        isExportUnlocked: Boolean(normalizedCV.isExportUnlocked ?? (isActiveEditorCV ? cvState.isExportUnlocked : false)),
-        unlockType: normalizedCV.unlockType ?? (isActiveEditorCV ? cvState.unlockType : null),
-        version: normalizedCV.version ?? (isActiveEditorCV ? cvState.version : 1),
+        isExportUnlocked: Boolean(cvData?.isExportUnlocked ?? (isActiveEditorCV ? cvState.isExportUnlocked : false)),
+        unlockType: cvData?.unlockType ?? (isActiveEditorCV ? cvState.unlockType : null),
+        version: cvData?.version ?? (isActiveEditorCV ? cvState.version : 1),
       }
     : null;
 
+  let normalizedCV = normalizedBaseCV;
+
   try {
+    // Compress oversized photo uploads/WebP images before API requests (Vercel 4.5MB limit)
+    normalizedCV = await optimizeCvPhotoForExport(normalizedBaseCV);
+
     // 2. Refresh user entitlements from server so cross-device/admin approvals are always fresh
     let currentUser = authState.user;
     try {
@@ -101,8 +110,7 @@ export async function runProtectedExport({
       }
     }
 
-    // 3. Ensure CV is persisted in MongoDB so entitlement locks permanently to its persistent `_id`
-    if (!activeCvId) {
+    const persistNewCV = async () => {
       const payloadToCreate = {
         ...normalizedCV,
         title: normalizedCV.title || `${normalizedCV.personalInfo?.fullName || 'Untitled'} - CV`,
@@ -126,6 +134,27 @@ export async function runProtectedExport({
           onSyncCV(createRes.data);
         }
       }
+    };
+
+    const handleStaleOrMissingCv = async () => {
+      activeCvId = null;
+      activeCvDoc = null;
+      if (isActiveEditorCV) {
+        dispatch(
+          setCVSyncMeta({
+            cvId: null,
+            version: 1,
+            isExportUnlocked: false,
+            unlockType: null,
+          })
+        );
+      }
+      await persistNewCV();
+    };
+
+    // 3. Ensure CV is persisted in MongoDB so entitlement locks permanently to its persistent `_id`
+    if (!activeCvId) {
+      await persistNewCV();
     } else if (isActiveEditorCV && cvState.isDirty) {
       try {
         const updateRes = await cvService.updateCV(activeCvId, {
@@ -144,13 +173,37 @@ export async function runProtectedExport({
           );
         }
       } catch (saveErr) {
-        // Non-conflict transient save issues should not silently corrupt state; fetch canonical doc meta if needed
-        if (saveErr?.status === 409) {
-          throw saveErr;
+        if (saveErr?.status === 404) {
+          await handleStaleOrMissingCv();
+        } else if (saveErr?.status === 409) {
+          // Resolve background autosave version race cleanly before exporting
+          try {
+            const forcedRes = await cvService.updateCV(activeCvId, {
+              ...normalizedCV,
+              forceOverwrite: true,
+            });
+            if (forcedRes?.data) {
+              activeCvDoc = forcedRes.data;
+              dispatch(
+                setCVSyncMeta({
+                  cvId: forcedRes.data._id,
+                  version: forcedRes.data.version,
+                  isExportUnlocked: Boolean(forcedRes.data.isExportUnlocked),
+                  unlockType: forcedRes.data.unlockType || null,
+                })
+              );
+            }
+          } catch (forcedErr) {
+            if (forcedErr?.status === 404) {
+              await handleStaleOrMissingCv();
+            } else {
+              throw forcedErr;
+            }
+          }
         }
       }
     } else if (activeCvId && activeCvDoc && activeCvDoc.isExportUnlocked === false) {
-      // Confirm unlock state from DB before deciding payment gate
+      // Confirm unlock state from DB (and recover transparently if old CV ID was deleted)
       try {
         const fetched = await cvService.getCVById(activeCvId);
         if (fetched?.data) {
@@ -166,7 +219,11 @@ export async function runProtectedExport({
             );
           }
         }
-      } catch (_) {}
+      } catch (fetchErr) {
+        if (fetchErr?.status === 404) {
+          await handleStaleOrMissingCv();
+        }
+      }
     }
 
     // 4. Pre-flight entitlement check to immediately show bKash ৳10 modal when credits = 0
@@ -187,18 +244,44 @@ export async function runProtectedExport({
     }
 
     // 5. Perform Export (Server enforces auth & atomic credit deduction as source of truth)
+    let exportedMeta = null;
+    const captureMeta = (meta) => {
+      if (meta) exportedMeta = meta;
+    };
+
     if (format === 'docx') {
-      await exportService.exportDOCX(normalizedCV, null, { cvId: activeCvId });
+      await exportService.exportDOCX(normalizedCV, null, {
+        cvId: activeCvId,
+        onServerMeta: captureMeta,
+      });
     } else {
       await exportService.exportPDF(normalizedCV, customHtml, elementId, null, {
         cvId: activeCvId,
         skipCache: true,
+        onServerMeta: captureMeta,
       });
     }
 
     // 6. Sync post-export state & refresh user credits in background
+    const finalCvId = exportedMeta?.cvId || activeCvId;
+    const finalUnlockType = exportedMeta?.unlockType || activeCvDoc?.unlockType || 'unlocked';
+
+    if (finalCvId && typeof onSyncCV === 'function' && finalCvId !== activeCvId) {
+      onSyncCV({ _id: finalCvId, isExportUnlocked: true, unlockType: finalUnlockType });
+    }
     if (isActiveEditorCV) {
-      dispatch(markExportUnlocked(activeCvDoc?.unlockType || 'unlocked'));
+      if (finalCvId && !cvState.cvId) {
+        dispatch(
+          setCVSyncMeta({
+            cvId: finalCvId,
+            version: activeCvDoc?.version || 1,
+            isExportUnlocked: true,
+            unlockType: finalUnlockType,
+          })
+        );
+      } else {
+        dispatch(markExportUnlocked(finalUnlockType));
+      }
     }
 
     authService
@@ -211,10 +294,10 @@ export async function runProtectedExport({
     notifyExportSuccess(dispatch, formatLabel, templateMeta?.name);
 
     if (typeof onExportSuccess === 'function') {
-      onExportSuccess({ cvId: activeCvId, format });
+      onExportSuccess({ cvId: finalCvId, format });
     }
 
-    return { status: 'success', cvId: activeCvId };
+    return { status: 'success', cvId: finalCvId };
   } catch (err) {
     if (err?.status === 401) {
       dispatch(logout());
