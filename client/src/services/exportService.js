@@ -20,6 +20,7 @@ import {
   ImageRun,
 } from 'docx';
 import { RenderCVTemplate } from '../templates';
+import { resolveTemplateMeta } from '@shared/constants/cvDefaults.js';
 import {
   normalizeCvData,
   toDocxHex,
@@ -807,6 +808,29 @@ export const exportService = {
         `;
         document.head.appendChild(baselineFixStyle);
 
+        const templateMeta = resolveTemplateMeta(cvData?.templateId);
+        const isOnePage =
+          cvData?.isOnePage !== undefined
+            ? Boolean(cvData.isOnePage)
+            : Boolean(
+                templateMeta?.isOnePage ||
+                  cvData?.category === 'One-Page CVs' ||
+                  templateMeta?.categories?.includes('One-Page CVs')
+              );
+
+        if (isOnePage && captureEl) {
+          const targetPx = isLetterStage ? 1056 : 1123;
+          captureEl.style.maxHeight = 'none';
+          captureEl.style.overflow = 'visible';
+          const actualHeight = captureEl.scrollHeight || captureEl.offsetHeight;
+          if (actualHeight > targetPx + 4) {
+            const fitScale = Math.max(0.70, (targetPx - 2) / actualHeight);
+            captureEl.style.zoom = String(fitScale);
+          }
+          captureEl.style.maxHeight = `${targetPx}px`;
+          captureEl.style.overflow = 'hidden';
+        }
+
         let canvas;
         try {
           canvas = await html2canvas(captureEl, {
@@ -844,8 +868,11 @@ export const exportService = {
 
         const pdfHeight = (canvas.height * pageWidth) / canvas.width;
 
-        // Only place on a single page when content genuinely fits A4/Letter without vertical squishing
-        if (pdfHeight <= pageHeight + 2) {
+        // Strictly keep 1-page CVs on exactly 1 page
+        if (isOnePage) {
+          const renderHeight = Math.min(pageHeight, pdfHeight);
+          pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, renderHeight, undefined, 'FAST');
+        } else if (pdfHeight <= pageHeight + 2) {
           pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, pdfHeight, undefined, 'FAST');
         } else {
           let heightLeft = pdfHeight;

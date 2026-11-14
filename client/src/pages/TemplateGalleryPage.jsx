@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector, useStore } from 'react-redux';
-import { setTemplateId } from '../store/cvSlice';
+import { setTemplateId, updateDesign } from '../store/cvSlice';
 import { showToast } from '../store/uiSlice';
 import templateService from '../services/templateService';
 import { runProtectedExport } from '../utils/runProtectedExport';
@@ -27,6 +27,7 @@ import {
   DANIEL_CARTER_CV,
   TAHMIDUR_RAHMAN_CV,
   resolveTemplateId,
+  resolveTemplateMeta,
   templateMatchesCategory,
 } from '@shared/constants/cvDefaults.js';
 
@@ -41,6 +42,7 @@ export const TemplateGalleryPage = () => {
   const [categoriesList, setCategoriesList] = useState(TEMPLATE_CATEGORIES);
   const [selectedCategory, setSelectedCategory] = useState('One-Page CVs');
   const [searchQuery, setSearchQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(24);
   const [previewTemplate, setPreviewTemplate] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
   const [downloadType, setDownloadType] = useState(null);
@@ -56,6 +58,10 @@ export const TemplateGalleryPage = () => {
   const [windowWidth, setWindowWidth] = useState(
     typeof window !== 'undefined' ? window.innerWidth : 1024
   );
+
+  useEffect(() => {
+    setVisibleCount(24);
+  }, [selectedCategory, searchQuery]);
 
   useEffect(() => {
     templateService
@@ -99,13 +105,26 @@ export const TemplateGalleryPage = () => {
     });
   }, [templatesList, selectedCategory, searchQuery]);
 
+  const displayedTemplates = useMemo(() => {
+    return filteredTemplates.slice(0, visibleCount);
+  }, [filteredTemplates, visibleCount]);
+
   // Handle template selection and launch editor
   const handleSelectTemplate = (id) => {
     const canonicalId = resolveTemplateId(id);
     dispatch(setTemplateId(canonicalId));
+    const meta = templatesList.find((t) => t.id === canonicalId) || resolveTemplateMeta(canonicalId);
+    if (meta?.thumbnailColor) {
+      dispatch(
+        updateDesign({
+          primaryColor: meta.thumbnailColor,
+          accentColor: meta.accentColor || meta.thumbnailColor,
+        })
+      );
+    }
     dispatch(
       showToast({
-        message: `Template selected: ${templatesList.find((t) => t.id === canonicalId)?.name || canonicalId}`,
+        message: `Template selected: ${meta?.name || canonicalId}`,
         type: 'success',
       })
     );
@@ -251,7 +270,7 @@ export const TemplateGalleryPage = () => {
 
         {/* Template Grid with Real Live Previews */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredTemplates.map((tpl) => {
+          {displayedTemplates.map((tpl) => {
             const isFav = favorites.includes(tpl.id);
             const isDownloading = downloadingId === tpl.id;
             const cardCVData = getCardCVData(tpl);
@@ -374,6 +393,22 @@ export const TemplateGalleryPage = () => {
             );
           })}
         </div>
+
+        {/* Load More Pagination */}
+        {visibleCount < filteredTemplates.length && (
+          <div className="flex justify-center pt-8 pb-4">
+            <button
+              type="button"
+              onClick={() => setVisibleCount((prev) => prev + 24)}
+              className="px-6 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 font-bold text-sm shadow-sm hover:shadow hover:bg-slate-50 dark:hover:bg-slate-850 active:scale-95 transition-all cursor-pointer inline-flex items-center gap-2"
+            >
+              <span>Load More Templates</span>
+              <span className="text-xs text-slate-500 font-normal">
+                ({displayedTemplates.length} of {filteredTemplates.length} shown)
+              </span>
+            </button>
+          </div>
+        )}
 
         {/* Empty Search State */}
         {filteredTemplates.length === 0 && (

@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   resolveTemplateId,
+  resolveTemplateMeta,
   TEMPLATE_ALIAS_COLORS,
 } from '@shared/constants/cvDefaults.js';
 import { normalizeCvData } from '@shared/utils/cvNormalize.js';
@@ -60,22 +61,42 @@ export const TEMPLATE_COMPONENTS = {
 export const RenderCVTemplate = ({ cvData, scale = 1, onOpenPhotoModal }) => {
   const rawTemplateId = cvData?.templateId || 'onepage-fresher-clean';
   const resolvedId = resolveTemplateId(rawTemplateId);
-  const Component = TEMPLATE_COMPONENTS[resolvedId] || OnePageFresherClean;
+  const templateMeta = resolveTemplateMeta(rawTemplateId);
+  const layoutArchitecture = templateMeta?.layoutArchitecture || templateMeta?.baseLayout || resolvedId;
+  const Component = TEMPLATE_COMPONENTS[resolvedId] || TEMPLATE_COMPONENTS[layoutArchitecture] || OnePageFresherClean;
   const safeCvData = normalizeCvData(cvData);
 
-  // Preserve custom palette if user loaded a legacy alias ID without custom design overrides
+  // Preserve custom palette or template's designated thumbnailColor
   const aliasColor = TEMPLATE_ALIAS_COLORS[rawTemplateId];
-  const mergedCvData =
-    aliasColor && safeCvData && (!safeCvData.design?.primaryColor || safeCvData.design.primaryColor === '#2563EB' || safeCvData.design.primaryColor === '#059669')
-      ? {
-          ...safeCvData,
-          design: {
-            ...safeCvData.design,
-            primaryColor: aliasColor.primaryColor,
-            accentColor: aliasColor.accentColor,
-          },
-        }
-      : safeCvData;
+  const templateColor = templateMeta?.thumbnailColor;
+  const templateAccent = templateMeta?.accentColor;
+
+  const currentPrimary = safeCvData?.design?.primaryColor;
+  const isDefaultPrimary =
+    !currentPrimary ||
+    currentPrimary === '#2563EB' ||
+    currentPrimary === '#2563eb' ||
+    currentPrimary === '#059669';
+
+  let appliedPrimary = currentPrimary || '#2563EB';
+  let appliedAccent = safeCvData?.design?.accentColor || '#3b82f6';
+
+  if (aliasColor && isDefaultPrimary) {
+    appliedPrimary = aliasColor.primaryColor;
+    appliedAccent = aliasColor.accentColor;
+  } else if (templateColor && isDefaultPrimary) {
+    appliedPrimary = templateColor;
+    appliedAccent = templateAccent || templateColor;
+  }
+
+  const mergedCvData = {
+    ...safeCvData,
+    design: {
+      ...safeCvData.design,
+      primaryColor: appliedPrimary,
+      accentColor: appliedAccent,
+    },
+  };
 
   return (
     <div

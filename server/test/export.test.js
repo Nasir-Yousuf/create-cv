@@ -220,12 +220,23 @@ const ALL_TEMPLATE_IDS = [
   'onepage-executive-brief',
   'onepage-academic-compact',
   'onepage-creative-editorial',
+  // Expanded One-Page Collection samples
+  'onepage-frontend-dev',
+  'onepage-devops-cloud',
+  'onepage-uiux-designer',
+  'onepage-business-analyst',
   // Multiple-Page Collection (5)
   'bd-corporate-standard',
   'modern-blue',
   'executive-slate',
   'ocean-split',
   'ats-classic',
+  // Expanded Bangladesh Collection samples
+  'bd-bank-mto',
+  'bd-bcs-admin-cadre',
+  'bd-textile-senior-merchandiser',
+  'bd-medical-mbbs-doctor',
+  'bd-fresher-buet-cse',
   // Legacy Aliases (must still render cleanly via resolveTemplateId)
   'bd-fresher-graduate',
   'harvard-executive',
@@ -273,6 +284,21 @@ describe('PDF Export Engine Test Suite', () => {
     assert.ok(Buffer.isBuffer(buffer));
     assert.ok(buffer.length > 15000);
     assert.strictEqual(buffer.subarray(0, 5).toString('ascii'), '%PDF-');
+  });
+
+  it('should strictly generate exactly 1 single page for One-Page CV even with full content', async () => {
+    const onePageFullCV = {
+      ...FULL_CV,
+      templateId: 'onepage-bd-compact',
+      isOnePage: true,
+    };
+    const buffer = await generatePDF(onePageFullCV);
+    assert.ok(Buffer.isBuffer(buffer));
+    assert.strictEqual(buffer.subarray(0, 5).toString('ascii'), '%PDF-');
+    // Verify that the PDF object tree contains exactly 1 page descriptor (/Type /Page)
+    const pageMatches = buffer.toString('latin1').match(/\/Type\s*\/Page\b/g);
+    assert.ok(pageMatches, 'PDF should have page descriptors');
+    assert.strictEqual(pageMatches.length, 1, `One-page CV must strictly contain 1 page (got ${pageMatches.length})`);
   });
 
   // Verify all canonical + legacy alias template IDs

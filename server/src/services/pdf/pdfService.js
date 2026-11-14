@@ -5,7 +5,7 @@ import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium-min';
-import { resolveTemplateId } from '../../../../shared/constants/cvDefaults.js';
+import { resolveTemplateId, resolveTemplateMeta } from '../../../../shared/constants/cvDefaults.js';
 import { normalizeCvData } from '../../../../shared/utils/cvNormalize.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -262,6 +262,15 @@ export const generateTemplateHtml = (rawCvData) => {
  */
 const buildPrintableDocument = ({ cvData, renderedHtml = '', customCss = '' }) => {
   const { design = {}, personalInfo = {} } = cvData || {};
+  const templateMeta = resolveTemplateMeta(cvData?.templateId);
+  const isOnePage =
+    cvData?.isOnePage !== undefined
+      ? Boolean(cvData.isOnePage)
+      : Boolean(
+          templateMeta?.isOnePage ||
+            cvData?.category === 'One-Page CVs' ||
+            templateMeta?.categories?.includes('One-Page CVs')
+        );
   const isLetter = design?.pageSize === 'Letter';
   const pageSize = isLetter ? 'Letter' : 'A4';
   const fontStack = formatFontStack(design?.fontFamily);
@@ -316,13 +325,16 @@ const buildPrintableDocument = ({ cvData, renderedHtml = '', customCss = '' }) =
         .resume-sheet-a4,
         .resume-sheet-letter {
           width: ${isLetter ? '8.5in' : '210mm'} !important;
-          min-height: ${isLetter ? '10.95in' : '296.5mm'} !important;
+          ${
+            isOnePage
+              ? `height: ${isLetter ? '11in' : '297mm'} !important; max-height: ${isLetter ? '11in' : '297mm'} !important; overflow: hidden !important;`
+              : `min-height: ${isLetter ? '10.95in' : '296.5mm'} !important; overflow: visible !important;`
+          }
           box-shadow: none !important;
           border-radius: 0 !important;
           border: none !important;
           margin: 0 !important;
           transform: none !important;
-          overflow: visible !important;
         }
         .avoid-break,
         .break-inside-avoid,
@@ -354,6 +366,15 @@ const buildPrintableDocument = ({ cvData, renderedHtml = '', customCss = '' }) =
  */
 export const generatePDF = async (rawCvData, renderedHtml = '', customCss = '') => {
   const cvData = normalizeCvData(rawCvData);
+  const templateMeta = resolveTemplateMeta(cvData?.templateId);
+  const isOnePage =
+    cvData?.isOnePage !== undefined
+      ? Boolean(cvData.isOnePage)
+      : Boolean(
+          templateMeta?.isOnePage ||
+            cvData?.category === 'One-Page CVs' ||
+            templateMeta?.categories?.includes('One-Page CVs')
+        );
   const { design = {} } = cvData;
   const isLetter = design?.pageSize === 'Letter';
   const pageSize = isLetter ? 'Letter' : 'A4';
@@ -377,59 +398,82 @@ export const generatePDF = async (rawCvData, renderedHtml = '', customCss = '') 
     await page.setContent(fullHtml, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     // Load Google Fonts non-blockingly so slow/offline networks never hang setContent()
-    await page.evaluate(async (fontsUrl) => {
-      try {
-        await new Promise((resolve) => {
-          const link = document.createElement('link');
-          link.rel = 'stylesheet';
-          link.href = fontsUrl;
-          const timer = setTimeout(resolve, 2500);
-          link.addEventListener(
-            'load',
-            () => {
-              clearTimeout(timer);
-              resolve();
-            },
-            { once: true }
-          );
-          link.addEventListener(
-            'error',
-            () => {
-              clearTimeout(timer);
-              resolve();
-            },
-            { once: true }
-          );
-          document.head.appendChild(link);
-        });
-        if (document.fonts && document.fonts.ready) {
+    await page.evaluate(
+      async ({ fontsUrl, isOnePage, isLetter }) => {
+        try {
+          await new Promise((resolve) => {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = fontsUrl;
+            const timer = setTimeout(resolve, 2500);
+            link.addEventListener(
+              'load',
+              () => {
+                clearTimeout(timer);
+                resolve();
+              },
+              { once: true }
+            );
+            link.addEventListener(
+              'error',
+              () => {
+                clearTimeout(timer);
+                resolve();
+              },
+              { once: true }
+            );
+            document.head.appendChild(link);
+          });
+          if (document.fonts && document.fonts.ready) {
+            await Promise.race([
+              document.fonts.ready,
+              new Promise((resolve) => setTimeout(resolve, 2500)),
+            ]);
+          }
+        } catch (e) {}
+
+        const imgs = Array.from(document.querySelectorAll('img'));
+        if (imgs.length > 0) {
           await Promise.race([
-            document.fonts.ready,
-            new Promise((resolve) => setTimeout(resolve, 2500)),
+            Promise.all(
+              imgs.map((img) => {
+                if (img.complete) return Promise.resolve();
+                return new Promise((resolve) => {
+                  img.addEventListener('load', resolve, { once: true });
+                  img.addEventListener('error', resolve, { once: true });
+                  img.addEventListener('abort', resolve, { once: true });
+                  setTimeout(resolve, 2500);
+                });
+              })
+            ),
+            new Promise((resolve) => setTimeout(resolve, 3000)),
           ]);
         }
-      } catch (e) {}
 
-      const imgs = Array.from(document.querySelectorAll('img'));
-      if (imgs.length > 0) {
-        await Promise.race([
-          Promise.all(
-            imgs.map((img) => {
-              if (img.complete) return Promise.resolve();
-              return new Promise((resolve) => {
-                img.addEventListener('load', resolve, { once: true });
-                img.addEventListener('error', resolve, { once: true });
-                img.addEventListener('abort', resolve, { once: true });
-                setTimeout(resolve, 2500);
-              });
-            })
-          ),
-          new Promise((resolve) => setTimeout(resolve, 3000)),
-        ]);
-      }
-    }, GOOGLE_FONTS_CSS_URL);
+        // For One-Page CVs, measure if content overflows single-page boundary and auto-fit zoom
+        if (isOnePage) {
+          const sheet =
+            document.getElementById('cv-export-sheet') ||
+            document.querySelector('.resume-sheet-a4, .resume-sheet-letter') ||
+            document.body.firstElementChild;
+          if (sheet) {
+            const targetPx = isLetter ? 1056 : 1122; // A4 297mm at 96 DPI = 1122.5px
+            sheet.style.maxHeight = 'none';
+            sheet.style.overflow = 'visible';
+            const actualHeight = sheet.scrollHeight || sheet.offsetHeight;
+            if (actualHeight > targetPx + 4) {
+              const fitScale = Math.max(0.70, (targetPx - 2) / actualHeight);
+              sheet.style.zoom = String(fitScale);
+            }
+            sheet.style.maxHeight = targetPx + 'px';
+            sheet.style.overflow = 'hidden';
+          }
+        }
+      },
+      { fontsUrl: GOOGLE_FONTS_CSS_URL, isOnePage, isLetter }
+    );
 
-    const pdfBuffer = await page.pdf({
+    const pdfOptions = {
       format: pageSize,
       printBackground: true,
       margin: {
@@ -439,7 +483,12 @@ export const generatePDF = async (rawCvData, renderedHtml = '', customCss = '') 
         left: '0mm',
       },
       preferCSSPageSize: true,
-    });
+    };
+    if (isOnePage) {
+      pdfOptions.pageRanges = '1';
+    }
+
+    const pdfBuffer = await page.pdf(pdfOptions);
 
     return Buffer.from(pdfBuffer);
   } catch (err) {

@@ -246,6 +246,7 @@ export const QuickCVWizard = () => {
   const [templatesList, setTemplatesList] = useState(TEMPLATES_REGISTRY);
   const [categoriesList, setCategoriesList] = useState(TEMPLATE_CATEGORIES);
   const [activeCategory, setActiveCategory] = useState("One-Page CVs");
+  const [wizardVisibleCount, setWizardVisibleCount] = useState(18);
   const [downloadingTemplateId, setDownloadingTemplateId] = useState(null);
   const [downloadType, setDownloadType] = useState(null); // 'pdf' | 'docx'
   const [wizardCvIds, setWizardCvIds] = useState({});
@@ -496,6 +497,14 @@ export const QuickCVWizard = () => {
   const filteredTemplates = templatesList.filter((t) =>
     templateMatchesCategory(t, activeCategory)
   );
+
+  useEffect(() => {
+    setWizardVisibleCount(18);
+  }, [activeCategory]);
+
+  const displayedTemplates = useMemo(() => {
+    return filteredTemplates.slice(0, wizardVisibleCount);
+  }, [filteredTemplates, wizardVisibleCount]);
   const onePageFitAnalysis = analyzeOnePageFit({
     ...cvData,
     templateId: "onepage-fresher-clean",
@@ -1563,7 +1572,7 @@ export const QuickCVWizard = () => {
 
         {/* Responsive Grid of Live Rendered CV Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredTemplates.map((template) => {
+          {displayedTemplates.map((template) => {
             const isDownloadingThis = downloadingTemplateId === template.id;
             const templateCVData = getTemplateCVData(template);
 
@@ -1672,6 +1681,22 @@ export const QuickCVWizard = () => {
             );
           })}
         </div>
+
+        {/* Load More Pagination */}
+        {wizardVisibleCount < filteredTemplates.length && (
+          <div className="flex justify-center pt-6 pb-2">
+            <button
+              type="button"
+              onClick={() => setWizardVisibleCount((prev) => prev + 18)}
+              className="px-6 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 font-bold text-xs shadow-sm hover:shadow active:scale-95 transition-all cursor-pointer inline-flex items-center gap-2"
+            >
+              <span>Show More Templates</span>
+              <span className="text-[11px] text-slate-500 font-normal">
+                ({displayedTemplates.length} of {filteredTemplates.length} shown)
+              </span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 4. Fullscreen Preview Modal */}
