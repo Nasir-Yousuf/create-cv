@@ -308,6 +308,13 @@ export const cvSlice = createSlice({
       if (action.payload.badgeBgColor) {
         state.currentCV.design.badgeBgColor = action.payload.badgeBgColor;
       }
+      if (action.payload.fontFamily) {
+        state.currentCV.designTokens.fontHeading = action.payload.fontFamily;
+        if (!action.payload.fontBody && !action.payload.fontHeading) {
+          state.currentCV.designTokens.fontBody = action.payload.fontFamily;
+        }
+        state.currentCV.design.fontFamily = action.payload.fontFamily;
+      }
       if (action.payload.fontHeading) {
         state.currentCV.design.fontFamily = action.payload.fontHeading;
       }
@@ -404,7 +411,7 @@ export const cvSlice = createSlice({
 
     // Mode B: Element Overrides & Custom Elements
     setElementOverride: (state, action) => {
-      const path = action.payload?.path;
+      const path = action.payload?.path || action.payload?.elementId;
       const override = action.payload?.override || action.payload?.overrides || {};
       if (path) {
         pushHistory(state);
