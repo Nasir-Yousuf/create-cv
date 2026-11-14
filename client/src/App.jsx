@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import Navbar from './components/layout/Navbar';
@@ -8,10 +8,6 @@ import AuthModal from './components/auth/AuthModal';
 import AIAssistantModal from './components/common/AIAssistantModal';
 import WhatsAppSupportButton from './components/common/WhatsAppSupportButton';
 import LandingPage from './pages/LandingPage';
-import TemplateGalleryPage from './pages/TemplateGalleryPage';
-import DashboardPage from './pages/DashboardPage';
-import CVEditorPage from './features/cv-editor/CVEditorPage';
-import AdminPaymentsPage from './pages/AdminPaymentsPage';
 import authService from './services/authService';
 import {
   openAuthModal,
@@ -19,7 +15,22 @@ import {
   logout,
 } from './store/authSlice';
 import { showToast } from './store/uiSlice';
-import { ShieldAlert, Lock, LogIn } from 'lucide-react';
+import { ShieldAlert, Lock, LogIn, Loader2 } from 'lucide-react';
+
+// Code-split heavy routes for Lighthouse 95+ FCP on mobile
+const TemplateGalleryPage = lazy(() => import('./pages/TemplateGalleryPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const CVEditorPage = lazy(() => import('./features/cv-editor/CVEditorPage'));
+const AdminPaymentsPage = lazy(() => import('./pages/AdminPaymentsPage'));
+
+const PageRouteSkeleton = () => (
+  <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 space-y-3">
+    <div className="w-9 h-9 rounded-full border-3 border-blue-600/20 border-t-blue-600 animate-spin" />
+    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 animate-pulse tracking-wide">
+      Loading NovaCV...
+    </span>
+  </div>
+);
 
 const ProtectedUserRoute = ({ children }) => {
   const dispatch = useDispatch();
@@ -166,28 +177,30 @@ export const App = () => {
       {!isEditorPage && !isAdminPage && <Navbar onOpenAuth={handleOpenAuth} />}
 
       <main className="flex-1">
-        <Routes>
-          <Route path="/" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
-          <Route path="/templates" element={<TemplateGalleryPage />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedUserRoute>
-                <DashboardPage onOpenAuth={handleOpenAuth} />
-              </ProtectedUserRoute>
-            }
-          />
-          <Route path="/builder" element={<CVEditorPage />} />
-          <Route
-            path="/admin"
-            element={
-              <ProtectedAdminRoute>
-                <AdminPaymentsPage />
-              </ProtectedAdminRoute>
-            }
-          />
-          <Route path="/pricing" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
-        </Routes>
+        <Suspense fallback={<PageRouteSkeleton />}>
+          <Routes>
+            <Route path="/" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
+            <Route path="/templates" element={<TemplateGalleryPage />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedUserRoute>
+                  <DashboardPage onOpenAuth={handleOpenAuth} />
+                </ProtectedUserRoute>
+              }
+            />
+            <Route path="/builder" element={<CVEditorPage />} />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminPaymentsPage />
+                </ProtectedAdminRoute>
+              }
+            />
+            <Route path="/pricing" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
+          </Routes>
+        </Suspense>
       </main>
 
       {!isEditorPage && !isAdminPage && <Footer />}

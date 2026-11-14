@@ -253,10 +253,17 @@ export const OnePageBDCompact = ({ cvData, onOpenPhotoModal }) => {
           )}
         </div>
 
-        {/* Personal Details Snapshot (BD Standard) */}
-        {isVisible('personalDetails') && quickBdFacts.length > 0 && (
-          <div className="pt-2 border-t border-slate-200">
-            <CVPersonalDetailsTable personalDetails={personalDetails} compact={true} />
+        {/* Personal Details Snapshot (BD Standard / Bank Format) */}
+        {isVisible('personalDetails') && (
+          <div className="pt-1.5 border-t border-slate-200">
+            <CompactSectionTitle title="Personal & Official Details" color={tokens.primaryColor} variant="bar" />
+            <CVPersonalDetailsTable
+              cvData={cvData}
+              personalDetails={personalDetails}
+              designTokens={tokens}
+              compact={true}
+              onSaveField={(field) => editors.savePersonal(field)}
+            />
           </div>
         )}
 
@@ -265,21 +272,37 @@ export const OnePageBDCompact = ({ cvData, onOpenPhotoModal }) => {
           <CVCustomSections customSections={customSections} primaryColor={tokens.primaryColor} />
         )}
 
-        {/* Reference */}
+        {/* References 1 & 2 Side-by-Side (Bangladesh Bank / BCS Standard) */}
         {isVisible('references') && references.length > 0 && (
-          <div className="pt-1 text-[10px] text-slate-700">
-            <span className="font-bold text-slate-900">Reference: </span>
-            {references[0].name}
-            {references[0].designation ? `, ${references[0].designation}` : ''}
-            {references[0].company ? `, ${references[0].company}` : ''}
-            {references[0].phone ? ` (${references[0].phone})` : ''}
+          <div className="pt-1">
+            <CompactSectionTitle title="Professional References" color={tokens.primaryColor} variant="bar" />
+            <div className="grid grid-cols-2 gap-2.5 text-[9.5px] text-slate-700">
+              {references.slice(0, 2).map((ref, idx) => (
+                <div
+                  key={ref.id || idx}
+                  className="p-1.5 rounded bg-slate-50/80 border border-slate-200/90 space-y-0.5 leading-snug"
+                >
+                  <p className="font-bold text-slate-900">{ref.name}</p>
+                  <p className="text-slate-600 truncate">{ref.designation}{ref.company ? `, ${ref.company}` : ''}</p>
+                  <div className="flex flex-wrap gap-x-2 text-[9px] text-slate-500 font-mono pt-0.5">
+                    {ref.phone && <span>Mob: {ref.phone}</span>}
+                    {ref.email && <span>Email: {ref.email}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Declaration Footer */}
-        {isVisible('declaration') && declaration?.text && (
-          <div className="pt-2 border-t border-slate-200">
-            <CVDeclaration declaration={declaration} />
+        {/* Formal Declaration & Signature Footer */}
+        {isVisible('declaration') && (
+          <div className="pt-1.5 border-t border-slate-200">
+            <CVDeclaration
+              declaration={declaration}
+              fullName={personalInfo.fullName}
+              designTokens={tokens}
+              onSaveText={editors.savePersonal('declarationText')}
+            />
           </div>
         )}
       </div>

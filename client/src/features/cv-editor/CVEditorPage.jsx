@@ -12,6 +12,7 @@ import {
   redo,
   setSavingState,
   setSaveStatus,
+  setNetworkStatus,
 } from '../../store/cvSlice';
 import { openAuthModal } from '../../store/authSlice';
 import {
@@ -33,7 +34,7 @@ import SectionFormEditor from './components/SectionFormEditor';
 import EditorInspector from './components/EditorInspector';
 import { AdvancedLayoutControls } from './components/AdvancedLayoutControls';
 import { MobileElementBottomSheet } from './components/MobileElementBottomSheet';
-import PhotoUploadCropModal from './components/PhotoUploadCropModal';
+const PhotoUploadCropModal = React.lazy(() => import('./components/PhotoUploadCropModal'));
 import AIAssistantModal from '../../components/common/AIAssistantModal';
 import WhatsAppSupportButton from '../../components/common/WhatsAppSupportButton';
 import PaymentExportModal from '../../components/common/PaymentExportModal';
@@ -77,6 +78,7 @@ import {
   Edit3,
   FileText,
   Clock,
+  WifiOff,
   ExternalLink,
   PanelLeftClose,
   PanelLeft,
@@ -400,11 +402,25 @@ export const CVEditorPage = () => {
     syncCloudCV();
   }, [isAuthenticated, searchParams]);
 
-  // Debounced Autosave with optimistic version guard and saveStatus tracking
+  // Debounced Autosave with offline-resilient queue, optimistic version guard, and saveStatus tracking
   useEffect(() => {
     if ((saveStatus !== 'unsaved' && !isDirty) || versionConflict) return;
 
     const timer = setTimeout(async () => {
+      // Check offline status before firing network call
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        const offlineItem = {
+          cvId,
+          payload: currentCV,
+          expectedVersion: version,
+          updatedAt: new Date().toISOString(),
+        };
+        localStorage.setItem('novacv_offline_queue', JSON.stringify(offlineItem));
+        localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
+        dispatch(setSaveStatus('offline-queued'));
+        return;
+      }
+
       dispatch(setSaveStatus('saving'));
       try {
         if (isAuthenticated) {
@@ -437,24 +453,157 @@ export const CVEditorPage = () => {
             }
           }
         }
+        localStorage.removeItem('novacv_offline_queue');
         localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
         dispatch(setSaveStatus('saved'));
       } catch (err) {
-        if (err?.status === 409) {
+        const isNetworkErr =
+          (typeof navigator !== 'undefined' && !navigator.onLine) ||
+          err?.message?.includes('Network') ||
+          err?.message?.includes('fetch') ||
+          !err?.status;
+
+        if (isNetworkErr) {
+          const offlineItem = {
+            cvId,
+            payload: currentCV,
+            expectedVersion: version,
+            updatedAt: new Date().toISOString(),
+          };
+          localStorage.setItem('novacv_offline_queue', JSON.stringify(offlineItem));
+          localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
+          dispatch(setSaveStatus('offline-queued'));
+        } else if (err?.status === 409) {
           setVersionConflict({
             serverVersion: err?.data?.serverVersion || err?.serverVersion,
             message: err.message || 'This CV was updated on another device.',
           });
+          localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
+          dispatch(setSaveStatus('error'));
         } else {
           console.warn('Autosave status:', err.message);
+          localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
+          dispatch(setSaveStatus('error'));
         }
-        localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
-        dispatch(setSaveStatus('error'));
       }
     }, 1500);
 
     return () => clearTimeout(timer);
   }, [currentCV, isDirty, saveStatus, cvId, version, versionConflict, isAuthenticated, dispatch]);
+
+  // Network Connectivity & Offline Auto-Sync Reconciler
+  useEffect(() => {
+    const handleOnline = async () => {
+      dispatch(setNetworkStatus(true));
+      const rawQueue = localStorage.getItem('novacv_offline_queue');
+      if (!rawQueue) return;
+
+      let queueItem = null;
+      try {
+        queueItem = JSON.parse(rawQueue);
+      } catch (_) {
+        return;
+      }
+
+      if (!queueItem || !queueItem.payload) return;
+
+      if (!isAuthenticated) {
+        localStorage.removeItem('novacv_offline_queue');
+        dispatch(setSaveStatus('saved'));
+        return;
+      }
+
+      dispatch(setSaveStatus('saving'));
+      try {
+        const targetCvId = queueItem.cvId || cvId;
+        if (targetCvId && !String(targetCvId).startsWith('sample-')) {
+          // Fetch latest server doc to reconcile
+          const serverDocRes = await cvService.getCVById(targetCvId);
+          const serverDoc = serverDocRes?.data;
+
+          if (serverDoc) {
+            const serverUpdated = new Date(serverDoc.updatedAt || 0).getTime();
+            const localUpdated = new Date(queueItem.updatedAt || 0).getTime();
+
+            // If server document was modified after our offline edits and versions diverge
+            if (serverDoc.version > queueItem.expectedVersion && serverUpdated > localUpdated) {
+              setVersionConflict({
+                serverVersion: serverDoc.version,
+                serverUpdatedAt: serverDoc.updatedAt,
+                message: 'This CV was updated on another device while you were offline. Choose how to reconcile.',
+              });
+              dispatch(setSaveStatus('error'));
+              return;
+            }
+
+            // Safe to push offline edits
+            const res = await cvService.updateCV(targetCvId, {
+              ...queueItem.payload,
+              expectedVersion: serverDoc.version,
+            });
+
+            if (res?.data) {
+              dispatch(
+                setCVSyncMeta({
+                  cvId: res.data._id,
+                  version: res.data.version,
+                  isExportUnlocked: Boolean(res.data.isExportUnlocked),
+                  unlockType: res.data.unlockType || null,
+                })
+              );
+            }
+          }
+        } else {
+          const res = await cvService.createCV(queueItem.payload);
+          if (res.data?._id) {
+            dispatch(
+              setCVSyncMeta({
+                cvId: res.data._id,
+                version: res.data.version || 1,
+                isExportUnlocked: Boolean(res.data.isExportUnlocked),
+                unlockType: res.data.unlockType || null,
+              })
+            );
+          }
+        }
+
+        localStorage.removeItem('novacv_offline_queue');
+        dispatch(setSaveStatus('saved'));
+        dispatch(showToast({ message: 'Network restored: Offline changes synced to cloud!', type: 'success' }));
+      } catch (err) {
+        if (err?.status === 409) {
+          setVersionConflict({
+            serverVersion: err?.data?.serverVersion || err?.serverVersion,
+            message: 'Conflict detected during offline sync. Choose how to reconcile.',
+          });
+        }
+        dispatch(setSaveStatus('error'));
+      }
+    };
+
+    const handleOffline = () => {
+      dispatch(setNetworkStatus(false));
+      dispatch(
+        showToast({
+          message: 'You are currently offline. Edits are queued locally and will auto-sync when reconnected.',
+          type: 'info',
+        })
+      );
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Initial check if we mounted online with a pending queue
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      handleOnline();
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [isAuthenticated, cvId, dispatch]);
 
   const handleReloadLatestCloud = async () => {
     if (!cvId) return;
@@ -1569,6 +1718,8 @@ export const CVEditorPage = () => {
                   title={
                     saveStatus === 'error'
                       ? 'Error saving changes. Click to retry.'
+                      : saveStatus === 'offline-queued'
+                      ? 'Offline: Edits queued locally in browser. Will auto-sync when online.'
                       : saveStatus === 'unsaved'
                       ? 'Unsaved changes. Click to save now.'
                       : 'All changes saved.'
@@ -1576,6 +1727,8 @@ export const CVEditorPage = () => {
                 >
                   {saveStatus === 'saving' || isAutosaving ? (
                     <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                  ) : saveStatus === 'offline-queued' ? (
+                    <WifiOff className="w-3.5 h-3.5 text-blue-500" />
                   ) : saveStatus === 'error' ? (
                     <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
                   ) : saveStatus === 'unsaved' ? (
@@ -1586,6 +1739,8 @@ export const CVEditorPage = () => {
                   <span className="hidden sm:inline">
                     {saveStatus === 'saving' || isAutosaving
                       ? 'Saving...'
+                      : saveStatus === 'offline-queued'
+                      ? 'Queued Offline'
                       : saveStatus === 'error'
                       ? 'Save Error'
                       : saveStatus === 'unsaved'
@@ -1595,6 +1750,8 @@ export const CVEditorPage = () => {
                   <span className="sm:hidden">
                     {saveStatus === 'saving' || isAutosaving
                       ? '...'
+                      : saveStatus === 'offline-queued'
+                      ? 'Offline'
                       : saveStatus === 'error'
                       ? 'Retry'
                       : saveStatus === 'unsaved'
@@ -2255,6 +2412,8 @@ export const CVEditorPage = () => {
                   <span className="text-xs text-slate-500">
                     {saveStatus === 'saving' || isAutosaving
                       ? 'Saving...'
+                      : saveStatus === 'offline-queued'
+                      ? 'Queued offline'
                       : saveStatus === 'unsaved'
                       ? 'Unsaved changes'
                       : 'Saved to cloud'}
@@ -2471,10 +2630,14 @@ export const CVEditorPage = () => {
       />
 
       {/* Profile Photo Upload & Crop Modal */}
-      <PhotoUploadCropModal
-        isOpen={photoModalOpen}
-        onClose={() => setPhotoModalOpen(false)}
-      />
+      {photoModalOpen && (
+        <React.Suspense fallback={null}>
+          <PhotoUploadCropModal
+            isOpen={photoModalOpen}
+            onClose={() => setPhotoModalOpen(false)}
+          />
+        </React.Suspense>
+      )}
 
       {/* Payment & Export Authorization Modal */}
       <PaymentExportModal

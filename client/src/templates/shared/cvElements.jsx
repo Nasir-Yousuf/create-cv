@@ -421,12 +421,14 @@ export const CVSection = ({
  */
 export const CVPersonalDetailsTable = ({
   cvData = {},
+  personalDetails: pdProp,
   designTokens = {},
-  columns = 2, // 2 or 4
+  columns = 2,
+  compact = false,
   className = '',
   onSaveField,
 }) => {
-  const pd = cvData?.personalDetails || {};
+  const pd = pdProp || cvData?.personalDetails || cvData?.personalInfo || {};
   const pi = cvData?.personalInfo || {};
   const activeBdFields = cvData?.sectionConfig?.bdFields;
 
@@ -455,6 +457,34 @@ export const CVPersonalDetailsTable = ({
   if (fields.length === 0) return null;
 
   const tokens = Object.keys(designTokens).length > 0 ? designTokens : resolveDesignTokens(cvData);
+
+  if (compact) {
+    return (
+      <div className={`cv-bd-table-wrapper cv-item-avoid-break ${className}`}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-1 text-[10px] pt-1">
+          {fields.map((f) => (
+            <div key={f.key} className="flex items-baseline gap-1 overflow-hidden">
+              <span className="font-bold text-slate-700 dark:text-slate-300 shrink-0">{f.label}:</span>
+              <span className="text-slate-800 dark:text-slate-200 truncate font-medium">
+                {onSaveField ? (
+                  <EditableElement
+                    section="personalDetails"
+                    field={f.key}
+                    value={f.value}
+                    onSave={onSaveField(f.key)}
+                    placeholder={f.label}
+                    className="inline"
+                  />
+                ) : (
+                  f.value || '—'
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`cv-bd-table-wrapper cv-item-avoid-break overflow-x-auto ${className}`}>

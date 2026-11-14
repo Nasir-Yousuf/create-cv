@@ -59,9 +59,11 @@ const initialState = {
   isExportUnlocked: false,
   unlockType: null,
   isDirty: false,
-  saveStatus: 'saved', // 'saved' | 'saving' | 'unsaved' | 'error'
+  saveStatus: 'saved', // 'saved' | 'saving' | 'unsaved' | 'error' | 'offline-queued'
   isAutosaving: false,
   lastSavedAt: null,
+  isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+  offlineQueue: [],
 };
 
 const pushHistory = (state) => {
@@ -1334,6 +1336,20 @@ export const cvSlice = createSlice({
       }
     },
 
+    setNetworkStatus: (state, action) => {
+      state.isOnline = Boolean(action.payload);
+      if (!action.payload) {
+        state.saveStatus = 'offline-queued';
+      }
+    },
+    queueOfflineEdit: (state, action) => {
+      state.offlineQueue.push(action.payload);
+      state.saveStatus = 'offline-queued';
+    },
+    clearOfflineQueue: (state) => {
+      state.offlineQueue = [];
+    },
+
     resetCV: (state) => {
       state.currentCV = normalizeLoadedCV(INITIAL_CV_DATA);
       state.past = [];
@@ -1452,6 +1468,9 @@ export const {
   duplicateCustomSectionItem,
   setSaveStatus,
   setSavingState,
+  setNetworkStatus,
+  queueOfflineEdit,
+  clearOfflineQueue,
   resetCV,
 } = cvSlice.actions;
 

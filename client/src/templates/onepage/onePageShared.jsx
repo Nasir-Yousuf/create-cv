@@ -216,11 +216,12 @@ export const OnePageExperienceList = ({
               <EditableElement
                 section="experience"
                 field="jobTitle"
+                tag="h3"
                 index={index}
                 value={exp.jobTitle || ''}
                 onSave={editors.saveExperienceField(index, 'jobTitle')}
                 placeholder="Role / Position"
-                className="text-[12px] font-bold text-slate-900 inline"
+                className="text-[12px] font-bold text-slate-900 inline m-0"
                 style={{ fontFamily: designTokens?.headingFont }}
               />
               {exp.company && (
@@ -309,11 +310,12 @@ export const OnePageEducationList = ({
             <EditableElement
               section="education"
               field="degree"
+              tag="h3"
               index={index}
               value={edu.degree || ''}
               onSave={editors.saveEducationField(index, 'degree')}
               placeholder="Degree / Certificate"
-              className="text-[11.5px] font-bold text-slate-900 inline"
+              className="text-[11.5px] font-bold text-slate-900 inline m-0"
               style={{ fontFamily: designTokens?.headingFont }}
             />
             <span className="text-[10.5px] font-semibold text-slate-500 whitespace-nowrap shrink-0">
@@ -379,11 +381,12 @@ export const OnePageProjectsGrid = ({
             <EditableElement
               section="projects"
               field="name"
+              tag="h3"
               index={index}
               value={proj.name || ''}
               onSave={editors.saveProjectField(index, 'name')}
               placeholder="Project Name"
-              className="text-[11.5px] font-bold text-slate-900 inline"
+              className="text-[11.5px] font-bold text-slate-900 inline m-0"
               style={{ fontFamily: designTokens?.headingFont }}
             />
             {proj.role && (

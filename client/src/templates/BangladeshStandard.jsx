@@ -409,6 +409,7 @@ export const BangladeshStandard = ({ cvData, onOpenPhotoModal }) => {
         return (
           <CVPersonalDetailsTable
             key="personalDetails"
+            cvData={cvData}
             personalDetails={personalDetails}
             designTokens={tokens}
             sectionConfig={cvData?.sectionConfig}
