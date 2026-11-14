@@ -11,6 +11,7 @@ import templateRoutes from './routes/templateRoutes.js';
 import exportRoutes from './routes/exportRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import aiRoutes from './routes/aiRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
 import { isDBConnected } from './config/db.js';
 
@@ -111,6 +112,7 @@ app.use('/api/templates', templateRoutes);
 app.use('/api/export', requireDatabase, exportRoutes);
 app.use('/api/payment', requireDatabase, paymentRoutes);
 app.use('/api/admin', requireDatabase, adminRoutes);
+app.use('/api/ai', aiRoutes);
 
 // 404 Handler for undefined routes
 app.use('/api/*', (req, res) => {

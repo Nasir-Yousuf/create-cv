@@ -117,6 +117,9 @@ import {
   Link as LinkIcon,
   Github,
   AlertCircle,
+  AlertTriangle,
+  CheckCheck,
+  Wand2,
   FileCheck,
 } from 'lucide-react';
 
@@ -437,6 +440,21 @@ export const SectionFormEditor = ({ onOpenPhotoModal }) => {
           </div>
         )}
 
+        {/* Missing Info Warning */}
+        {(!personalInfo.email || !personalInfo.phone || !personalInfo.jobTitle) && (
+          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-800 dark:text-amber-200">
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span>
+              {!personalInfo.email
+                ? 'Missing email address.'
+                : !personalInfo.phone
+                ? 'Missing contact phone number.'
+                : 'Missing target job title / headline.'}{' '}
+              Recruiters need these key details to contact and evaluate you.
+            </span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -548,6 +566,8 @@ export const SectionFormEditor = ({ onOpenPhotoModal }) => {
 
   // 2. Summary Editor
   if (activeSection === 'summary') {
+    const summaryText = cvData.personalInfo?.summary || cvData.summary || '';
+    const charCount = summaryText.length;
     return (
       <div className="space-y-4">
         {isSectionHidden && <HiddenSectionBanner sectionId="summary" />}
@@ -556,31 +576,54 @@ export const SectionFormEditor = ({ onOpenPhotoModal }) => {
           sectionId="summary"
           cvData={cvData}
           extraButton={
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={Sparkles}
-              onClick={() => dispatch(openAIModal({ mode: 'summary' }))}
-            >
-              Enhance with AI
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={Sparkles}
+                onClick={() => dispatch(openAIModal({ mode: 'summary' }))}
+              >
+                Enhance with AI
+              </Button>
+              {summaryText.trim() && (
+                <button
+                  type="button"
+                  onClick={() => dispatch(openAIModal({ mode: 'grammar', contextData: { text: summaryText, section: 'summary' } }))}
+                  className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center gap-1 transition-colors"
+                  title="Fix grammar, spelling and tighten phrasing"
+                >
+                  <CheckCheck className="w-3.5 h-3.5 text-indigo-500" />
+                  <span className="hidden sm:inline">Fix Grammar</span>
+                </button>
+              )}
+            </div>
           }
         />
         <SectionTipBox sectionId="summary" profileType={cvData.profileType} />
 
-        <textarea
-          rows={6}
-          value={cvData.personalInfo?.summary || ''}
-          onChange={(e) => dispatch(updatePersonalInfo({ summary: e.target.value }))}
-          placeholder="Results-driven Software Engineer with 6+ years of experience architecting scalable microservices..."
-          className="w-full p-3.5 text-xs leading-relaxed rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs"
-        />
+        <div className="space-y-1.5">
+          <textarea
+            rows={6}
+            value={summaryText}
+            onChange={(e) => dispatch(updatePersonalInfo({ summary: e.target.value }))}
+            placeholder="Results-driven Software Engineer with 6+ years of experience architecting scalable microservices..."
+            className="w-full p-3.5 text-xs leading-relaxed rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs"
+          />
+          <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
+            <span className={charCount > 500 ? 'text-amber-600 font-semibold' : ''}>
+              {charCount} characters
+            </span>
+            <span>Recommended: 200–450 characters (2–4 lines)</span>
+          </div>
+        </div>
       </div>
     );
   }
 
   // 3. Career Objective Editor
   if (activeSection === 'careerObjective') {
+    const objectiveText = cvData.careerObjective || '';
+    const charCount = objectiveText.length;
     return (
       <div className="space-y-4">
         {isSectionHidden && <HiddenSectionBanner sectionId="careerObjective" />}
@@ -589,25 +632,46 @@ export const SectionFormEditor = ({ onOpenPhotoModal }) => {
           sectionId="careerObjective"
           cvData={cvData}
           extraButton={
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={Sparkles}
-              onClick={() => dispatch(openAIModal({ mode: 'objective' }))}
-            >
-              Draft with AI
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={Sparkles}
+                onClick={() => dispatch(openAIModal({ mode: 'objective' }))}
+              >
+                Draft with AI
+              </Button>
+              {objectiveText.trim() && (
+                <button
+                  type="button"
+                  onClick={() => dispatch(openAIModal({ mode: 'grammar', contextData: { text: objectiveText, section: 'careerObjective' } }))}
+                  className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center gap-1 transition-colors"
+                  title="Fix grammar, spelling and tighten phrasing"
+                >
+                  <CheckCheck className="w-3.5 h-3.5 text-indigo-500" />
+                  <span className="hidden sm:inline">Fix Grammar</span>
+                </button>
+              )}
+            </div>
           }
         />
         <SectionTipBox sectionId="careerObjective" profileType={cvData.profileType} />
 
-        <textarea
-          rows={5}
-          value={cvData.careerObjective || ''}
-          onChange={(e) => dispatch(updateCareerObjective(e.target.value))}
-          placeholder="Dedicated Computer Science graduate seeking an entry-level Junior Developer role to apply strong algorithm design and full-stack web development skills..."
-          className="w-full p-3.5 text-xs leading-relaxed rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs"
-        />
+        <div className="space-y-1.5">
+          <textarea
+            rows={5}
+            value={objectiveText}
+            onChange={(e) => dispatch(updateCareerObjective(e.target.value))}
+            placeholder="Dedicated Computer Science graduate seeking an entry-level Junior Developer role to apply strong algorithm design and full-stack web development skills..."
+            className="w-full p-3.5 text-xs leading-relaxed rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs"
+          />
+          <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
+            <span className={charCount > 350 ? 'text-amber-600 font-semibold' : ''}>
+              {charCount} characters
+            </span>
+            <span>Recommended: 100–300 characters</span>
+          </div>
+        </div>
       </div>
     );
   }
@@ -717,6 +781,12 @@ export const SectionFormEditor = ({ onOpenPhotoModal }) => {
                       </div>
                     </div>
 
+                    {!exp.startDate && !exp.year && !exp.current && (
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1 font-medium">
+                        <AlertTriangle className="w-3 h-3" /> Missing employment start / end dates.
+                      </p>
+                    )}
+
                     <div className="flex items-center justify-between">
                       <label className="flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-400 cursor-pointer">
                         <input
@@ -727,14 +797,66 @@ export const SectionFormEditor = ({ onOpenPhotoModal }) => {
                         />
                         <span>Currently Working Here</span>
                       </label>
-                      <button
-                        type="button"
-                        onClick={() => dispatch(openAIModal({ mode: 'experience', contextData: exp }))}
-                        className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
-                      >
-                        <Sparkles className="w-3 h-3" /> Quantify with AI
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => dispatch(openAIModal({ mode: 'bullet', contextData: { experienceItem: exp, itemIndex: index } }))}
+                          className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                        >
+                          <Sparkles className="w-3 h-3" /> Action Bullets
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => dispatch(openAIModal({ mode: 'experience', contextData: { experienceItem: exp, itemIndex: index } }))}
+                          className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                        >
+                          <Wand2 className="w-3 h-3" /> Quantify [X]%
+                        </button>
+                      </div>
                     </div>
+
+                    {/* Real-time Bullet Length Detector */}
+                    {(() => {
+                      const expLines = Array.isArray(exp.highlights)
+                        ? exp.highlights
+                        : (exp.description || '').split('\n').filter(Boolean);
+                      const longBullets = expLines.filter((l) => l.trim().length > 200);
+                      const longestBullet = longBullets.reduce((max, b) => (b.length > max.length ? b : max), '');
+
+                      if (longBullets.length === 0) return null;
+
+                      return (
+                        <div className="flex items-center justify-between p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-[11px] text-amber-800 dark:text-amber-300">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span className="truncate">
+                              {longBullets.length === 1
+                                ? `Bullet exceeds 200 characters (${longestBullet.trim().length} chars).`
+                                : `${longBullets.length} bullets exceed 200 characters.`}{' '}
+                              Recruiters prefer punchy 1-2 line bullets.
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              dispatch(
+                                openAIModal({
+                                  mode: 'bullet',
+                                  contextData: {
+                                    experienceItem: exp,
+                                    itemIndex: index,
+                                    targetBullet: longestBullet,
+                                  },
+                                })
+                              )
+                            }
+                            className="underline font-bold text-indigo-600 dark:text-indigo-400 shrink-0 ml-2 hover:text-indigo-700"
+                          >
+                            Trim with AI
+                          </button>
+                        </div>
+                      );
+                    })()}
 
                     <textarea
                       rows={3}
@@ -962,6 +1084,13 @@ export const SectionFormEditor = ({ onOpenPhotoModal }) => {
                       />
                     </div>
 
+                    {(!edu.institution || (!edu.year && !edu.graduationYear && !edu.endDate)) && (
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1 font-medium">
+                        <AlertTriangle className="w-3 h-3" />
+                        {!edu.institution ? 'Missing institution name.' : 'Missing graduation year or completion date.'}
+                      </p>
+                    )}
+
                     <textarea
                       rows={2}
                       placeholder="Honors, Dean's List, relevant coursework, thesis topic..."
@@ -992,8 +1121,34 @@ export const SectionFormEditor = ({ onOpenPhotoModal }) => {
           onAdd={() => dispatch(addSkill())}
           addLabel="Add Skill"
           cvData={cvData}
+          extraButton={
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Sparkles}
+              onClick={() => dispatch(openAIModal({ mode: 'skills' }))}
+            >
+              Suggest with AI
+            </Button>
+          }
         />
         <SectionTipBox sectionId="skills" profileType={cvData.profileType} />
+
+        {list.length < 4 && (
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-800/60 text-xs text-indigo-900 dark:text-indigo-200">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span>Recruiters scan for 6–10 industry skills to pass ATS screening.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => dispatch(openAIModal({ mode: 'skills' }))}
+              className="underline font-bold text-indigo-600 dark:text-indigo-400 shrink-0 ml-2"
+            >
+              Suggest Skills
+            </button>
+          </div>
+        )}
 
         <div className="space-y-2.5">
           {list.map((skill, index) => (

@@ -1,6 +1,7 @@
 /**
- * Smart Client AI Generator for Bios, Career Objectives, and Resume Enhancements
- * Works with backend AI Assistant, and provides instant fallback algorithms for 100% uptime.
+ * Client-side Heuristic Helpers & Fallback Generators
+ * Note: All real AI transformations run strictly server-side via /api/ai endpoints.
+ * These client helpers provide instant local fallbacks and 0ms validation for UI badges.
  */
 
 export const PRESET_ROLES = [
@@ -67,18 +68,16 @@ export const PRESET_ROLES = [
 ];
 
 /**
- * Generate an impressive Bio/Objective based on input details
+ * Generate fallback bio / summary based on role
  */
 export const generateSmartBio = (jobTitle = '', education = [], experience = [], rolePreset = null) => {
-  const title = jobTitle.trim().toLowerCase();
+  const title = (jobTitle || '').trim().toLowerCase();
 
-  // Check preset first
   if (rolePreset && rolePreset.bios) {
     const randomIdx = Math.floor(Math.random() * rolePreset.bios.length);
     return rolePreset.bios[randomIdx];
   }
 
-  // Keyword matching
   if (title.includes('software') || title.includes('developer') || title.includes('engineer') || title.includes('frontend') || title.includes('backend') || title.includes('full stack')) {
     const list = PRESET_ROLES[0].bios;
     return list[Math.floor(Math.random() * list.length)];
@@ -109,18 +108,17 @@ export const generateSmartBio = (jobTitle = '', education = [], experience = [],
     return list[Math.floor(Math.random() * list.length)];
   }
 
-  // General high-quality professional default
   const latestDegree = education?.[0]?.degree || 'higher education';
   const displayTitle = jobTitle || 'Professional';
   return `Dedicated and analytical ${displayTitle} with a solid background in ${latestDegree}. Proven track record in streamlining operational workflows, managing client deliverables under pressure, and maintaining high standards of quality and teamwork.`;
 };
 
 /**
- * AI Enhance Work Experience Bullet Points
+ * Enhance single bullet point (rule-based client fallback with [X]% metric placeholder)
  */
 export const enhanceBulletPoint = (text, role = '') => {
   if (!text || text.trim().length < 5) {
-    return "Architected key operational processes, improving team efficiency by 25% and reducing turn-around time.";
+    return "Architected key operational processes, improving team efficiency by [X]% and reducing turn-around time by [Number] days.";
   }
 
   const clean = text.trim();
@@ -132,6 +130,81 @@ export const enhanceBulletPoint = (text, role = '') => {
   ];
 
   const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-  return `${prefix}${clean.charAt(0).toLowerCase() + clean.slice(1)} resulting in significant performance gains and enhanced team productivity.`;
+  return `${prefix}${clean.charAt(0).toLowerCase() + clean.slice(1)}, improving efficiency by [X]% and reducing turnaround time by [Number] days.`;
 };
 
+/**
+ * Instant client-side validation for bullet length and missing info
+ */
+export const checkBulletLength = (bulletText = '') => {
+  const len = (bulletText || '').trim().length;
+  if (len === 0) return { status: 'empty', length: 0 };
+  if (len > 200) {
+    return {
+      status: 'too_long',
+      length: len,
+      warning: `Bullet is ${len} chars. Recruiters prefer concise bullets (<200 chars).`,
+    };
+  }
+  if (len < 25) {
+    return {
+      status: 'too_short',
+      length: len,
+      warning: 'Bullet is very short. Consider elaborating with an action verb.',
+    };
+  }
+  return { status: 'optimal', length: len };
+};
+
+/**
+ * Fast client-side missing info scan
+ */
+export const detectCVIssuesClient = (cvData = {}) => {
+  const issues = [];
+  const p = cvData?.personalInfo || {};
+
+  if (!p.email) issues.push({ section: 'Personal Info', message: 'Email address is missing' });
+  if (!p.phone) issues.push({ section: 'Personal Info', message: 'Phone number is missing' });
+  if (!p.jobTitle) issues.push({ section: 'Personal Info', message: 'Job title / headline is missing' });
+
+  const edu = cvData?.education || [];
+  if (edu.length === 0) {
+    issues.push({ section: 'Education', message: 'No education entries added' });
+  } else {
+    edu.forEach((e, idx) => {
+      if (!e.degree || !e.institution) {
+        issues.push({ section: 'Education', message: `Education #${idx + 1} is missing degree or school name` });
+      }
+      if (!e.year && !e.graduationYear && !e.startDate && !e.endDate) {
+        issues.push({ section: 'Education', message: `Education #${idx + 1} is missing graduation year/dates` });
+      }
+    });
+  }
+
+  const exp = cvData?.experience || [];
+  exp.forEach((x, idx) => {
+    if (!x.jobTitle) issues.push({ section: 'Experience', message: `Job #${idx + 1} is missing title` });
+    if (!x.startDate && !x.year) issues.push({ section: 'Experience', message: `Job #${idx + 1} is missing dates` });
+
+    const bullets = Array.isArray(x.highlights) ? x.highlights : (x.description || '').split('\n').filter(Boolean);
+    bullets.forEach((b) => {
+      if (b.trim().length > 200) {
+        issues.push({
+          section: 'Experience',
+          type: 'length',
+          message: `Bullet in ${x.company || 'Job ' + (idx + 1)} is too long (${b.trim().length} chars > 200)`,
+        });
+      }
+    });
+  });
+
+  return issues;
+};
+
+export default {
+  PRESET_ROLES,
+  generateSmartBio,
+  enhanceBulletPoint,
+  checkBulletLength,
+  detectCVIssuesClient,
+};

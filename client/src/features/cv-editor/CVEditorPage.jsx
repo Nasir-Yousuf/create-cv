@@ -19,6 +19,7 @@ import {
   setPreviewScale,
   showToast,
   openAIModal,
+  closeAIModal,
   toggleDarkMode,
   setEditorMode,
   clearSelectedElement,
@@ -108,9 +109,13 @@ export const CVEditorPage = () => {
     saveStatus,
     lastSavedAt,
   } = useSelector((state) => state.cv);
-  const { previewScale, isDarkMode, editorMode = 'form', selectedElementPath } = useSelector(
-    (state) => state.ui
-  );
+  const {
+    previewScale,
+    isDarkMode,
+    editorMode = 'form',
+    selectedElementPath,
+    aiModal,
+  } = useSelector((state) => state.ui);
   const { isAuthenticated, user } = useSelector((state) => state.auth);
 
   // macOS App State
@@ -2458,8 +2463,11 @@ export const CVEditorPage = () => {
 
       {/* AI Assistant Generator Modal */}
       <AIAssistantModal
-        isOpen={aiModalOpen}
-        onClose={() => setAiModalOpen(false)}
+        isOpen={Boolean(aiModalOpen || aiModal?.isOpen)}
+        onClose={() => {
+          setAiModalOpen(false);
+          dispatch(closeAIModal());
+        }}
       />
 
       {/* Profile Photo Upload & Crop Modal */}

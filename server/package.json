@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node --test test/export.test.js test/document_model.test.js"
+    "test": "node --test test/export.test.js test/document_model.test.js test/ai.test.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

@@ -1,48 +1,77 @@
 import api from './api';
 
 export const aiService = {
-  // Generate full CV structure conversationally
-  async generateCV(prompt, targetRole) {
-    const res = await api.post('/ai/generate-cv', { prompt, targetRole });
+  /**
+   * 1. Improve Professional Summary
+   */
+  async improveSummary({ text = '', role = '', tone = 'professional', cvData = null }) {
+    const res = await api.post('/ai/improve-summary', { text, role, tone, cvData });
     return res.data;
   },
 
-  // Generate / rewrite professional summary
-  async generateSummary(cvData, tone = 'professional') {
-    const res = await api.post('/ai/generate-summary', { cvData, tone });
+  /**
+   * 2. Rewrite Career Objective
+   */
+  async rewriteObjective({ text = '', role = '', field = '', education = '' }) {
+    const res = await api.post('/ai/rewrite-objective', { text, role, field, education });
     return res.data;
   },
 
-  // Improve work experience bullet points
-  async improveExperience(experienceItem, role) {
-    const res = await api.post('/ai/improve-experience', { experienceItem, role });
+  /**
+   * 3. Convert Responsibilities into Action Bullet Points
+   */
+  async improveExperience({ experienceItem = {}, role = '', targetBullet = '' }) {
+    const res = await api.post('/ai/improve-experience', { experienceItem, role, targetBullet });
     return res.data;
   },
 
-  // Suggest relevant industry skills
-  async suggestSkills(jobTitle, existingSkills) {
-    const res = await api.post('/ai/suggest-skills', { jobTitle, existingSkills });
+  /**
+   * 4. Fix Grammar & Make Concise
+   */
+  async fixGrammar({ text = '' }) {
+    const res = await api.post('/ai/fix-grammar', { text });
     return res.data;
   },
 
-  // Match CV against target job description
-  async matchJobDescription(cvData, jobDescription) {
+  /**
+   * 5. Suggest Relevant Skills for Role
+   */
+  async suggestSkills({ jobTitle = '', existingSkills = [], industry = '' }) {
+    const res = await api.post('/ai/suggest-skills', { jobTitle, existingSkills, industry });
+    return res.data;
+  },
+
+  /**
+   * 6. Tailor CV to Job Description
+   */
+  async matchJobDescription({ cvData = {}, jobDescription = '' }) {
     const res = await api.post('/ai/match-job', { cvData, jobDescription });
     return res.data;
   },
 
-  // Review CV completeness, ATS score, and improvements
+  /**
+   * 7. Missing Info & Length Detector
+   */
+  async detectIssues({ cvData = {} }) {
+    const res = await api.post('/ai/detect-issues', { cvData });
+    return res.data;
+  },
+
+  // Backward-compatible methods
+  async generateSummary(cvData, tone = 'professional', prompt = '', role = '') {
+    const res = await api.post('/ai/generate-summary', { cvData, tone, prompt, role });
+    return res.data;
+  },
+
   async reviewCV(cvData) {
     const res = await api.post('/ai/review-cv', { cvData });
     return res.data;
   },
 
-  // Natural language design assistant
-  async assistantDesign(instruction, currentDesign) {
-    const res = await api.post('/ai/design-assistant', { instruction, currentDesign });
+  async generateCV(prompt, targetRole) {
+    const res = await api.post('/ai/improve-summary', { text: prompt, role: targetRole });
     return res.data;
   },
 };
 
 export default aiService;
-
