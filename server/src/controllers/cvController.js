@@ -6,6 +6,7 @@ import {
   resolveTemplateMeta,
 } from '../../../shared/constants/cvDefaults.js';
 import { normalizeCvData } from '../../../shared/utils/cvNormalize.js';
+import { validateAndSanitizePhoto } from '../utils/sanitizeHtml.js';
 
 export const ALLOWED_CV_FIELDS = [
   'title',
@@ -78,6 +79,16 @@ export const pickAllowedCVData = (payload = {}) => {
     clean.isOnePage = Boolean(meta.isOnePage);
   }
 
+  // Validate and sanitize image payloads to strictly allowed formats (JPEG, PNG, WebP)
+  if (clean.personalInfo && typeof clean.personalInfo === 'object') {
+    if (clean.personalInfo.photo) {
+      clean.personalInfo.photo = validateAndSanitizePhoto(clean.personalInfo.photo);
+    }
+    if (clean.personalInfo.photoUrl) {
+      clean.personalInfo.photoUrl = validateAndSanitizePhoto(clean.personalInfo.photoUrl);
+    }
+  }
+
   return clean;
 };
 
@@ -105,7 +116,7 @@ const logActivity = async ({
   }
 };
 
-const createSnapshotRecord = async (cvDoc, label = 'Auto Checkpoint') => {
+export const createSnapshotRecord = async (cvDoc, label = 'Auto Checkpoint') => {
   try {
     const plain = cvDoc.toObject();
     delete plain._id;
@@ -113,6 +124,7 @@ const createSnapshotRecord = async (cvDoc, label = 'Auto Checkpoint') => {
     delete plain.createdAt;
     delete plain.updatedAt;
     delete plain.__v;
+    delete plain.versionSnapshots;
 
     await CVVersion.create({
       cvId: cvDoc._id,
@@ -124,7 +136,7 @@ const createSnapshotRecord = async (cvDoc, label = 'Auto Checkpoint') => {
       snapshot: plain,
     });
 
-    // Retain at most 20 most recent versions per CV
+    // Retain at most 20 most recent versions in collection
     const oldVersions = await CVVersion.find({ cvId: cvDoc._id })
       .sort({ version: -1 })
       .skip(20)
@@ -132,6 +144,22 @@ const createSnapshotRecord = async (cvDoc, label = 'Auto Checkpoint') => {
     if (oldVersions.length > 0) {
       await CVVersion.deleteMany({ _id: { $in: oldVersions.map((v) => v._id) } });
     }
+
+    // Embed in CV document (keep last 5 lightweight snapshots)
+    if (!Array.isArray(cvDoc.versionSnapshots)) {
+      cvDoc.versionSnapshots = [];
+    }
+    cvDoc.versionSnapshots.push({
+      versionNumber: cvDoc.version || 1,
+      label: label || `Snapshot v${cvDoc.version || 1}`,
+      createdAt: new Date(),
+      templateId: cvDoc.templateId,
+      snapshot: plain,
+    });
+    if (cvDoc.versionSnapshots.length > 5) {
+      cvDoc.versionSnapshots = cvDoc.versionSnapshots.slice(-5);
+    }
+    await cvDoc.save();
   } catch (err) {
     console.warn('Version checkpoint skipped:', err.message);
   }
@@ -162,7 +190,7 @@ export const getCVs = async (req, res, next) => {
     const cvs = await CV.find(query)
       .sort({ updatedAt: -1 })
       .select(
-        'title templateId category isOnePage isExportUnlocked unlockType unlockedAt pdfExportCount docxExportCount lastExportedAt isDeleted deletedAt updatedAt createdAt version personalInfo.fullName personalInfo.jobTitle personalInfo.email design.primaryColor'
+        'title templateId category isOnePage isExportUnlocked unlockType unlockedAt pdfExportCount docxExportCount lastExportedAt isDeleted deletedAt updatedAt createdAt version personalInfo.fullName personalInfo.jobTitle personalInfo.email design.primaryColor versionSnapshots'
       );
 
     res.status(200).json({
@@ -483,24 +511,46 @@ export const restoreCV = async (req, res, next) => {
   }
 };
 
-// @desc    Get saved version checkpoints for a CV
+// @desc    Get saved version checkpoints for a CV (Embedded snapshots + CVVersion collection)
 // @route   GET /api/cvs/:id/versions
 // @access  Private
 export const getCVVersions = async (req, res, next) => {
   try {
-    const cv = await CV.findOne({ _id: req.params.id, userId: req.user.id }).select('_id title');
-    if (!cv) {
+    const cv = await CV.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!cv || cv.userId.toString() !== req.user.id.toString()) {
       return res.status(404).json({ success: false, message: 'CV document not found' });
     }
 
-    const versions = await CVVersion.find({ cvId: cv._id, userId: req.user.id })
+    const dbVersions = await CVVersion.find({ cvId: cv._id, userId: req.user.id })
       .sort({ version: -1 })
       .select('version label title templateId createdAt');
 
+    // Merge embedded document versionSnapshots
+    const embedded = (cv.versionSnapshots || []).map((s) => ({
+      _id: s._id,
+      version: s.versionNumber,
+      label: s.label,
+      title: cv.title,
+      templateId: s.templateId || cv.templateId,
+      createdAt: s.createdAt,
+      isEmbedded: true,
+    }));
+
+    const seen = new Set();
+    const combined = [];
+    for (const v of [...embedded, ...dbVersions]) {
+      const key = `${v.version}-${v.label}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        combined.push(v);
+      }
+    }
+    combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
     res.status(200).json({
       success: true,
-      count: versions.length,
-      data: versions,
+      count: combined.length,
+      data: combined.slice(0, 10),
     });
   } catch (err) {
     next(err);
@@ -513,7 +563,7 @@ export const getCVVersions = async (req, res, next) => {
 export const createManualCheckpoint = async (req, res, next) => {
   try {
     const cv = await CV.findOne({ _id: req.params.id, userId: req.user.id });
-    if (!cv) {
+    if (!cv || cv.userId.toString() !== req.user.id.toString()) {
       return res.status(404).json({ success: false, message: 'CV document not found' });
     }
 
@@ -535,37 +585,93 @@ export const createManualCheckpoint = async (req, res, next) => {
 export const restoreCVVersion = async (req, res, next) => {
   try {
     const cv = await CV.findOne({ _id: req.params.id, userId: req.user.id });
-    if (!cv) {
+    if (!cv || cv.userId.toString() !== req.user.id.toString()) {
       return res.status(404).json({ success: false, message: 'CV document not found' });
     }
 
+    let targetSnapshot = null;
+    let targetVersionNum = 1;
+
+    // First check CVVersion collection
     const targetVersion = await CVVersion.findOne({
       _id: req.params.versionId,
       cvId: cv._id,
       userId: req.user.id,
     });
-    if (!targetVersion) {
+
+    if (targetVersion) {
+      targetSnapshot = targetVersion.snapshot;
+      targetVersionNum = targetVersion.version;
+    } else if (Array.isArray(cv.versionSnapshots)) {
+      // Check embedded snapshots by _id or versionNumber
+      const found = cv.versionSnapshots.find(
+        (s) => String(s._id) === String(req.params.versionId) || String(s.versionNumber) === String(req.params.versionId)
+      );
+      if (found) {
+        targetSnapshot = found.snapshot;
+        targetVersionNum = found.versionNumber;
+      }
+    }
+
+    if (!targetSnapshot) {
       return res.status(404).json({ success: false, message: 'Version snapshot not found' });
     }
 
-    const allowedSnapshot = pickAllowedCVData(targetVersion.snapshot || {});
+    const allowedSnapshot = pickAllowedCVData(targetSnapshot || {});
     Object.assign(cv, allowedSnapshot);
     cv.version = (cv.version || 1) + 1;
     await cv.save();
 
-    await createSnapshotRecord(cv, `Restored from v${targetVersion.version}`);
+    await createSnapshotRecord(cv, `Restored from v${targetVersionNum}`);
     await logActivity({
       userId: req.user.id,
       cvId: cv._id,
       cvTitle: cv.title,
       action: 'restored',
-      details: `Restored content to snapshot v${targetVersion.version}`,
+      details: `Restored content to snapshot v${targetVersionNum}`,
     });
 
     res.status(200).json({
       success: true,
       data: cv,
-      message: `Restored document to v${targetVersion.version}.`,
+      message: `Restored document to v${targetVersionNum}.`,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Upload profile photo with strict MIME and size enforcement
+// @route   POST /api/cvs/upload-photo
+// @access  Private
+export const uploadPhoto = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No image file uploaded.' });
+    }
+
+    const mime = req.file.mimetype;
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(mime)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid image format. Allowed formats: image/jpeg, image/png, image/webp.',
+      });
+    }
+
+    if (req.file.size > 5 * 1024 * 1024) {
+      return res.status(400).json({
+        success: false,
+        message: 'Image size exceeds maximum limit of 5MB.',
+      });
+    }
+
+    const base64 = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+    return res.status(200).json({
+      success: true,
+      photoUrl: base64,
+      size: req.file.size,
+      mimetype: mime,
     });
   } catch (err) {
     next(err);

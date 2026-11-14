@@ -338,6 +338,15 @@ const cvSchema = new mongoose.Schema(
       type: Number,
       default: 1,
     },
+    versionSnapshots: [
+      {
+        versionNumber: { type: Number, required: true },
+        label: { type: String, default: 'Snapshot' },
+        createdAt: { type: Date, default: Date.now },
+        templateId: { type: String, default: '' },
+        snapshot: { type: mongoose.Schema.Types.Mixed, required: true },
+      },
+    ],
   },
   {
     timestamps: true,

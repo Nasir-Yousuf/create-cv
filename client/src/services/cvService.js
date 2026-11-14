@@ -60,6 +60,15 @@ export const cvService = {
     const res = await api.get('/cvs/activity', { params: { limit } });
     return res.data;
   },
+
+  async uploadPhoto(file) {
+    const formData = new FormData();
+    formData.append('photo', file);
+    const res = await api.post('/cvs/upload-photo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
 };
 
 export default cvService;

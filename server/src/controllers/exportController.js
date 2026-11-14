@@ -4,9 +4,10 @@ import { generateDOCX } from '../services/docx/docxService.js';
 import CV from '../models/CV.js';
 import User from '../models/User.js';
 import CVActivity from '../models/CVActivity.js';
-import { pickAllowedCVData } from './cvController.js';
+import { pickAllowedCVData, createSnapshotRecord } from './cvController.js';
 import { computeUserEntitlements, getPaymentConfigValues } from './paymentController.js';
 import { hasExportableCvContent, normalizeCvData } from '../../../shared/utils/cvNormalize.js';
+import { sanitizeHtml, sanitizeCss } from '../utils/sanitizeHtml.js';
 
 export const validateCvPayload = (cvData) => {
   if (!cvData || typeof cvData !== 'object' || Array.isArray(cvData)) {
@@ -128,6 +129,9 @@ const commitExportConsumptionAndLog = async ({
   targetCv.lastExportedAt = new Date();
   await targetCv.save();
 
+  // Save a lightweight version snapshot on major export events
+  await createSnapshotRecord(targetCv, `Exported ${format.toUpperCase()}`);
+
   await CVActivity.create({
     userId: user._id,
     cvId: targetCv._id,
@@ -184,10 +188,19 @@ export const exportPDF = async (req, res) => {
       });
     }
 
+    // Strict document ownership check
+    if (gate.cv && gate.cv.userId.toString() !== req.user.id.toString()) {
+      return res.status(403).json({
+        success: false,
+        code: 'FORBIDDEN',
+        message: 'Access denied: You do not own this CV document.',
+      });
+    }
+
     const safeHtml =
-      typeof html === 'string' && html.length > 50 && html.length < 3000000 ? html : null;
+      typeof html === 'string' && html.length > 50 && html.length < 3000000 ? sanitizeHtml(html) : null;
     const safeCss =
-      typeof css === 'string' && css.length > 50 && css.length < 1500000 ? css : '';
+      typeof css === 'string' && css.length > 50 && css.length < 1500000 ? sanitizeCss(css) : '';
 
     const pdfBuffer = await generatePDF(cvData, safeHtml, safeCss);
 
@@ -282,6 +295,15 @@ export const exportPDFFallbackRecord = async (req, res) => {
       });
     }
 
+    // Strict document ownership check
+    if (gate.cv && gate.cv.userId.toString() !== req.user.id.toString()) {
+      return res.status(403).json({
+        success: false,
+        code: 'FORBIDDEN',
+        message: 'Access denied: You do not own this CV document.',
+      });
+    }
+
     const meta = await commitExportConsumptionAndLog({
       user: gate.user,
       cv: gate.cv,
@@ -347,6 +369,15 @@ export const exportDOCX = async (req, res) => {
         code: gate.code,
         message: gate.message,
         entitlements: gate.entitlements,
+      });
+    }
+
+    // Strict document ownership check
+    if (gate.cv && gate.cv.userId.toString() !== req.user.id.toString()) {
+      return res.status(403).json({
+        success: false,
+        code: 'FORBIDDEN',
+        message: 'Access denied: You do not own this CV document.',
       });
     }
 

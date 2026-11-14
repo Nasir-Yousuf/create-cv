@@ -12,6 +12,7 @@ import {
   formatFontStack,
   containsBanglaText,
 } from '../../../../shared/utils/cvNormalize.js';
+import { sanitizeHtml, sanitizeCss } from '../../utils/sanitizeHtml.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -359,16 +360,17 @@ const buildPrintableDocument = ({ cvData, renderedHtml = '', customCss = '' }) =
   const fontsUrl = getGoogleFontsUrl(cvData);
   const safeName = (personalInfo?.fullName || cvData?.title || 'CV').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  const bodyContent =
+  const rawBodyContent =
     typeof renderedHtml === 'string' && renderedHtml.trim().length > 50
       ? renderedHtml
       : generateTemplateHtml(cvData);
+  const bodyContent = sanitizeHtml(rawBodyContent);
 
   const clientProvidedCss =
     typeof customCss === 'string' && customCss.includes('resume-sheet-a4')
-      ? sanitizeCssForStyleTag(customCss)
+      ? sanitizeCss(sanitizeCssForStyleTag(customCss))
       : '';
-  const compiledCss = clientProvidedCss || sanitizeCssForStyleTag(getCompiledClientStyles());
+  const compiledCss = clientProvidedCss || sanitizeCss(sanitizeCssForStyleTag(getCompiledClientStyles()));
   const shouldIncludeTailwindCdn = !compiledCss;
 
   return `
