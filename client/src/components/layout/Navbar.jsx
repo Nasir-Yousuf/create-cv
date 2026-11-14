@@ -162,13 +162,13 @@ export const Navbar = ({ onOpenAuth }) => {
       </nav>
 
       {/* Right Action Buttons */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3">
         <button
           onClick={() => dispatch(toggleDarkMode())}
           aria-label="Toggle theme"
-          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
         >
-          {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
+          {isDarkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
         </button>
 
         {isAuthenticated ? (
@@ -176,19 +176,19 @@ export const Navbar = ({ onOpenAuth }) => {
             {user?.role === 'admin' ? (
               <Link
                 to="/admin"
-                className="px-2.5 py-1 rounded-lg bg-[#E2136E]/10 text-[#E2136E] border border-[#E2136E]/30 text-xs font-bold hover:bg-[#E2136E]/20 transition-all flex items-center gap-1"
+                className="min-h-[44px] px-3 rounded-xl bg-[#E2136E]/10 text-[#E2136E] border border-[#E2136E]/30 text-xs font-bold hover:bg-[#E2136E]/20 transition-all flex items-center gap-1"
                 title="Open Admin Center"
               >
-                <LayoutDashboard className="w-3 h-3" />
+                <LayoutDashboard className="w-4 h-4" />
                 <span>Admin</span>
               </Link>
             ) : (
               <Link
                 to="/dashboard"
-                className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/70 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors"
+                className="hidden sm:inline-flex items-center gap-1 min-h-[44px] px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/70 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors"
                 title="Available new CV export credits"
               >
-                <Coins className="w-3 h-3" />
+                <Coins className="w-3.5 h-3.5" />
                 <span>
                   {freeLeft > 0 && paidLeft === 0
                     ? '1 Free CV'
@@ -199,7 +199,7 @@ export const Navbar = ({ onOpenAuth }) => {
               </Link>
             )}
 
-            <Link to="/dashboard" title={`${user?.name || 'User'} (${user?.email || ''})`}>
+            <Link to="/dashboard" title={`${user?.name || 'User'} (${user?.email || ''})`} className="min-w-[44px] min-h-[44px] flex items-center justify-center">
               {user?.avatar ? (
                 <div className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer shadow-sm hover:ring-2 hover:ring-blue-500/50 transition-all">
                   <img src={user.avatar} alt={user.name || 'User'} className="w-full h-full object-cover" />
@@ -213,30 +213,30 @@ export const Navbar = ({ onOpenAuth }) => {
 
             <button
               onClick={handleLogout}
-              className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               title="Log out"
             >
               <LogOut className="w-4 h-4" />
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <button
               type="button"
               onClick={() => triggerAuth('login')}
-              className="px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+              className="min-h-[44px] px-3 flex items-center justify-center text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
             >
               Sign In
             </button>
             <button
               type="button"
               onClick={() => triggerAuth('register')}
-              className="hidden sm:inline-flex px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold transition-all cursor-pointer"
+              className="hidden sm:inline-flex min-h-[44px] px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold items-center transition-all cursor-pointer"
             >
               Register
             </button>
             <Link to="/builder" className="hidden sm:inline-flex">
-              <button className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow hover:shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5">
+              <button className="min-h-[44px] px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow hover:shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5">
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>Open Editor</span>
               </button>
@@ -244,11 +244,12 @@ export const Navbar = ({ onOpenAuth }) => {
           </div>
         )}
 
-        {/* Mobile Menu Button */}
+        {/* Mobile Menu Button (44x44 minimum touch target) */}
         <div className="flex md:hidden items-center">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            aria-label="Open mobile navigation menu"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -269,13 +270,14 @@ export const Navbar = ({ onOpenAuth }) => {
                   tab.action();
                 }
               }}
-              className="block py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-blue-600"
+              className="min-h-[44px] flex items-center px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
             >
-              {tab.name}
+              <tab.icon className="w-4 h-4 mr-2.5 text-indigo-500" />
+              <span>{tab.name}</span>
             </Link>
           ))}
 
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
             {isAuthenticated ? (
               <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 py-1">
                 <span>
@@ -284,7 +286,7 @@ export const Navbar = ({ onOpenAuth }) => {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="text-rose-600 font-semibold"
+                  className="min-h-[44px] px-3 flex items-center text-rose-600 font-semibold"
                 >
                   Log Out
                 </button>
@@ -297,7 +299,7 @@ export const Navbar = ({ onOpenAuth }) => {
                     setMobileMenuOpen(false);
                     triggerAuth('login');
                   }}
-                  className="py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200"
+                  className="min-h-[44px] flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200"
                 >
                   Sign In
                 </button>
@@ -307,7 +309,7 @@ export const Navbar = ({ onOpenAuth }) => {
                     setMobileMenuOpen(false);
                     triggerAuth('register');
                   }}
-                  className="py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold"
+                  className="min-h-[44px] flex items-center justify-center rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold"
                 >
                   Register Free
                 </button>
@@ -315,7 +317,7 @@ export const Navbar = ({ onOpenAuth }) => {
             )}
 
             <Link to="/builder" onClick={() => setMobileMenuOpen(false)} className="block">
-              <button className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold shadow">
+              <button className="w-full min-h-[44px] flex items-center justify-center rounded-xl bg-blue-600 text-white text-sm font-bold shadow">
                 Launch CV Editor
               </button>
             </Link>

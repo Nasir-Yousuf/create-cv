@@ -59,7 +59,7 @@ export const SortableItem = ({
             type="button"
             {...attributes}
             {...listeners}
-            className="p-1 cursor-grab active:cursor-grabbing hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg touch-none transition-colors"
+            className="p-2 sm:p-1 min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg touch-none transition-colors"
             title="Drag to reorder section"
             aria-label="Drag to reorder section"
           >
@@ -75,11 +75,11 @@ export const SortableItem = ({
                 e.stopPropagation();
                 if (onMoveUp) onMoveUp();
               }}
-              className="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-20 disabled:pointer-events-none transition-colors"
+              className="p-2 sm:p-1 min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 flex items-center justify-center rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-20 disabled:pointer-events-none transition-colors"
               title="Move Up"
               aria-label="Move Up"
             >
-              <ChevronUp className="w-3.5 h-3.5" />
+              <ChevronUp className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             </button>
             <button
               type="button"
@@ -88,11 +88,11 @@ export const SortableItem = ({
                 e.stopPropagation();
                 if (onMoveDown) onMoveDown();
               }}
-              className="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-20 disabled:pointer-events-none transition-colors"
+              className="p-2 sm:p-1 min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 flex items-center justify-center rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-20 disabled:pointer-events-none transition-colors"
               title="Move Down"
               aria-label="Move Down"
             >
-              <ChevronDown className="w-3.5 h-3.5" />
+              <ChevronDown className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             </button>
           </div>
         </div>

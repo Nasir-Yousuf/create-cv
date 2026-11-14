@@ -21,6 +21,7 @@ import {
   openAIModal,
   toggleDarkMode,
   setEditorMode,
+  clearSelectedElement,
 } from '../../store/uiSlice';
 import cvService from '../../services/cvService';
 import exportService from '../../services/exportService';
@@ -29,6 +30,8 @@ import { RenderCVTemplate } from '../../templates';
 import SortableSectionList from './components/SortableSectionList';
 import SectionFormEditor from './components/SectionFormEditor';
 import EditorInspector from './components/EditorInspector';
+import { AdvancedLayoutControls } from './components/AdvancedLayoutControls';
+import { MobileElementBottomSheet } from './components/MobileElementBottomSheet';
 import PhotoUploadCropModal from './components/PhotoUploadCropModal';
 import AIAssistantModal from '../../components/common/AIAssistantModal';
 import WhatsAppSupportButton from '../../components/common/WhatsAppSupportButton';
@@ -91,7 +94,8 @@ export const CVEditorPage = () => {
   const store = useStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const canvasScrollContainerRef = useRef(null);
+  const desktopCanvasScrollContainerRef = useRef(null);
+  const mobileCanvasScrollContainerRef = useRef(null);
 
   const {
     currentCV,
@@ -108,27 +112,6 @@ export const CVEditorPage = () => {
     (state) => state.ui
   );
   const { isAuthenticated, user } = useSelector((state) => state.auth);
-
-  // Auto-switch to Inspector tab and open drawer when user selects an element on the canvas
-  useEffect(() => {
-    if (selectedElementPath) {
-      setActiveSidebarTab('inspector');
-      setIsSidebarOpen(true);
-    }
-  }, [selectedElementPath]);
-
-  // Warn on tab/window close if there are unsaved changes
-  useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      if (saveStatus === 'unsaved' || isDirty) {
-        e.preventDefault();
-        e.returnValue = '';
-        return '';
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [saveStatus, isDirty]);
 
   // macOS App State
   const [templatesList, setTemplatesList] = useState(TEMPLATES_REGISTRY);
@@ -162,6 +145,43 @@ export const CVEditorPage = () => {
   const [versionConflict, setVersionConflict] = useState(null);
   const [onePageFit, setOnePageFit] = useState(() => analyzeOnePageFit(currentCV));
 
+  // Dedicated Mobile App States (4 clear tabs: forms, canvas, style, export)
+  const [mobileNavTab, setMobileNavTab] = useState('forms');
+  const [mobileZoomMultiplier, setMobileZoomMultiplier] = useState(1.0);
+  const [isMobileBottomSheetOpen, setIsMobileBottomSheetOpen] = useState(false);
+  const [mobileStyleSubTab, setMobileStyleSubTab] = useState('templates');
+
+  // Auto-switch to Inspector on desktop OR open bottom sheet & auto-scroll on mobile
+  useEffect(() => {
+    if (selectedElementPath) {
+      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+        setActiveSidebarTab('inspector');
+        setIsSidebarOpen(true);
+      } else {
+        setIsMobileBottomSheetOpen(true);
+        setTimeout(() => {
+          const el = document.querySelector(`[data-cv-path="${selectedElementPath}"]`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 120);
+      }
+    }
+  }, [selectedElementPath]);
+
+  // Warn on tab/window close if there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (saveStatus === 'unsaved' || isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [saveStatus, isDirty]);
+
   // Zoom preset values
   const zoomPresets = [
     { label: '50%', value: 0.5 },
@@ -174,18 +194,19 @@ export const CVEditorPage = () => {
   ];
 
   // Auto-fit canvas calculation
-  const handleFitZoom = () => {
+  const handleFitZoom = (zoomMult = mobileZoomMultiplier) => {
     const isMobileScreen = typeof window !== 'undefined' && window.innerWidth < 768;
     if (isMobileScreen) {
-      const availableWidth = Math.max(280, window.innerWidth - 12);
-      const targetPaperWidth = devicePreview === 'mobile' ? 400 : 794;
-      const optimalScale = Math.min(1.0, Math.max(0.30, Math.floor((availableWidth / targetPaperWidth) * 100) / 100));
+      const availableWidth = Math.max(280, window.innerWidth - 24);
+      const targetPaperWidth = 794;
+      const baseFitScale = availableWidth / targetPaperWidth;
+      const optimalScale = Math.min(2.0, Math.max(0.30, Math.round(baseFitScale * zoomMult * 100) / 100));
       dispatch(setPreviewScale(optimalScale));
       return;
     }
 
     const containerWidth =
-      canvasScrollContainerRef.current?.clientWidth ||
+      desktopCanvasScrollContainerRef.current?.clientWidth ||
       (window.innerWidth - (isSidebarOpen ? 370 : 70) - (isRightDockOpen ? 90 : 28));
     const availableWidth = Math.max(300, containerWidth - 48);
     const targetPaperWidth = devicePreview === 'mobile' ? 400 : devicePreview === 'tablet' ? 680 : 800;
@@ -208,6 +229,59 @@ export const CVEditorPage = () => {
       window.removeEventListener('resize', handleResize);
     };
   }, [isSidebarOpen, isRightDockOpen, devicePreview]);
+
+  // Mobile canvas touch pinch-to-zoom listener
+  useEffect(() => {
+    const container = mobileCanvasScrollContainerRef.current;
+    if (!container) return;
+
+    let initialDistance = 0;
+    let initialMultiplier = mobileZoomMultiplier;
+
+    const handleTouchStart = (e) => {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        initialDistance = Math.hypot(dx, dy);
+        initialMultiplier = mobileZoomMultiplier;
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (e.touches.length === 2 && initialDistance > 0) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const currentDistance = Math.hypot(dx, dy);
+        const ratio = currentDistance / initialDistance;
+        const nextMultiplier = Math.min(1.8, Math.max(0.85, Math.round(initialMultiplier * ratio * 10) / 10));
+        setMobileZoomMultiplier(nextMultiplier);
+      }
+    };
+
+    const handleTouchEnd = (e) => {
+      if (e.touches.length < 2) {
+        initialDistance = 0;
+      }
+    };
+
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [mobileZoomMultiplier, mobileNavTab]);
+
+  // Recalculate zoom when switching to mobile canvas tab or changing multiplier
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768 && mobileNavTab === 'canvas') {
+      handleFitZoom(mobileZoomMultiplier);
+    }
+  }, [mobileZoomMultiplier, mobileNavTab]);
 
   // Keyboard shortcuts (Ctrl/Cmd+Z, Ctrl/Cmd+Y, Ctrl/Cmd+Shift+Z, Ctrl/Cmd+S)
   useEffect(() => {
@@ -610,7 +684,7 @@ export const CVEditorPage = () => {
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="sm:hidden p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="sm:hidden p-2 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer"
             title="Back to Home"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -740,7 +814,7 @@ export const CVEditorPage = () => {
             <button
               type="button"
               onClick={() => dispatch(toggleDarkMode())}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer"
               title="Toggle theme"
             >
               {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
@@ -749,7 +823,7 @@ export const CVEditorPage = () => {
             {isAuthenticated ? (
               <div
                 onClick={() => navigate('/dashboard')}
-                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer shadow-sm hover:ring-2 hover:ring-blue-500/50 transition-all shrink-0 flex items-center justify-center bg-gradient-to-tr from-indigo-600 to-blue-500 text-white text-xs font-bold"
+                className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer shadow-sm hover:ring-2 hover:ring-blue-500/50 transition-all shrink-0 flex items-center justify-center bg-gradient-to-tr from-indigo-600 to-blue-500 text-white text-xs font-bold"
                 title={user?.name || user?.email || 'User Profile'}
               >
                 {user?.avatar ? (
@@ -772,7 +846,7 @@ export const CVEditorPage = () => {
               <button
                 type="button"
                 onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
-                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold transition-colors cursor-pointer"
+                className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold transition-colors min-h-[44px] flex items-center cursor-pointer"
               >
                 Sign In
               </button>
@@ -781,9 +855,9 @@ export const CVEditorPage = () => {
         </header>
 
         {/* -----------------------------------------------------------------------
-            2. MAIN TWO-TIER WORKSPACE (Left Sidebars + Canvas + Floating Dock)
+            2. DESKTOP MAIN WORKSPACE (Desktop Only: hidden md:flex)
         ------------------------------------------------------------------------ */}
-        <div className="flex-1 flex overflow-hidden relative">
+        <div className="hidden md:flex flex-1 overflow-hidden relative">
           {/* ===================================================================
               A. TIER 1: FAR-LEFT SLIM ICON STRIP (~68px) (Desktop Only)
           ==================================================================== */}
@@ -1638,7 +1712,7 @@ export const CVEditorPage = () => {
                 DOCUMENT CANVAS (Centered, Scaled, Fully Click-to-Edit WYSIWYG)
             ------------------------------------------------------------------ */}
             <div
-              ref={canvasScrollContainerRef}
+              ref={desktopCanvasScrollContainerRef}
               className="flex-1 overflow-auto p-1.5 sm:p-6 md:p-8 relative select-text"
             >
               <div className="w-fit min-w-full flex justify-center py-2 sm:py-4 px-0.5 sm:px-2">
@@ -1842,187 +1916,545 @@ export const CVEditorPage = () => {
         </div>
 
         {/* ===================================================================
-            MOBILE BOTTOM NAVIGATION BAR (Native Mobile Experience for Smartphones)
+            3. DEDICATED MOBILE WORKSPACE (flex flex-col md:hidden)
         ==================================================================== */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 z-30 flex items-center justify-around px-2 select-none shadow-lg">
-          {/* 1. Templates Tab */}
+        <div className="flex-1 flex flex-col md:hidden overflow-hidden relative bg-slate-100 dark:bg-slate-950">
+          {/* TAB 1: CONTENT (FORMS) */}
+          {mobileNavTab === 'forms' && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-3 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                  <Sliders className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <input
+                    type="text"
+                    value={currentCV?.title || 'Untitled CV'}
+                    onChange={(e) => dispatch(updateTitle(e.target.value))}
+                    className="font-bold text-sm bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none text-slate-800 dark:text-white truncate w-full"
+                    placeholder="Document Title"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => dispatch(undo())}
+                    disabled={past.length === 0}
+                    className="p-2 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white disabled:opacity-30 cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
+                    title="Undo"
+                  >
+                    <Undo2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dispatch(redo())}
+                    disabled={future.length === 0}
+                    className="p-2 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white disabled:opacity-30 cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
+                    title="Redo"
+                  >
+                    <Redo2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-3 space-y-4 pb-24">
+                <SortableSectionList />
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <SectionFormEditor onOpenPhotoModal={() => setPhotoModalOpen(true)} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: VISUAL CANVAS */}
+          {mobileNavTab === 'canvas' && (
+            <div className="flex-1 flex flex-col overflow-hidden relative">
+              {/* Mobile Canvas Top Control Bar */}
+              <div className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 px-3 flex items-center justify-between shrink-0 z-20 select-none">
+                {/* Undo / Redo */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => dispatch(undo())}
+                    disabled={past.length === 0}
+                    className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer transition-colors"
+                    title="Undo"
+                  >
+                    <Undo2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dispatch(redo())}
+                    disabled={future.length === 0}
+                    className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 cursor-pointer transition-colors"
+                    title="Redo"
+                  >
+                    <Redo2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Smooth Zoom Preset Pills */}
+                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileZoomMultiplier(1.0);
+                      handleFitZoom(1.0);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all min-h-[32px] cursor-pointer ${
+                      mobileZoomMultiplier === 1.0
+                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    1x Fit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileZoomMultiplier(1.25);
+                      handleFitZoom(1.25);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all min-h-[32px] cursor-pointer ${
+                      mobileZoomMultiplier === 1.25
+                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    1.25x
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileZoomMultiplier(1.5);
+                      handleFitZoom(1.5);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all min-h-[32px] cursor-pointer ${
+                      mobileZoomMultiplier === 1.5
+                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    1.5x
+                  </button>
+                </div>
+
+                {/* AI Polish */}
+                <button
+                  type="button"
+                  onClick={() => handleOpenAI('summary')}
+                  className="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 cursor-pointer transition-colors"
+                  title="AI Polish"
+                >
+                  <Sparkles className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Document Canvas Container with Pinch Zoom & Auto-Scale */}
+              <div
+                ref={mobileCanvasScrollContainerRef}
+                className={`flex-1 overflow-y-auto ${mobileZoomMultiplier <= 1.0 ? 'overflow-x-hidden' : 'overflow-x-auto'} p-2 relative select-text touch-pan-y`}
+                style={{
+                  paddingBottom: isMobileBottomSheetOpen ? '46vh' : '5rem',
+                }}
+                onClick={() => {
+                  if (isMobileBottomSheetOpen) {
+                    setIsMobileBottomSheetOpen(false);
+                    dispatch(clearSelectedElement());
+                  }
+                }}
+              >
+                <div className="w-fit min-w-full flex justify-center py-2">
+                  <div
+                    className="shrink-0 transition-all duration-150 shadow-xl rounded-sm bg-white overflow-hidden"
+                    style={{
+                      width: `${Math.round(794 * previewScale)}px`,
+                      minHeight: `${Math.round(1123 * previewScale)}px`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '794px',
+                        minHeight: '1123px',
+                        transform: `scale(${previewScale})`,
+                        transformOrigin: 'top left',
+                        boxSizing: 'border-box',
+                      }}
+                    >
+                      <RenderCVTemplate
+                        cvData={currentCV}
+                        scale={1}
+                        onOpenPhotoModal={() => setPhotoModalOpen(true)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Floating Bottom Page Navigator Pill */}
+              <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+                <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border border-slate-200/80 dark:border-slate-700 shadow-md rounded-full px-3 py-1 flex items-center gap-2 text-[11px] text-slate-700 dark:text-slate-200 pointer-events-auto">
+                  <span className="font-semibold">
+                    {onePageFit.isOnePageTemplate
+                      ? `Page 1 / ${onePageFit.estimatedPages || 1}`
+                      : 'Multi-Page'}
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                  <span
+                    className={`font-bold ${
+                      onePageFit.status === 'overflow'
+                        ? 'text-rose-600 dark:text-rose-400'
+                        : onePageFit.status === 'tight'
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-emerald-600 dark:text-emerald-400'
+                    }`}
+                  >
+                    {onePageFit.status === 'overflow'
+                      ? 'Overflow'
+                      : onePageFit.status === 'tight'
+                      ? 'Tight Fit'
+                      : '1-Page Fit'} ({onePageFit.percentUsed}%)
+                  </span>
+                </div>
+              </div>
+
+              {/* Dedicated Mobile Element Bottom Sheet */}
+              <MobileElementBottomSheet
+                isOpen={isMobileBottomSheetOpen}
+                onClose={() => {
+                  setIsMobileBottomSheetOpen(false);
+                  dispatch(clearSelectedElement());
+                }}
+              />
+            </div>
+          )}
+
+          {/* TAB 3: STYLE & LAYOUT */}
+          {mobileNavTab === 'style' && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Segmented Subtabs: Templates vs Design Tokens */}
+              <div className="p-3 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-center shrink-0">
+                <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 w-full max-w-xs">
+                  <button
+                    type="button"
+                    onClick={() => setMobileStyleSubTab('templates')}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all min-h-[36px] flex items-center justify-center gap-1.5 cursor-pointer ${
+                      mobileStyleSubTab === 'templates'
+                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span>Templates</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMobileStyleSubTab('tokens')}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all min-h-[36px] flex items-center justify-center gap-1.5 cursor-pointer ${
+                      mobileStyleSubTab === 'tokens'
+                        ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <Palette className="w-3.5 h-3.5" />
+                    <span>Design & Theme</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Subtab Body */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-4 pb-24">
+                {mobileStyleSubTab === 'templates' ? (
+                  <div className="space-y-3">
+                    {/* Category Filter Horizontal Scroll */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs scrollbar-none">
+                      {categoriesList.map((category) => (
+                        <button
+                          key={category}
+                          type="button"
+                          onClick={() => setTemplateFilter(category)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all min-h-[36px] flex items-center shrink-0 cursor-pointer ${
+                            templateFilter === category
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          {category}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* 2-Column Template Cards Grid */}
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {templatesList
+                        .filter((tpl) => templateMatchesCategory(tpl, templateFilter))
+                        .map((tpl) => {
+                          const isSelected = resolveTemplateId(currentCV?.templateId) === tpl.id;
+                          return (
+                            <button
+                              key={tpl.id}
+                              type="button"
+                              onClick={() => dispatch(setTemplateId(tpl.id))}
+                              className={`p-3 rounded-2xl border text-left transition-all relative flex flex-col justify-between min-h-[120px] cursor-pointer ${
+                                isSelected
+                                  ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-500 ring-2 ring-blue-500 shadow-sm'
+                                  : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                              }`}
+                            >
+                              <div>
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                    {tpl.category}
+                                  </span>
+                                  {isSelected && (
+                                    <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+                                      <Check className="w-3 h-3" />
+                                    </div>
+                                  )}
+                                </div>
+                                <h4 className="font-bold text-xs text-slate-800 dark:text-white leading-snug line-clamp-2">
+                                  {tpl.name}
+                                </h4>
+                              </div>
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {tpl.isOnePage && (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                    1-Page
+                                  </span>
+                                )}
+                                {tpl.isBDStandard && (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                                    BD Govt
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </div>
+                ) : (
+                  <AdvancedLayoutControls onOpenPhotoModal={() => setPhotoModalOpen(true)} />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: PREVIEW & DOWNLOAD */}
+          {mobileNavTab === 'export' && (
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
+              {/* Document Summary Card */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 shadow-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Document
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    {saveStatus === 'saving' || isAutosaving
+                      ? 'Saving...'
+                      : saveStatus === 'unsaved'
+                      ? 'Unsaved changes'
+                      : 'Saved to cloud'}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  value={currentCV?.title || 'Untitled CV'}
+                  onChange={(e) => dispatch(updateTitle(e.target.value))}
+                  className="w-full font-bold text-base bg-transparent border-b border-slate-200 dark:border-slate-700 pb-1 focus:border-blue-500 focus:outline-none text-slate-900 dark:text-white"
+                  placeholder="My Resume"
+                />
+              </div>
+
+              {/* 1-Page Fit Diagnostic Card */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <span>📄</span>
+                    <span>1-Page Fit Diagnostics</span>
+                  </h4>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                      onePageFit.status === 'overflow'
+                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                        : onePageFit.status === 'tight'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                    }`}
+                  >
+                    {onePageFit.status === 'overflow'
+                      ? 'Exceeds 1-Page'
+                      : onePageFit.status === 'tight'
+                      ? 'Tight 1-Page'
+                      : 'Optimal 1-Page'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+                  <span>Capacity Used: <strong>{onePageFit.percentUsed}%</strong></span>
+                  <span>Word Count: <strong>~{onePageFit.wordCount} words</strong></span>
+                </div>
+
+                {onePageFit.status !== 'fit' && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenAI('summary')}
+                      className="flex-1 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center justify-center gap-1.5 min-h-[44px] cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Condense with AI</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => dispatch(setTemplateId('bd-corporate-standard'))}
+                      className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center justify-center min-h-[44px] cursor-pointer"
+                    >
+                      <span>Switch to Multi-Page</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Primary Action Buttons */}
+              <div className="space-y-2.5">
+                {/* 1. Preview Generated PDF */}
+                <button
+                  type="button"
+                  onClick={handlePreviewPDF}
+                  disabled={isExporting}
+                  className="w-full p-4 rounded-2xl bg-slate-900 dark:bg-slate-800 text-white font-bold text-sm shadow-md hover:bg-slate-800 dark:hover:bg-slate-700 transition-all flex items-center gap-3 text-left min-h-[52px] cursor-pointer"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                    <Eye className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-bold">Preview Generated PDF</div>
+                    <div className="text-[11px] text-slate-300 font-normal">
+                      Inspect exact vector binary before saving
+                    </div>
+                  </div>
+                </button>
+
+                {/* 2. Download PDF */}
+                <button
+                  type="button"
+                  onClick={handleExportPDF}
+                  disabled={isExporting}
+                  className="w-full p-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg shadow-emerald-600/20 active:scale-98 transition-all flex items-center gap-3 text-left min-h-[52px] cursor-pointer"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                    <Download className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-bold">
+                      {isExporting ? 'Generating PDF...' : 'Download PDF Document'}
+                    </div>
+                    <div className="text-[11px] text-emerald-100 font-normal">
+                      Vector print-ready • BDJobs & international ATS
+                    </div>
+                  </div>
+                </button>
+
+                {/* 3. Download Word DOCX */}
+                <button
+                  type="button"
+                  onClick={handleExportDOCX}
+                  disabled={isExporting}
+                  className="w-full p-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-600/20 active:scale-98 transition-all flex items-center gap-3 text-left min-h-[52px] cursor-pointer"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                    <FileText className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-bold">Download Word (.docx)</div>
+                    <div className="text-[11px] text-blue-100 font-normal">
+                      Editable Microsoft Word document
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              {/* WhatsApp Help Support */}
+              <div className="pt-2">
+                <WhatsAppSupportButton />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ===================================================================
+            4. MOBILE STICKY BOTTOM NAVIGATION BAR (4 Clear Tabs, >= 44px Tap Targets)
+        ==================================================================== */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 z-50 flex items-stretch justify-around px-1 select-none shadow-xl pb-[env(safe-area-inset-bottom)]">
+          {/* Tab 1: Forms */}
           <button
             type="button"
             onClick={() => {
-              setActiveSidebarTab('templates');
-              setIsSidebarOpen(true);
+              setMobileNavTab('forms');
+              dispatch(setEditorMode('form'));
+              setIsMobileBottomSheetOpen(false);
             }}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-              isSidebarOpen && activeSidebarTab === 'templates'
+            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all min-h-[44px] cursor-pointer ${
+              mobileNavTab === 'forms'
                 ? 'text-blue-600 dark:text-blue-400 font-bold'
                 : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <LayoutGrid className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px]">Templates</span>
+            <Sliders className="w-5 h-5 mb-0.5" />
+            <span className="text-[11px] leading-tight">Forms</span>
           </button>
 
-          {/* 2. Design Tab */}
+          {/* Tab 2: Canvas */}
           <button
             type="button"
             onClick={() => {
-              setActiveSidebarTab('design');
-              setIsSidebarOpen(true);
+              setMobileNavTab('canvas');
+              dispatch(setEditorMode('visual'));
+              handleFitZoom(mobileZoomMultiplier);
             }}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
-              isSidebarOpen && activeSidebarTab === 'design'
-                ? 'text-blue-600 dark:text-blue-400 font-bold'
+            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all min-h-[44px] cursor-pointer ${
+              mobileNavTab === 'canvas'
+                ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <MousePointer className="w-5 h-5 mb-0.5" />
+            <span className="text-[11px] leading-tight">Canvas</span>
+          </button>
+
+          {/* Tab 3: Style */}
+          <button
+            type="button"
+            onClick={() => {
+              setMobileNavTab('style');
+              setIsMobileBottomSheetOpen(false);
+            }}
+            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all min-h-[44px] cursor-pointer ${
+              mobileNavTab === 'style'
+                ? 'text-purple-600 dark:text-purple-400 font-bold'
                 : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Palette className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px]">Design</span>
+            <span className="text-[11px] leading-tight">Style</span>
           </button>
 
-          {/* 3. Edit Sections Tab (Center Floating Action Badge) */}
+          {/* Tab 4: Export */}
           <button
             type="button"
             onClick={() => {
-              setActiveSidebarTab('sections');
-              setIsSidebarOpen(true);
+              setMobileNavTab('export');
+              setIsMobileBottomSheetOpen(false);
             }}
-            className="flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer"
-          >
-            <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/30 -mt-4 mb-0.5 active:scale-95 transition-transform">
-              <Edit3 className="w-4 h-4" />
-            </div>
-            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">Edit</span>
-          </button>
-
-          {/* 4. Fit / Zoom Tab */}
-          <button
-            type="button"
-            onClick={() => {
-              if (previewScale < 0.6) {
-                dispatch(setPreviewScale(0.85));
-              } else if (previewScale < 0.9) {
-                dispatch(setPreviewScale(1.0));
-              } else {
-                handleFitZoom();
-              }
-            }}
-            className="flex flex-col items-center justify-center flex-1 py-1 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer"
-            title="Toggle Zoom / Fit"
-          >
-            <Eye className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] font-medium">
-              {Math.round(previewScale * 100)}%
-            </span>
-          </button>
-
-          {/* 5. Export Tab (Opens Mobile Choice Sheet) */}
-          <button
-            type="button"
-            onClick={() => setMobileExportSheetOpen(true)}
-            className="flex flex-col items-center justify-center flex-1 py-1 text-blue-600 dark:text-blue-400 transition-all cursor-pointer"
+            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all min-h-[44px] cursor-pointer ${
+              mobileNavTab === 'export'
+                ? 'text-emerald-600 dark:text-emerald-400 font-bold'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            }`}
           >
             <Download className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] font-bold">Export</span>
+            <span className="text-[11px] leading-tight">Export</span>
           </button>
         </nav>
-
-        {/* Mobile Export Choice Bottom Sheet */}
-        {mobileExportSheetOpen && (
-          <div
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end md:hidden animate-fade-in"
-            onClick={() => setMobileExportSheetOpen(false)}
-          >
-            <div
-              className="w-full bg-white dark:bg-slate-900 rounded-t-3xl p-5 shadow-2xl border-t border-slate-200 dark:border-slate-800 space-y-3"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="w-12 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-2" />
-              <div className="text-center pb-2">
-                <h4 className="font-bold text-slate-900 dark:text-white text-base">
-                  Export Document
-                </h4>
-                <p className="text-xs text-slate-500">
-                  Select your desired download format:
-                </p>
-              </div>
-
-              {/* Preview PDF Option */}
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileExportSheetOpen(false);
-                  handlePreviewPDF();
-                }}
-                className="w-full p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center gap-3 text-left cursor-pointer"
-              >
-                <div className="w-10 h-10 rounded-xl bg-slate-800 dark:bg-slate-700 text-white flex items-center justify-center shrink-0 shadow-md">
-                  <Eye className="w-5 h-5 text-emerald-400" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                    Preview Generated PDF
-                  </div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Inspect exact binary document before saving
-                  </div>
-                </div>
-              </button>
-
-              {/* PDF Option */}
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileExportSheetOpen(false);
-                  handleExportPDF();
-                }}
-                className="w-full p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all flex items-center gap-3 text-left cursor-pointer"
-              >
-                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md">
-                  <Download className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-bold text-sm text-emerald-950 dark:text-emerald-200">
-                    Download PDF Document
-                  </div>
-                  <div className="text-[11px] text-emerald-700 dark:text-emerald-400">
-                    High-res vector print format • BDJobs & global standard
-                  </div>
-                </div>
-              </button>
-
-              {/* Word DOCX Option */}
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileExportSheetOpen(false);
-                  handleExportDOCX();
-                }}
-                className="w-full p-3.5 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all flex items-center gap-3 text-left cursor-pointer"
-              >
-                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-bold text-sm text-blue-950 dark:text-blue-200">
-                    Download Word Document (.docx)
-                  </div>
-                  <div className="text-[11px] text-blue-700 dark:text-blue-400">
-                    Microsoft Word editable doc • All BD & executive sections
-                  </div>
-                </div>
-              </button>
-
-              {/* Cancel Button */}
-              <button
-                type="button"
-                onClick={() => setMobileExportSheetOpen(false)}
-                className="w-full py-2.5 rounded-xl text-center text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
 
       {/* AI Assistant Generator Modal */}
       <AIAssistantModal

@@ -257,6 +257,7 @@ export const EditableElement = ({
     return (
       <div
         ref={containerRef}
+        data-cv-path={fieldKey}
         onClick={(e) => e.stopPropagation()}
         className="relative inline-block w-full max-w-full z-30"
       >
@@ -319,6 +320,8 @@ export const EditableElement = ({
 
   return (
     <Tag
+      ref={containerRef}
+      data-cv-path={fieldKey}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       className={`cv-editable-element ${

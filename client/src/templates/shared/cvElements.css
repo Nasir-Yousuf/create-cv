@@ -232,6 +232,33 @@ h3 {
   pointer-events: none;
 }
 
+/* On mobile touch viewports, hide desktop mini hover toolbars in favor of mobile bottom sheet */
+@media (max-width: 767px) {
+  .cv-editor-toolbar {
+    display: none !important;
+  }
+
+  /* Ensure mobile form inputs, selects, textareas, and buttons have >= 44px tap targets and 16px font size to prevent iOS zoom */
+  .cv-section-form input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  .cv-section-form select {
+    min-height: 44px !important;
+    font-size: 16px !important;
+  }
+
+  .cv-section-form textarea {
+    min-height: 64px !important;
+    font-size: 16px !important;
+  }
+
+  .cv-section-form button {
+    min-height: 44px !important;
+  }
+
+  .cv-section-form label {
+    font-size: 12px !important;
+  }
+}
+
 /* Ensure all interactive editing overlays, pips, and toolbars are 100% hidden in print/exports */
 @media print {
   .cv-editor-pip,

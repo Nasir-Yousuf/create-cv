@@ -231,27 +231,27 @@ const SectionHeaderControls = ({
         )}
       </div>
 
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 flex-wrap">
         {/* Intra-page Section Reordering */}
         {currentIndex !== -1 && (
-          <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800">
+          <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800">
             <button
               type="button"
               disabled={isFirst}
               onClick={() => dispatch(moveSection({ id: sectionId, direction: 'up' }))}
-              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:p-1.5 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 disabled:opacity-30 disabled:pointer-events-none transition-colors"
               title="Move section up on CV page"
             >
-              <ChevronUp className="w-3.5 h-3.5" />
+              <ChevronUp className="w-4 h-4" />
             </button>
             <button
               type="button"
               disabled={isLast}
               onClick={() => dispatch(moveSection({ id: sectionId, direction: 'down' }))}
-              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 disabled:opacity-30 disabled:pointer-events-none transition-colors border-l border-slate-200 dark:border-slate-700"
+              className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:p-1.5 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 disabled:opacity-30 disabled:pointer-events-none transition-colors border-l border-slate-200 dark:border-slate-700"
               title="Move section down on CV page"
             >
-              <ChevronDown className="w-3.5 h-3.5" />
+              <ChevronDown className="w-4 h-4" />
             </button>
           </div>
         )}
@@ -266,23 +266,28 @@ const SectionHeaderControls = ({
               dispatch(hideSection(sectionId));
             }
           }}
-          className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-colors ${
+          className={`min-h-[44px] sm:min-h-0 sm:p-1.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
             isHidden
               ? 'border-indigo-200 bg-indigo-50 text-indigo-600 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300'
               : 'border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
           }`}
           title={isHidden ? 'Restore section to CV' : 'Hide section from CV'}
         >
-          {isHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-          <span className="hidden sm:inline text-[11px]">{isHidden ? 'Restore' : 'Hide'}</span>
+          {isHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          <span className="text-[11px]">{isHidden ? 'Restore' : 'Hide'}</span>
         </button>
 
         {extraButton}
 
         {onAdd && (
-          <Button variant="primary" size="sm" icon={Plus} onClick={onAdd}>
-            {addLabel || 'Add Entry'}
-          </Button>
+          <button
+            type="button"
+            onClick={onAdd}
+            className="min-h-[44px] px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 active:scale-95 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{addLabel || 'Add Entry'}</span>
+          </button>
         )}
       </div>
     </div>

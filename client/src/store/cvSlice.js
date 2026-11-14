@@ -429,6 +429,26 @@ export const cvSlice = createSlice({
       state.currentCV.elementOverrides = {};
     },
 
+    updateFieldByPath: (state, action) => {
+      const { path, value } = action.payload || {};
+      if (!path) return;
+      pushHistory(state);
+      const parts = path.split('.');
+      let curr = state.currentCV;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const key = parts[i];
+        if (!curr[key] || typeof curr[key] !== 'object') {
+          curr[key] = isNaN(Number(parts[i + 1])) ? {} : [];
+        }
+        curr = curr[key];
+      }
+      curr[parts[parts.length - 1]] = value;
+      // Sync personalInfo aliases
+      if (parts[0] === 'personalInfo' && (parts[1] === 'summary' || parts[1] === 'careerObjective')) {
+        state.currentCV[parts[1]] = value;
+      }
+    },
+
     addCustomElement: (state, action) => {
       pushHistory(state);
       if (!Array.isArray(state.currentCV.customElements)) {
@@ -1341,6 +1361,7 @@ export const {
   setElementOverride,
   removeElementOverride,
   clearAllElementOverrides,
+  updateFieldByPath,
   addCustomElement,
   updateCustomElement,
   removeCustomElement,
