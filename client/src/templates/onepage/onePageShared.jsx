@@ -55,15 +55,30 @@ export const OnePageAvatar = ({
   photoStyle = 'circle',
   photoSize = 'md',
   shapeOverride,
-  borderColor = '#e2e8f0',
+  borderColor: propBorderColor,
+  borderWidth: propBorderWidth,
+  photoConfig = {},
   darkPlaceholder = false,
   onOpenPhotoModal,
 }) => {
   if (showPhoto === false) return null;
 
-  const styleType = shapeOverride || photoStyle || 'circle';
+  const styleType = shapeOverride || photoConfig?.shape || photoStyle || 'circle';
+  const effectiveBorderWidth =
+    typeof propBorderWidth === 'number'
+      ? propBorderWidth
+      : typeof photoConfig?.borderWidth === 'number'
+      ? photoConfig.borderWidth
+      : 2;
+  const effectiveBorderColor =
+    propBorderColor || photoConfig?.borderColor || '#e2e8f0';
+  const effectiveBgColor = photoConfig?.bgColor || '#ffffff';
+
+  const isPortraitAspect =
+    photoConfig?.aspect === 0.75 || photoConfig?.aspect === 0.8 || styleType === 'portrait';
+
   const sizeClass =
-    styleType === 'portrait'
+    isPortraitAspect
       ? photoSize === 'sm'
         ? 'w-16 h-20'
         : photoSize === 'lg'
@@ -76,24 +91,31 @@ export const OnePageAvatar = ({
       : 'w-[76px] h-[76px]';
 
   const radiusClass =
-    styleType === 'circle'
+    styleType === 'circle' && !isPortraitAspect
       ? 'rounded-full'
       : styleType === 'square'
-      ? 'rounded-sm'
+      ? 'rounded-none'
       : 'rounded-xl';
 
   if (photo) {
     return (
       <div
         onClick={() => onOpenPhotoModal && onOpenPhotoModal()}
-        className={`relative group cursor-pointer shrink-0 overflow-hidden ${sizeClass} ${radiusClass} border-2 shadow-sm`}
-        style={{ borderColor }}
+        className={`relative group cursor-pointer shrink-0 overflow-hidden ${sizeClass} ${radiusClass} shadow-sm`}
+        style={{
+          border: `${effectiveBorderWidth}px solid ${effectiveBorderColor}`,
+          backgroundColor: effectiveBgColor,
+        }}
         title="Click to change photo"
       >
         <img
           src={photo}
           alt={fullName || 'Profile Photo'}
           className="w-full h-full object-cover object-center block"
+          style={{
+            objectFit: 'cover',
+            objectPosition: 'center',
+          }}
         />
       </div>
     );

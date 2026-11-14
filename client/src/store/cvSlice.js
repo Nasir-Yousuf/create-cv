@@ -209,31 +209,81 @@ export const cvSlice = createSlice({
         ...action.payload,
       };
       // Synchronize designTokens
+      if (!state.currentCV.designTokens) {
+        state.currentCV.designTokens = { ...DEFAULT_DESIGN_TOKENS };
+      }
       if (action.payload.primaryColor) {
         state.currentCV.designTokens.primaryColor = action.payload.primaryColor;
       }
       if (action.payload.accentColor) {
         state.currentCV.designTokens.accentColor = action.payload.accentColor;
       }
-      if (action.payload.textColor) {
-        state.currentCV.designTokens.bodyColor = action.payload.textColor;
+      if (action.payload.textColor || action.payload.bodyColor) {
+        state.currentCV.designTokens.bodyColor = action.payload.bodyColor || action.payload.textColor;
+      }
+      if (action.payload.headingColor) {
+        state.currentCV.designTokens.headingColor = action.payload.headingColor;
       }
       if (action.payload.backgroundColor) {
         state.currentCV.designTokens.backgroundColor = action.payload.backgroundColor;
       }
+      if (action.payload.sidebarBgColor) {
+        state.currentCV.designTokens.sidebarBgColor = action.payload.sidebarBgColor;
+      }
+      if (action.payload.dividerColor) {
+        state.currentCV.designTokens.dividerColor = action.payload.dividerColor;
+      }
+      if (action.payload.badgeBgColor) {
+        state.currentCV.designTokens.badgeBgColor = action.payload.badgeBgColor;
+      }
       if (action.payload.fontFamily) {
         state.currentCV.designTokens.fontHeading = action.payload.fontFamily;
-        state.currentCV.designTokens.fontBody = action.payload.fontFamily;
+        if (!action.payload.fontBody) {
+          state.currentCV.designTokens.fontBody = action.payload.fontFamily;
+        }
+      }
+      if (action.payload.fontHeading) {
+        state.currentCV.designTokens.fontHeading = action.payload.fontHeading;
+      }
+      if (action.payload.fontBody) {
+        state.currentCV.designTokens.fontBody = action.payload.fontBody;
+      }
+      if (action.payload.lineHeight) {
+        state.currentCV.designTokens.lineHeight = action.payload.lineHeight;
+      }
+      if (action.payload.letterSpacing) {
+        state.currentCV.designTokens.letterSpacing = action.payload.letterSpacing;
+      }
+      if (action.payload.paragraphSpacing) {
+        state.currentCV.designTokens.paragraphSpacing = action.payload.paragraphSpacing;
+      }
+      if (action.payload.pageMargin) {
+        state.currentCV.designTokens.pageMargin = action.payload.pageMargin;
+      }
+      if (action.payload.sectionSpacing) {
+        state.currentCV.designTokens.sectionSpacing = action.payload.sectionSpacing;
+      }
+      if (action.payload.itemSpacing) {
+        state.currentCV.designTokens.itemSpacing = action.payload.itemSpacing;
+      }
+      if (action.payload.columnRatio) {
+        state.currentCV.designTokens.columnRatio = action.payload.columnRatio;
+      }
+      if (action.payload.dividerThickness) {
+        state.currentCV.designTokens.dividerThickness = action.payload.dividerThickness;
       }
     },
 
     updateDesignTokens: (state, action) => {
       pushHistory(state);
       state.currentCV.designTokens = {
-        ...state.currentCV.designTokens,
+        ...(state.currentCV.designTokens || DEFAULT_DESIGN_TOKENS),
         ...action.payload,
       };
       // Synchronize design
+      state.currentCV.design = {
+        ...state.currentCV.design,
+      };
       if (action.payload.primaryColor) {
         state.currentCV.design.primaryColor = action.payload.primaryColor;
       }
@@ -243,11 +293,50 @@ export const cvSlice = createSlice({
       if (action.payload.bodyColor) {
         state.currentCV.design.textColor = action.payload.bodyColor;
       }
+      if (action.payload.headingColor) {
+        state.currentCV.design.headingColor = action.payload.headingColor;
+      }
       if (action.payload.backgroundColor) {
         state.currentCV.design.backgroundColor = action.payload.backgroundColor;
       }
+      if (action.payload.sidebarBgColor) {
+        state.currentCV.design.sidebarBgColor = action.payload.sidebarBgColor;
+      }
+      if (action.payload.dividerColor) {
+        state.currentCV.design.dividerColor = action.payload.dividerColor;
+      }
+      if (action.payload.badgeBgColor) {
+        state.currentCV.design.badgeBgColor = action.payload.badgeBgColor;
+      }
       if (action.payload.fontHeading) {
         state.currentCV.design.fontFamily = action.payload.fontHeading;
+      }
+      if (action.payload.fontBody) {
+        state.currentCV.design.fontBody = action.payload.fontBody;
+      }
+      if (action.payload.lineHeight) {
+        state.currentCV.design.lineHeight = action.payload.lineHeight;
+      }
+      if (action.payload.letterSpacing) {
+        state.currentCV.design.letterSpacing = action.payload.letterSpacing;
+      }
+      if (action.payload.paragraphSpacing) {
+        state.currentCV.design.paragraphSpacing = action.payload.paragraphSpacing;
+      }
+      if (action.payload.pageMargin) {
+        state.currentCV.design.pageMargin = action.payload.pageMargin;
+      }
+      if (action.payload.sectionSpacing) {
+        state.currentCV.design.sectionSpacing = action.payload.sectionSpacing;
+      }
+      if (action.payload.itemSpacing) {
+        state.currentCV.design.itemSpacing = action.payload.itemSpacing;
+      }
+      if (action.payload.columnRatio) {
+        state.currentCV.design.columnRatio = action.payload.columnRatio;
+      }
+      if (action.payload.dividerThickness) {
+        state.currentCV.design.dividerThickness = action.payload.dividerThickness;
       }
     },
 

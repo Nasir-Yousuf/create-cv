@@ -20,6 +20,8 @@ import {
   Minus,
 } from 'lucide-react';
 
+const EMPTY_OVERRIDE = {};
+
 export const EditableElement = ({
   section,
   field,
@@ -38,11 +40,12 @@ export const EditableElement = ({
   const activeSection = useSelector((state) => state.ui?.activeSection);
   const activeField = useSelector((state) => state.ui?.activeField);
   const selectedElementPath = useSelector((state) => state.ui?.selectedElementPath);
-  const elementOverrides = useSelector((state) => state.cv?.currentCV?.elementOverrides || {});
 
   const fieldKey = index !== null ? `${section}.${index}.${field}` : `${section}.${field}`;
   const isSelected = selectedElementPath === fieldKey || activeField === fieldKey;
-  const override = elementOverrides[fieldKey] || {};
+  const override = useSelector(
+    (state) => state.cv?.currentCV?.elementOverrides?.[fieldKey] || EMPTY_OVERRIDE
+  );
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentText, setCurrentText] = useState(value || '');

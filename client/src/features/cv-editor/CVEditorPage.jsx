@@ -69,6 +69,7 @@ import {
   MousePointer,
   Move,
   Plus,
+  Minus,
   Edit3,
   FileText,
   Clock,
@@ -168,7 +169,8 @@ export const CVEditorPage = () => {
     { label: '90%', value: 0.9 },
     { label: '100%', value: 1.0 },
     { label: '125%', value: 1.25 },
-    { label: 'Fit to Window', value: 'fit' },
+    { label: '150%', value: 1.5 },
+    { label: 'Fit to Screen', value: 'fit' },
   ];
 
   // Auto-fit canvas calculation
@@ -207,17 +209,18 @@ export const CVEditorPage = () => {
     };
   }, [isSidebarOpen, isRightDockOpen, devicePreview]);
 
-  // Keyboard shortcuts (Ctrl/Cmd+Z, Ctrl/Cmd+Y, Ctrl/Cmd+S)
+  // Keyboard shortcuts (Ctrl/Cmd+Z, Ctrl/Cmd+Y, Ctrl/Cmd+Shift+Z, Ctrl/Cmd+S)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+      const key = (e.key || '').toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && key === 'z') {
         e.preventDefault();
         if (e.shiftKey) dispatch(redo());
         else dispatch(undo());
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+      } else if ((e.ctrlKey || e.metaKey) && key === 'y') {
         e.preventDefault();
         dispatch(redo());
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      } else if ((e.ctrlKey || e.metaKey) && key === 's') {
         e.preventDefault();
         handleManualSave();
       }
@@ -1358,42 +1361,67 @@ export const CVEditorPage = () => {
                   </button>
                   <div className="w-[1px] h-3.5 bg-slate-200 dark:bg-slate-700 mx-1" />
 
-                  {/* Zoom Dropdown (100% ▾) */}
-                  <div className="relative">
+                  {/* Zoom Controls (- 100% +) */}
+                  <div className="flex items-center gap-0.5">
                     <button
                       type="button"
-                      onClick={() => setZoomDropdownOpen(!zoomDropdownOpen)}
-                      className="flex items-center gap-1 text-xs font-medium hover:text-slate-900 dark:hover:text-white px-1 py-0.5"
+                      onClick={() =>
+                        dispatch(setPreviewScale(Math.max(0.4, Number((previewScale - 0.1).toFixed(2)))))
+                      }
+                      className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+                      title="Zoom Out"
                     >
-                      <span>{Math.round(previewScale * 100)}%</span>
-                      <ChevronDown className="w-3 h-3 text-slate-400" />
+                      <Minus className="w-3 h-3" />
                     </button>
 
-                    {zoomDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-1 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg py-1 z-30 animate-fade-in text-xs">
-                        {zoomPresets.map((preset) => (
-                          <button
-                            key={preset.label}
-                            type="button"
-                            onClick={() => {
-                              if (preset.value === 'fit') {
-                                handleFitZoom();
-                              } else {
-                                dispatch(setPreviewScale(preset.value));
-                              }
-                              setZoomDropdownOpen(false);
-                            }}
-                            className="w-full px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-between"
-                          >
-                            <span>{preset.label}</span>
-                            {preset.value !== 'fit' &&
-                              Math.round(previewScale * 100) === Math.round(preset.value * 100) && (
-                                <Check className="w-3 h-3 text-blue-600" />
-                              )}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setZoomDropdownOpen(!zoomDropdownOpen)}
+                        className="flex items-center gap-1 text-xs font-medium hover:text-slate-900 dark:hover:text-white px-1 py-0.5 cursor-pointer"
+                        title="Zoom Presets"
+                      >
+                        <span className="min-w-[36px] text-center">{Math.round(previewScale * 100)}%</span>
+                        <ChevronDown className="w-3 h-3 text-slate-400" />
+                      </button>
+
+                      {zoomDropdownOpen && (
+                        <div className="absolute top-full left-0 mt-1 w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg py-1 z-30 animate-fade-in text-xs">
+                          {zoomPresets.map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => {
+                                if (preset.value === 'fit') {
+                                  handleFitZoom();
+                                } else {
+                                  dispatch(setPreviewScale(preset.value));
+                                }
+                                setZoomDropdownOpen(false);
+                              }}
+                              className="w-full px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-between cursor-pointer"
+                            >
+                              <span>{preset.label}</span>
+                              {preset.value !== 'fit' &&
+                                Math.round(previewScale * 100) === Math.round(preset.value * 100) && (
+                                  <Check className="w-3 h-3 text-blue-600" />
+                                )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        dispatch(setPreviewScale(Math.min(1.5, Number((previewScale + 0.1).toFixed(2)))))
+                      }
+                      className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+                      title="Zoom In"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
               </div>
