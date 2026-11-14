@@ -424,6 +424,35 @@ export const cvSlice = createSlice({
         state.currentCV.design.sectionOrder.splice(destinationIndex, 0, removed);
       }
     },
+    moveSection: (state, action) => {
+      const { id, direction } = action.payload || {};
+      const currentOrder = state.currentCV.design?.sectionOrder || [];
+      const index = currentOrder.indexOf(id);
+      if (index === -1) return;
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= currentOrder.length) return;
+      pushHistory(state);
+      const newOrder = [...currentOrder];
+      const [moved] = newOrder.splice(index, 1);
+      newOrder.splice(targetIndex, 0, moved);
+      state.currentCV.design.sectionOrder = newOrder;
+
+      // Also align sectionConfig
+      const seen = new Set(newOrder);
+      const reordered = [];
+      newOrder.forEach((sid) => {
+        const item = state.currentCV.sectionConfig?.find((s) => s.id === sid);
+        if (item) reordered.push(item);
+      });
+      state.currentCV.sectionConfig?.forEach((s) => {
+        if (!seen.has(s.id)) reordered.push(s);
+      });
+      state.currentCV.sectionConfig = reordered;
+    },
+    setProfileType: (state, action) => {
+      pushHistory(state);
+      state.currentCV.profileType = action.payload;
+    },
 
     // Undo / Redo
     undo: (state) => {
@@ -482,6 +511,15 @@ export const cvSlice = createSlice({
       const [removed] = state.currentCV.experience.splice(sourceIndex, 1);
       state.currentCV.experience.splice(destinationIndex, 0, removed);
     },
+    duplicateExperience: (state, action) => {
+      const index = action.payload;
+      if (Array.isArray(state.currentCV.experience) && state.currentCV.experience[index]) {
+        pushHistory(state);
+        const copy = JSON.parse(JSON.stringify(state.currentCV.experience[index]));
+        copy.id = `exp-${Date.now()}`;
+        state.currentCV.experience.splice(index + 1, 0, copy);
+      }
+    },
 
     // Internships Actions
     addInternship: (state, action) => {
@@ -527,6 +565,15 @@ export const cvSlice = createSlice({
         state.currentCV.internships.splice(destinationIndex, 0, removed);
       }
     },
+    duplicateInternship: (state, action) => {
+      const index = action.payload;
+      if (Array.isArray(state.currentCV.internships) && state.currentCV.internships[index]) {
+        pushHistory(state);
+        const copy = JSON.parse(JSON.stringify(state.currentCV.internships[index]));
+        copy.id = `intern-${Date.now()}`;
+        state.currentCV.internships.splice(index + 1, 0, copy);
+      }
+    },
 
     // Education Actions
     addEducation: (state, action) => {
@@ -564,6 +611,15 @@ export const cvSlice = createSlice({
       const [removed] = state.currentCV.education.splice(sourceIndex, 1);
       state.currentCV.education.splice(destinationIndex, 0, removed);
     },
+    duplicateEducation: (state, action) => {
+      const index = action.payload;
+      if (Array.isArray(state.currentCV.education) && state.currentCV.education[index]) {
+        pushHistory(state);
+        const copy = JSON.parse(JSON.stringify(state.currentCV.education[index]));
+        copy.id = `edu-${Date.now()}`;
+        state.currentCV.education.splice(index + 1, 0, copy);
+      }
+    },
 
     // Skills Actions
     addSkill: (state, action) => {
@@ -596,6 +652,15 @@ export const cvSlice = createSlice({
       const { sourceIndex, destinationIndex } = action.payload;
       const [removed] = state.currentCV.skills.splice(sourceIndex, 1);
       state.currentCV.skills.splice(destinationIndex, 0, removed);
+    },
+    duplicateSkill: (state, action) => {
+      const index = action.payload;
+      if (Array.isArray(state.currentCV.skills) && state.currentCV.skills[index]) {
+        pushHistory(state);
+        const copy = JSON.parse(JSON.stringify(state.currentCV.skills[index]));
+        copy.id = `skill-${Date.now()}`;
+        state.currentCV.skills.splice(index + 1, 0, copy);
+      }
     },
 
     // Projects Actions
@@ -634,6 +699,15 @@ export const cvSlice = createSlice({
       const [removed] = state.currentCV.projects.splice(sourceIndex, 1);
       state.currentCV.projects.splice(destinationIndex, 0, removed);
     },
+    duplicateProject: (state, action) => {
+      const index = action.payload;
+      if (Array.isArray(state.currentCV.projects) && state.currentCV.projects[index]) {
+        pushHistory(state);
+        const copy = JSON.parse(JSON.stringify(state.currentCV.projects[index]));
+        copy.id = `proj-${Date.now()}`;
+        state.currentCV.projects.splice(index + 1, 0, copy);
+      }
+    },
 
     // Certifications Actions
     addCertification: (state, action) => {
@@ -668,6 +742,15 @@ export const cvSlice = createSlice({
       const [removed] = state.currentCV.certifications.splice(sourceIndex, 1);
       state.currentCV.certifications.splice(destinationIndex, 0, removed);
     },
+    duplicateCertification: (state, action) => {
+      const index = action.payload;
+      if (Array.isArray(state.currentCV.certifications) && state.currentCV.certifications[index]) {
+        pushHistory(state);
+        const copy = JSON.parse(JSON.stringify(state.currentCV.certifications[index]));
+        copy.id = `cert-${Date.now()}`;
+        state.currentCV.certifications.splice(index + 1, 0, copy);
+      }
+    },
 
     // Languages Actions
     addLanguage: (state, action) => {
@@ -693,6 +776,25 @@ export const cvSlice = createSlice({
     removeLanguage: (state, action) => {
       pushHistory(state);
       state.currentCV.languages.splice(action.payload, 1);
+    },
+    reorderLanguages: (state, action) => {
+      if (Array.isArray(state.currentCV.languages)) {
+        pushHistory(state);
+        const { sourceIndex, destinationIndex } = action.payload;
+        const [removed] = state.currentCV.languages.splice(sourceIndex, 1);
+        state.currentCV.languages.splice(destinationIndex, 0, removed);
+      }
+    },
+    duplicateLanguage: (state, action) => {
+      const index = typeof action.payload === 'number'
+        ? action.payload
+        : state.currentCV.languages?.findIndex((x) => x.id === action.payload);
+      if (Array.isArray(state.currentCV.languages) && index >= 0 && state.currentCV.languages[index]) {
+        pushHistory(state);
+        const copy = JSON.parse(JSON.stringify(state.currentCV.languages[index]));
+        copy.id = `lang-${Date.now()}`;
+        state.currentCV.languages.splice(index + 1, 0, copy);
+      }
     },
 
     // Achievements Actions
@@ -725,6 +827,25 @@ export const cvSlice = createSlice({
       if (Array.isArray(state.currentCV.achievements)) {
         pushHistory(state);
         state.currentCV.achievements.splice(action.payload, 1);
+      }
+    },
+    reorderAchievements: (state, action) => {
+      if (Array.isArray(state.currentCV.achievements)) {
+        pushHistory(state);
+        const { sourceIndex, destinationIndex } = action.payload;
+        const [removed] = state.currentCV.achievements.splice(sourceIndex, 1);
+        state.currentCV.achievements.splice(destinationIndex, 0, removed);
+      }
+    },
+    duplicateAchievement: (state, action) => {
+      const index = typeof action.payload === 'number'
+        ? action.payload
+        : state.currentCV.achievements?.findIndex((x) => x.id === action.payload);
+      if (Array.isArray(state.currentCV.achievements) && index >= 0 && state.currentCV.achievements[index]) {
+        pushHistory(state);
+        const copy = JSON.parse(JSON.stringify(state.currentCV.achievements[index]));
+        copy.id = `ach-${Date.now()}`;
+        state.currentCV.achievements.splice(index + 1, 0, copy);
       }
     },
 
@@ -764,7 +885,25 @@ export const cvSlice = createSlice({
         state.currentCV.volunteer.splice(action.payload, 1);
       }
     },
-
+    reorderVolunteer: (state, action) => {
+      if (Array.isArray(state.currentCV.volunteer)) {
+        pushHistory(state);
+        const { sourceIndex, destinationIndex } = action.payload;
+        const [removed] = state.currentCV.volunteer.splice(sourceIndex, 1);
+        state.currentCV.volunteer.splice(destinationIndex, 0, removed);
+      }
+    },
+    duplicateVolunteer: (state, action) => {
+      const index = typeof action.payload === 'number'
+        ? action.payload
+        : state.currentCV.volunteer?.findIndex((x) => x.id === action.payload);
+      if (Array.isArray(state.currentCV.volunteer) && index >= 0 && state.currentCV.volunteer[index]) {
+        pushHistory(state);
+        const copy = JSON.parse(JSON.stringify(state.currentCV.volunteer[index]));
+        copy.id = `vol-${Date.now()}`;
+        state.currentCV.volunteer.splice(index + 1, 0, copy);
+      }
+    },
     // Publications Actions
     addPublication: (state, action) => {
       pushHistory(state);
@@ -798,7 +937,25 @@ export const cvSlice = createSlice({
         state.currentCV.publications.splice(action.payload, 1);
       }
     },
-
+    reorderPublications: (state, action) => {
+      if (Array.isArray(state.currentCV.publications)) {
+        pushHistory(state);
+        const { sourceIndex, destinationIndex } = action.payload;
+        const [removed] = state.currentCV.publications.splice(sourceIndex, 1);
+        state.currentCV.publications.splice(destinationIndex, 0, removed);
+      }
+    },
+    duplicatePublication: (state, action) => {
+      const index = typeof action.payload === 'number'
+        ? action.payload
+        : state.currentCV.publications?.findIndex((x) => x.id === action.payload);
+      if (Array.isArray(state.currentCV.publications) && index >= 0 && state.currentCV.publications[index]) {
+        pushHistory(state);
+        const copy = JSON.parse(JSON.stringify(state.currentCV.publications[index]));
+        copy.id = `pub-${Date.now()}`;
+        state.currentCV.publications.splice(index + 1, 0, copy);
+      }
+    },
     // References Actions
     addReference: (state, action) => {
       pushHistory(state);
@@ -843,7 +1000,15 @@ export const cvSlice = createSlice({
         state.currentCV.references.splice(destinationIndex, 0, removed);
       }
     },
-
+    duplicateReference: (state, action) => {
+      const index = action.payload;
+      if (Array.isArray(state.currentCV.references) && state.currentCV.references[index]) {
+        pushHistory(state);
+        const copy = JSON.parse(JSON.stringify(state.currentCV.references[index]));
+        copy.id = `ref-${Date.now()}`;
+        state.currentCV.references.splice(index + 1, 0, copy);
+      }
+    },
     // Additional Info Actions
     addAdditionalInfo: (state, action) => {
       pushHistory(state);
@@ -874,7 +1039,25 @@ export const cvSlice = createSlice({
         state.currentCV.additionalInfo.splice(action.payload, 1);
       }
     },
-
+    reorderAdditionalInfo: (state, action) => {
+      if (Array.isArray(state.currentCV.additionalInfo)) {
+        pushHistory(state);
+        const { sourceIndex, destinationIndex } = action.payload;
+        const [removed] = state.currentCV.additionalInfo.splice(sourceIndex, 1);
+        state.currentCV.additionalInfo.splice(destinationIndex, 0, removed);
+      }
+    },
+    duplicateAdditionalInfo: (state, action) => {
+      const index = typeof action.payload === 'number'
+        ? action.payload
+        : state.currentCV.additionalInfo?.findIndex((x) => x.id === action.payload);
+      if (Array.isArray(state.currentCV.additionalInfo) && index >= 0 && state.currentCV.additionalInfo[index]) {
+        pushHistory(state);
+        const copy = JSON.parse(JSON.stringify(state.currentCV.additionalInfo[index]));
+        copy.id = `add-${Date.now()}`;
+        state.currentCV.additionalInfo.splice(index + 1, 0, copy);
+      }
+    },
     // Custom Sections
     addCustomSection: (state, action) => {
       pushHistory(state);
@@ -939,19 +1122,76 @@ export const cvSlice = createSlice({
       }
     },
     updateCustomSectionItem: (state, action) => {
-      const { sectionId, itemIndex, data } = action.payload;
+      const { sectionId, itemIndex, index, data } = action.payload;
+      const idx = itemIndex !== undefined ? itemIndex : index;
       const section = state.currentCV.customSections.find((s) => s.id === sectionId);
-      if (section && Array.isArray(section.items) && section.items[itemIndex]) {
+      if (section && Array.isArray(section.items) && section.items[idx]) {
         pushHistory(state);
-        Object.assign(section.items[itemIndex], data);
+        Object.assign(section.items[idx], data);
       }
     },
     removeCustomSectionItem: (state, action) => {
-      const { sectionId, itemIndex } = action.payload;
+      const { sectionId, itemIndex, index } = action.payload;
+      const idx = itemIndex !== undefined ? itemIndex : index;
       const section = state.currentCV.customSections.find((s) => s.id === sectionId);
       if (section && Array.isArray(section.items)) {
         pushHistory(state);
-        section.items.splice(itemIndex, 1);
+        section.items.splice(idx, 1);
+      }
+    },
+    reorderCustomSectionItems: (state, action) => {
+      const { sectionId, sourceIndex, destinationIndex } = action.payload || {};
+      const section = state.currentCV.customSections.find((s) => s.id === sectionId);
+      if (section && Array.isArray(section.items)) {
+        pushHistory(state);
+        const [removed] = section.items.splice(sourceIndex, 1);
+        section.items.splice(destinationIndex, 0, removed);
+      }
+    },
+    duplicateCustomSectionItem: (state, action) => {
+      const { sectionId, itemIndex, index } = action.payload || {};
+      const idx = itemIndex !== undefined ? itemIndex : index;
+      const section = state.currentCV.customSections.find((s) => s.id === sectionId);
+      if (section && Array.isArray(section.items) && section.items[idx]) {
+        pushHistory(state);
+        const copy = JSON.parse(JSON.stringify(section.items[idx]));
+        copy.id = `item-${Date.now()}`;
+        section.items.splice(idx + 1, 0, copy);
+      }
+    },
+    hideSection: (state, action) => {
+      const id = action.payload;
+      pushHistory(state);
+      if (!Array.isArray(state.currentCV.sectionConfig)) {
+        state.currentCV.sectionConfig = [];
+      }
+      let item = state.currentCV.sectionConfig.find((s) => s.id === id);
+      if (item) {
+        item.visible = false;
+      } else {
+        state.currentCV.sectionConfig.push({ id, label: id, visible: false, column: 'main' });
+      }
+      state.currentCV.design.sectionOrder = (state.currentCV.design?.sectionOrder || []).filter(
+        (sid) => sid !== id
+      );
+    },
+    restoreSection: (state, action) => {
+      const id = action.payload;
+      pushHistory(state);
+      if (!Array.isArray(state.currentCV.sectionConfig)) {
+        state.currentCV.sectionConfig = [];
+      }
+      let item = state.currentCV.sectionConfig.find((s) => s.id === id);
+      if (item) {
+        item.visible = true;
+      } else {
+        state.currentCV.sectionConfig.push({ id, label: id, visible: true, column: 'main' });
+      }
+      if (!Array.isArray(state.currentCV.design?.sectionOrder)) {
+        state.currentCV.design.sectionOrder = [];
+      }
+      if (!state.currentCV.design.sectionOrder.includes(id)) {
+        state.currentCV.design.sectionOrder.push(id);
       }
     },
 
@@ -1018,58 +1258,81 @@ export const {
   setSectionConfig,
   updateSectionConfigItem,
   toggleSectionVisibility,
+  hideSection,
+  restoreSection,
+  moveSection,
   reorderSections,
+  setProfileType,
   undo,
   redo,
   addExperience,
   updateExperience,
   removeExperience,
   reorderExperience,
+  duplicateExperience,
   addInternship,
   updateInternship,
   removeInternship,
   reorderInternships,
+  duplicateInternship,
   addEducation,
   updateEducation,
   removeEducation,
   reorderEducation,
+  duplicateEducation,
   addSkill,
   updateSkill,
   removeSkill,
   reorderSkills,
+  duplicateSkill,
   addProject,
   updateProject,
   removeProject,
   reorderProjects,
+  duplicateProject,
   addCertification,
   updateCertification,
   removeCertification,
   reorderCertifications,
+  duplicateCertification,
   addLanguage,
   updateLanguage,
   removeLanguage,
+  reorderLanguages,
+  duplicateLanguage,
   addAchievement,
   updateAchievement,
   removeAchievement,
+  reorderAchievements,
+  duplicateAchievement,
   addVolunteer,
   updateVolunteer,
   removeVolunteer,
+  reorderVolunteer,
+  duplicateVolunteer,
   addPublication,
   updatePublication,
   removePublication,
+  reorderPublications,
+  duplicatePublication,
   addReference,
   updateReference,
   removeReference,
   reorderReferences,
+  duplicateReference,
   addAdditionalInfo,
   updateAdditionalInfo,
   removeAdditionalInfo,
+  reorderAdditionalInfo,
+  duplicateAdditionalInfo,
   addCustomSection,
   updateCustomSection,
   removeCustomSection,
   addCustomSectionItem,
   updateCustomSectionItem,
   removeCustomSectionItem,
+  reorderCustomSectionItems,
+  duplicateCustomSectionItem,
   setSaveStatus,
   setSavingState,
   resetCV,

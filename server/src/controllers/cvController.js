@@ -12,6 +12,7 @@ export const ALLOWED_CV_FIELDS = [
   'templateId',
   'category',
   'isOnePage',
+  'profileType',
   'personalInfo',
   'personalDetails',
   'summary',

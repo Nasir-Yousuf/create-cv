@@ -575,6 +575,7 @@ export const normalizeCvData = (raw = {}) => {
 
   return {
     ...src,
+    profileType: src.profileType || 'student',
     summary,
     careerObjective,
     personalInfo,

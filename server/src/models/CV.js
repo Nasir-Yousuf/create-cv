@@ -27,6 +27,11 @@ const cvSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    profileType: {
+      type: String,
+      default: 'student',
+      trim: true,
+    },
     summary: {
       type: String,
       default: '',
