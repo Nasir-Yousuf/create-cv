@@ -32,6 +32,7 @@ import {
   optimizeCvPhotoForExport,
   fetchExternalImageAsDataUrl,
 } from '../utils/imageOptimize';
+import { applyOnePageAutoFit } from '../utils/onePageFit';
 
 const exportStaticStore = {
   getState: () => ({
@@ -819,16 +820,7 @@ export const exportService = {
               );
 
         if (isOnePage && captureEl) {
-          const targetPx = isLetterStage ? 1056 : 1123;
-          captureEl.style.maxHeight = 'none';
-          captureEl.style.overflow = 'visible';
-          const actualHeight = captureEl.scrollHeight || captureEl.offsetHeight;
-          if (actualHeight > targetPx + 4) {
-            const fitScale = Math.max(0.70, (targetPx - 2) / actualHeight);
-            captureEl.style.zoom = String(fitScale);
-          }
-          captureEl.style.maxHeight = `${targetPx}px`;
-          captureEl.style.overflow = 'hidden';
+          applyOnePageAutoFit(captureEl, isLetterStage);
         }
 
         let canvas;
@@ -1320,28 +1312,33 @@ export const exportService = {
           ],
         });
 
-      if (personalInfo.summary) {
-        paragraphs.push(createHeading('Professional Summary'));
-        paragraphs.push(
+      // Modular Section Generators
+      const renderSummary = () => {
+        const summaryText = personalInfo.summary || personalInfo.objective;
+        if (!summaryText) return [];
+        return [
+          createHeading(personalInfo.summary ? 'Professional Summary' : 'Career Objective'),
           new Paragraph({
             spacing: { after: 160, line: 260 },
-            children: [safeRun(personalInfo.summary, { size: 20, color: darkTextHex })],
-          })
-        );
-      }
+            children: [safeRun(summaryText, { size: 20, color: darkTextHex })],
+          }),
+        ];
+      };
 
-      if (experience && experience.length > 0) {
-        paragraphs.push(createHeading('Work Experience'));
+      const renderExperience = () => {
+        if (!experience || experience.length === 0) return [];
+        const items = [createHeading('Work Experience')];
+
         experience.forEach((exp) => {
           const dateRange = [exp.startDate, exp.current ? 'Present' : exp.endDate]
             .filter(Boolean)
             .join(' – ');
 
-          paragraphs.push(
+          items.push(
             new Paragraph({
               spacing: { before: 100, after: 30 },
               children: [
-                safeRun(exp.jobTitle || 'Role', {
+                safeRun(exp.jobTitle || 'Role / Position', {
                   bold: true,
                   size: 21,
                   color: darkTextHex,
@@ -1361,7 +1358,7 @@ export const exportService = {
 
           const compLoc = [exp.company, exp.location].filter(Boolean).join(' • ');
           if (compLoc) {
-            paragraphs.push(
+            items.push(
               new Paragraph({
                 spacing: { after: 50 },
                 children: [safeRun(compLoc, { italics: true, size: 19, color: grayHex })],
@@ -1370,7 +1367,7 @@ export const exportService = {
           }
 
           if (exp.description) {
-            paragraphs.push(
+            items.push(
               new Paragraph({
                 spacing: { after: 50, line: 240 },
                 children: [safeRun(exp.description, { size: 20, color: darkTextHex })],
@@ -1381,7 +1378,7 @@ export const exportService = {
           if (Array.isArray(exp.highlights) && exp.highlights.length > 0) {
             exp.highlights.forEach((h) => {
               if (typeof h === 'string' && h.trim()) {
-                paragraphs.push(
+                items.push(
                   new Paragraph({
                     bullet: { level: 0 },
                     spacing: { after: 30, line: 240 },
@@ -1392,76 +1389,162 @@ export const exportService = {
             });
           }
         });
-      }
 
-      if (education && education.length > 0) {
-        paragraphs.push(createHeading('Academic Qualifications'));
-        education.forEach((edu) => {
-          const dateRange = [edu.startDate, edu.endDate].filter(Boolean).join(' – ');
-          paragraphs.push(
-            new Paragraph({
-              spacing: { before: 80, after: 20 },
-              children: [
-                safeRun(edu.degree || 'Degree', {
-                  bold: true,
-                  size: 21,
-                  color: darkTextHex,
-                }),
-                ...(dateRange
-                  ? [
-                      safeRun(`   |   ${dateRange}`, {
-                        bold: true,
-                        size: 18,
-                        color: lightGrayHex,
+        return items;
+      };
+
+      const renderEducation = () => {
+        if (!education || education.length === 0) return [];
+        const items = [createHeading('Academic Qualifications')];
+
+        if ((String(templateId).includes('bd') || String(templateId).includes('bangladesh')) && education.length > 0) {
+          const headerRow = new TableRow({
+            children: [
+              new TableCell({
+                width: { size: 30, type: WidthType.PERCENTAGE },
+                shading: { fill: 'F1F5F9' },
+                children: [new Paragraph({ children: [safeRun('Exam / Degree', { bold: true, size: 19 })] })],
+              }),
+              new TableCell({
+                width: { size: 35, type: WidthType.PERCENTAGE },
+                shading: { fill: 'F1F5F9' },
+                children: [new Paragraph({ children: [safeRun('Institute / Board', { bold: true, size: 19 })] })],
+              }),
+              new TableCell({
+                width: { size: 18, type: WidthType.PERCENTAGE },
+                shading: { fill: 'F1F5F9' },
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    children: [safeRun('Passing Year', { bold: true, size: 19 })],
+                  }),
+                ],
+              }),
+              new TableCell({
+                width: { size: 17, type: WidthType.PERCENTAGE },
+                shading: { fill: 'F1F5F9' },
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    children: [safeRun('Result', { bold: true, size: 19 })],
+                  }),
+                ],
+              }),
+            ],
+          });
+
+          const dataRows = education.map(
+            (edu) =>
+              new TableRow({
+                children: [
+                  new TableCell({
+                    width: { size: 30, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ children: [safeRun(edu.degree || '', { bold: true, size: 19 })] })],
+                  }),
+                  new TableCell({
+                    width: { size: 35, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ children: [safeRun(edu.institution || '', { size: 19 })] })],
+                  }),
+                  new TableCell({
+                    width: { size: 18, type: WidthType.PERCENTAGE },
+                    children: [
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [safeRun(edu.endDate || edu.startDate || '', { size: 19 })],
                       }),
-                    ]
-                  : []),
-              ],
-            })
+                    ],
+                  }),
+                  new TableCell({
+                    width: { size: 17, type: WidthType.PERCENTAGE },
+                    children: [
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [safeRun(edu.grade || '', { bold: true, size: 19 })],
+                      }),
+                    ],
+                  }),
+                ],
+              })
           );
 
-          const eduDetails = [edu.institution, edu.fieldOfStudy, edu.grade ? `Result: ${edu.grade}` : null]
-            .filter(Boolean)
-            .join(' • ');
-
-          if (eduDetails) {
-            paragraphs.push(
+          items.push(
+            new Table({
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              rows: [headerRow, ...dataRows],
+            })
+          );
+        } else {
+          education.forEach((edu) => {
+            const dateRange = [edu.startDate, edu.endDate].filter(Boolean).join(' – ');
+            items.push(
               new Paragraph({
-                spacing: { after: 50 },
-                children: [safeRun(eduDetails, { italics: true, size: 19, color: grayHex })],
+                spacing: { before: 80, after: 20 },
+                children: [
+                  safeRun(edu.degree || 'Degree', {
+                    bold: true,
+                    size: 21,
+                    color: darkTextHex,
+                  }),
+                  ...(dateRange
+                    ? [
+                        safeRun(`   |   ${dateRange}`, {
+                          bold: true,
+                          size: 18,
+                          color: lightGrayHex,
+                        }),
+                      ]
+                    : []),
+                ],
               })
             );
-          }
-        });
-      }
 
-      if (skills && skills.length > 0) {
+            const eduDetails = [edu.institution, edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : null, edu.grade ? `Result: ${edu.grade}` : null]
+              .filter(Boolean)
+              .join(' • ');
+
+            if (eduDetails) {
+              items.push(
+                new Paragraph({
+                  spacing: { after: 50 },
+                  children: [safeRun(eduDetails, { italics: true, size: 19, color: grayHex })],
+                })
+              );
+            }
+          });
+        }
+
+        return items;
+      };
+
+      const renderSkills = () => {
+        if (!skills || skills.length === 0) return [];
         const skillList = skills
           .map((s) => (typeof s === 'string' ? s : s?.name))
           .filter(Boolean);
 
-        if (skillList.length > 0) {
-          paragraphs.push(createHeading('Skills & Competencies'));
-          paragraphs.push(
-            new Paragraph({
-              spacing: { after: 140, line: 260 },
-              children: [
-                safeRun(skillList.join('   •   '), {
-                  bold: true,
-                  size: 20,
-                  color: darkTextHex,
-                }),
-              ],
-            })
-          );
-        }
-      }
+        if (skillList.length === 0) return [];
+        return [
+          createHeading('Skills & Competencies'),
+          new Paragraph({
+            spacing: { after: 140, line: 260 },
+            children: [
+              safeRun(skillList.join('   •   '), {
+                bold: true,
+                size: 20,
+                color: darkTextHex,
+              }),
+            ],
+          }),
+        ];
+      };
 
-      if (projects && projects.length > 0) {
-        paragraphs.push(createHeading('Key Projects'));
+      const renderProjects = () => {
+        if (!projects || projects.length === 0) return [];
+        const items = [createHeading('Key Projects')];
+
         projects.forEach((proj) => {
           const hasTech = Array.isArray(proj.technologies) && proj.technologies.length > 0;
-          paragraphs.push(
+          items.push(
             new Paragraph({
               spacing: { before: 80, after: 20 },
               children: [
@@ -1483,7 +1566,7 @@ export const exportService = {
             })
           );
           if (proj.description) {
-            paragraphs.push(
+            items.push(
               new Paragraph({
                 spacing: { after: 50, line: 240 },
                 children: [safeRun(proj.description, { size: 19, color: darkTextHex })],
@@ -1491,13 +1574,17 @@ export const exportService = {
             );
           }
         });
-      }
 
-      if (certifications && certifications.length > 0) {
-        paragraphs.push(createHeading('Certifications & Licenses'));
+        return items;
+      };
+
+      const renderCertifications = () => {
+        if (!certifications || certifications.length === 0) return [];
+        const items = [createHeading('Certifications & Licenses')];
+
         certifications.forEach((cert) => {
           const certInfo = [cert.issuer, cert.date || cert.year].filter(Boolean).join(' • ');
-          paragraphs.push(
+          items.push(
             new Paragraph({
               bullet: { level: 0 },
               spacing: { after: 30 },
@@ -1514,59 +1601,116 @@ export const exportService = {
             })
           );
         });
-      }
 
-      if (languages && languages.length > 0) {
+        return items;
+      };
+
+      const renderLanguages = () => {
+        if (!languages || languages.length === 0) return [];
         const langItems = languages
           .map((lang) => {
             if (typeof lang === 'string') return lang;
             return `${lang.language || lang.name || ''} ${lang.proficiency ? `(${lang.proficiency})` : ''}`.trim();
           })
           .filter(Boolean);
-        if (langItems.length > 0) {
-          paragraphs.push(createHeading('Languages'));
-          paragraphs.push(
-            new Paragraph({
-              spacing: { after: 120 },
-              children: [safeRun(langItems.join('   •   '), { size: 20, color: darkTextHex })],
-            })
-          );
-        }
-      }
 
-      const isBdTemplate = String(templateId).includes('bd') || String(templateId).includes('bangladesh');
-      const bdFields = [
-        { label: "Father's Name", value: personalDetails.fatherName },
-        { label: "Mother's Name", value: personalDetails.motherName },
-        { label: 'Date of Birth', value: personalDetails.dob || personalDetails.dateOfBirth },
-        { label: 'Gender', value: personalDetails.gender },
-        { label: 'Marital Status', value: personalDetails.maritalStatus },
-        { label: 'Nationality', value: personalDetails.nationality || (isBdTemplate ? 'Bangladeshi' : '') },
-        { label: 'National ID (NID)', value: personalDetails.nid || personalDetails.nationalId },
-        { label: 'Blood Group', value: personalDetails.bloodGroup },
-        { label: 'Present Address', value: personalDetails.presentAddress },
-        { label: 'Permanent Address', value: personalDetails.permanentAddress },
-      ].filter((f) => Boolean(f.value));
+        if (langItems.length === 0) return [];
+        return [
+          createHeading('Languages'),
+          new Paragraph({
+            spacing: { after: 120 },
+            children: [safeRun(langItems.join('   •   '), { size: 20, color: darkTextHex })],
+          }),
+        ];
+      };
 
-      if (bdFields.length > 0) {
-        paragraphs.push(createHeading('Personal Details'));
-        bdFields.forEach((field) => {
-          paragraphs.push(
-            new Paragraph({
-              spacing: { before: 20, after: 30 },
+      const renderPersonalDetails = () => {
+        const isBdTemplate = String(templateId).includes('bd') || String(templateId).includes('bangladesh');
+        const bdFields = [
+          { label: "Father's Name", value: personalDetails.fatherName },
+          { label: "Mother's Name", value: personalDetails.motherName },
+          { label: 'Date of Birth', value: personalDetails.dob || personalDetails.dateOfBirth },
+          { label: 'Gender', value: personalDetails.gender },
+          { label: 'Marital Status', value: personalDetails.maritalStatus },
+          { label: 'Nationality', value: personalDetails.nationality || (isBdTemplate ? 'Bangladeshi' : '') },
+          { label: 'National ID (NID)', value: personalDetails.nid || personalDetails.nationalId },
+          { label: 'Blood Group', value: personalDetails.bloodGroup },
+          { label: 'Religion', value: personalDetails.religion },
+          { label: 'Present Address', value: personalDetails.presentAddress },
+          { label: 'Permanent Address', value: personalDetails.permanentAddress },
+        ].filter((f) => Boolean(f.value));
+
+        if (bdFields.length === 0) return [];
+
+        const rows = bdFields.map(
+          (field) =>
+            new TableRow({
               children: [
-                safeRun(`${field.label}: `, { bold: true, size: 19, color: grayHex }),
-                safeRun(field.value, { size: 19, color: darkTextHex }),
+                new TableCell({
+                  width: { size: 35, type: WidthType.PERCENTAGE },
+                  borders: {
+                    top: { style: BorderStyle.NONE },
+                    bottom: { style: BorderStyle.NONE },
+                    left: { style: BorderStyle.NONE },
+                    right: { style: BorderStyle.NONE },
+                  },
+                  children: [
+                    new Paragraph({
+                      spacing: { before: 20, after: 20 },
+                      children: [
+                        safeRun(`${field.label}:`, {
+                          bold: true,
+                          size: 19,
+                          color: grayHex,
+                        }),
+                      ],
+                    }),
+                  ],
+                }),
+                new TableCell({
+                  width: { size: 65, type: WidthType.PERCENTAGE },
+                  borders: {
+                    top: { style: BorderStyle.NONE },
+                    bottom: { style: BorderStyle.NONE },
+                    left: { style: BorderStyle.NONE },
+                    right: { style: BorderStyle.NONE },
+                  },
+                  children: [
+                    new Paragraph({
+                      spacing: { before: 20, after: 20 },
+                      children: [
+                        safeRun(field.value, { size: 19, color: darkTextHex }),
+                      ],
+                    }),
+                  ],
+                }),
               ],
             })
-          );
-        });
-      }
+        );
 
-      if (references && references.length > 0) {
-        paragraphs.push(createHeading('References'));
+        return [
+          createHeading('Personal Details'),
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.NONE },
+              bottom: { style: BorderStyle.NONE },
+              left: { style: BorderStyle.NONE },
+              right: { style: BorderStyle.NONE },
+              insideHorizontal: { style: BorderStyle.NONE },
+              insideVertical: { style: BorderStyle.NONE },
+            },
+            rows,
+          }),
+        ];
+      };
+
+      const renderReferences = () => {
+        if (!references || references.length === 0) return [];
+        const items = [createHeading('References')];
+
         references.forEach((ref) => {
-          paragraphs.push(
+          items.push(
             new Paragraph({
               spacing: { before: 60, after: 20 },
               children: [safeRun(ref.name || 'Reference Person', { bold: true, size: 20, color: darkTextHex })],
@@ -1581,7 +1725,7 @@ export const exportService = {
             .filter(Boolean)
             .join('   |   ');
           if (refDetails) {
-            paragraphs.push(
+            items.push(
               new Paragraph({
                 spacing: { after: 50 },
                 children: [safeRun(refDetails, { size: 18, color: grayHex })],
@@ -1589,16 +1733,36 @@ export const exportService = {
             );
           }
         });
-      }
 
-      if (customSections && customSections.length > 0) {
+        return items;
+      };
+
+      const renderInterests = () => {
+        const list = (Array.isArray(cvData.interests) ? cvData.interests : [])
+          .map((item) => (typeof item === 'string' ? item.trim() : item?.name || ''))
+          .filter(Boolean);
+
+        if (list.length === 0) return [];
+        return [
+          createHeading('Interests & Activities'),
+          new Paragraph({
+            spacing: { after: 120 },
+            children: [safeRun(list.join('   •   '), { size: 19, color: darkTextHex })],
+          }),
+        ];
+      };
+
+      const renderCustomSections = () => {
+        if (!customSections || customSections.length === 0) return [];
+        const items = [];
+
         customSections.forEach((sec) => {
           if (!sec || (!sec.content && (!Array.isArray(sec.items) || sec.items.length === 0))) {
             return;
           }
-          paragraphs.push(createHeading(sec.title || 'Additional Information'));
+          items.push(createHeading(sec.title || 'Additional Information'));
           if (sec.content) {
-            paragraphs.push(
+            items.push(
               new Paragraph({
                 spacing: { after: 80, line: 240 },
                 children: [safeRun(sec.content, { size: 19, color: darkTextHex })],
@@ -1609,7 +1773,7 @@ export const exportService = {
             sec.items.forEach((item) => {
               const headline = [item.title, item.subtitle, item.date].filter(Boolean).join(' • ');
               if (headline) {
-                paragraphs.push(
+                items.push(
                   new Paragraph({
                     bullet: { level: 0 },
                     spacing: { after: 30, line: 240 },
@@ -1618,7 +1782,7 @@ export const exportService = {
                 );
               }
               if (item.description) {
-                paragraphs.push(
+                items.push(
                   new Paragraph({
                     spacing: { after: 40, line: 240 },
                     children: [safeRun(item.description, { size: 18, color: grayHex })],
@@ -1628,11 +1792,14 @@ export const exportService = {
             });
           }
         });
-      }
 
-      if (declaration && (declaration.signedBy || declaration.text)) {
-        paragraphs.push(createHeading('Declaration'));
-        paragraphs.push(
+        return items;
+      };
+
+      const renderDeclaration = () => {
+        if (!declaration || (!declaration.signedBy && !declaration.text)) return [];
+        return [
+          createHeading('Declaration'),
           new Paragraph({
             spacing: { after: 120, line: 240 },
             children: [
@@ -1641,9 +1808,7 @@ export const exportService = {
                 { italics: true, size: 19, color: darkTextHex }
               ),
             ],
-          })
-        );
-        paragraphs.push(
+          }),
           new Paragraph({
             alignment: AlignmentType.RIGHT,
             spacing: { before: 120, after: 60 },
@@ -1654,8 +1819,88 @@ export const exportService = {
                 color: primaryHex,
               }),
             ],
-          })
-        );
+          }),
+        ];
+      };
+
+      const sectionGenerators = {
+        summary: renderSummary,
+        experience: renderExperience,
+        education: renderEducation,
+        skills: renderSkills,
+        projects: renderProjects,
+        certifications: renderCertifications,
+        languages: renderLanguages,
+        personalDetails: renderPersonalDetails,
+        references: renderReferences,
+        interests: renderInterests,
+        customSections: renderCustomSections,
+        declaration: renderDeclaration,
+      };
+
+      const mapSectionKey = (key) => {
+        if (!key || typeof key !== 'string') return null;
+        const lower = key.trim().toLowerCase();
+        if (lower === 'summary' || lower === 'objective' || lower === 'about' || lower === 'professionalsummary') return 'summary';
+        if (lower === 'experience' || lower === 'work' || lower === 'workexperience' || lower === 'employment') return 'experience';
+        if (lower === 'education' || lower === 'academic' || lower === 'qualifications') return 'education';
+        if (lower === 'skills' || lower === 'competencies' || lower === 'technicalskills') return 'skills';
+        if (lower === 'projects' || lower === 'keyprojects' || lower === 'portfolio') return 'projects';
+        if (lower === 'certifications' || lower === 'certificates' || lower === 'licenses') return 'certifications';
+        if (lower === 'languages' || lower === 'language') return 'languages';
+        if (lower === 'personaldetails' || lower === 'personal_details' || lower === 'bdpersonaldetails') return 'personalDetails';
+        if (lower === 'references' || lower === 'reference') return 'references';
+        if (lower === 'interests' || lower === 'hobbies') return 'interests';
+        if (lower === 'declaration' || lower === 'signature') return 'declaration';
+        if (lower === 'customsections' || lower === 'custom_sections' || lower.startsWith('custom')) return 'customSections';
+        return lower;
+      };
+
+      const defaultOrder = [
+        'summary',
+        'experience',
+        'education',
+        'skills',
+        'projects',
+        'certifications',
+        'languages',
+        'personalDetails',
+        'references',
+        'interests',
+        'customSections',
+        'declaration',
+      ];
+
+      const rawOrder = Array.isArray(design?.sectionOrder) && design.sectionOrder.length > 0
+        ? design.sectionOrder
+        : defaultOrder;
+
+      const executedSections = new Set();
+      const orderedKeys = [];
+
+      for (const rawKey of rawOrder) {
+        const canonicalKey = mapSectionKey(rawKey);
+        if (canonicalKey && sectionGenerators[canonicalKey] && !executedSections.has(canonicalKey)) {
+          executedSections.add(canonicalKey);
+          orderedKeys.push(canonicalKey);
+        }
+      }
+
+      for (const fallbackKey of defaultOrder) {
+        if (!executedSections.has(fallbackKey)) {
+          executedSections.add(fallbackKey);
+          orderedKeys.push(fallbackKey);
+        }
+      }
+
+      for (const key of orderedKeys) {
+        const generator = sectionGenerators[key];
+        if (generator) {
+          const generatedItems = generator();
+          if (Array.isArray(generatedItems) && generatedItems.length > 0) {
+            paragraphs.push(...generatedItems);
+          }
+        }
       }
 
       const doc = new Document({

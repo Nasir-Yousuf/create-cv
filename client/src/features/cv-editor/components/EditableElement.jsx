@@ -19,6 +19,7 @@ export const EditableElement = ({
   const dispatch = useDispatch();
   const activeSection = useSelector((state) => state.ui.activeSection);
   const activeField = useSelector((state) => state.ui.activeField);
+  const elementOverrides = useSelector((state) => state.cv?.currentCV?.elementOverrides || {});
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentText, setCurrentText] = useState(value || '');
@@ -31,6 +32,19 @@ export const EditableElement = ({
 
   const fieldKey = index !== null ? `${section}.${index}.${field}` : `${section}.${field}`;
   const isSelected = activeSection === section && activeField === fieldKey;
+  const override = elementOverrides[fieldKey] || {};
+
+  const mergedStyle = {
+    ...style,
+    ...(override.fontSize
+      ? { fontSize: typeof override.fontSize === 'number' ? `${override.fontSize}px` : override.fontSize }
+      : {}),
+    ...(override.fontWeight ? { fontWeight: override.fontWeight } : {}),
+    ...(override.italic ? { fontStyle: 'italic' } : {}),
+    ...(override.underline ? { textDecoration: 'underline' } : {}),
+    ...(override.color ? { color: override.color } : {}),
+    ...(override.align ? { textAlign: override.align } : {}),
+  };
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -92,7 +106,7 @@ export const EditableElement = ({
             onBlur={handleCommit}
             onKeyDown={handleKeyDown}
             className="w-full p-2 text-xs border-2 border-indigo-500 rounded-lg bg-white text-slate-900 shadow-xl focus:outline-none resize-y"
-            style={style}
+            style={mergedStyle}
           />
         ) : (
           <input
@@ -103,7 +117,7 @@ export const EditableElement = ({
             onBlur={handleCommit}
             onKeyDown={handleKeyDown}
             className="w-full px-2 py-1 text-xs border-2 border-indigo-500 rounded-lg bg-white text-slate-900 shadow-xl focus:outline-none"
-            style={style}
+            style={mergedStyle}
           />
         )}
 
@@ -147,7 +161,7 @@ export const EditableElement = ({
           ? 'ring-2 ring-indigo-500 ring-offset-1 bg-indigo-50/30 rounded-sm'
           : 'hover:outline-dashed hover:outline-1 hover:outline-indigo-400/80 hover:bg-indigo-50/10 rounded-sm'
       } ${className}`}
-      style={style}
+      style={mergedStyle}
       title="Click to edit directly"
     >
       {/* Corner pip indicators when selected (matches Canva / smallseotools screenshot 2) */}

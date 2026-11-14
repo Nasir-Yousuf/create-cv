@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
+  editorMode: 'form', // 'form' (Mode A) | 'visual' (Mode B)
   mobileViewMode: 'edit', // 'edit' | 'preview' | 'design'
   desktopTab: 'content', // 'content' | 'design' | 'templates' | 'ai'
   activeSection: 'personalInfo',
@@ -33,6 +34,9 @@ export const uiSlice = createSlice({
   name: 'ui',
   initialState,
   reducers: {
+    setEditorMode: (state, action) => {
+      state.editorMode = action.payload === 'visual' ? 'visual' : 'form';
+    },
     setMobileViewMode: (state, action) => {
       state.mobileViewMode = action.payload;
     },
@@ -107,6 +111,7 @@ export const uiSlice = createSlice({
 });
 
 export const {
+  setEditorMode,
   setMobileViewMode,
   setDesktopTab,
   setActiveSection,

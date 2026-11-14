@@ -89,8 +89,18 @@ export const RenderCVTemplate = ({ cvData, scale = 1, onOpenPhotoModal }) => {
     appliedAccent = templateAccent || templateColor;
   }
 
+  const isOnePage =
+    cvData?.isOnePage !== undefined
+      ? Boolean(cvData.isOnePage)
+      : Boolean(
+          templateMeta?.isOnePage ||
+            cvData?.category === 'One-Page CVs' ||
+            templateMeta?.categories?.includes('One-Page CVs')
+        );
+
   const mergedCvData = {
     ...safeCvData,
+    isOnePage,
     design: {
       ...safeCvData.design,
       primaryColor: appliedPrimary,
@@ -109,8 +119,9 @@ export const RenderCVTemplate = ({ cvData, scale = 1, onOpenPhotoModal }) => {
       <div
         className={`${
           mergedCvData?.design?.pageSize === 'Letter' ? 'resume-sheet-letter' : 'resume-sheet-a4'
-        } bg-white shadow-2xl rounded-sm overflow-hidden`}
+        } ${isOnePage ? 'cv-one-page-sheet' : 'cv-multi-page-sheet'} bg-white shadow-2xl rounded-sm`}
         id="cv-export-sheet"
+        data-one-page={isOnePage ? 'true' : 'false'}
       >
         <Component cvData={mergedCvData} onOpenPhotoModal={onOpenPhotoModal} />
       </div>

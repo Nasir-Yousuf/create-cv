@@ -1,6 +1,148 @@
 /* Shared CV typography alignment, badge centering, and photo proportion rules.
    Consistently bundled for Browser Preview, Client html2canvas PDF, and Server Puppeteer PDF. */
 
+/* ==========================================================================
+   Page Setup & Print Geometry (Unified for Browser Preview & Puppeteer PDF)
+   ========================================================================== */
+@page {
+  size: A4 portrait;
+  margin: 0 !important;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0 !important;
+  }
+
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* Exact physical page dimensions for A4 and Letter */
+.resume-sheet-a4,
+#cv-export-sheet.resume-sheet-a4 {
+  width: 210mm;
+  min-height: 297mm;
+  box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  position: relative;
+}
+
+.resume-sheet-letter,
+#cv-export-sheet.resume-sheet-letter {
+  width: 8.5in;
+  min-height: 11in;
+  box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  position: relative;
+}
+
+/* Strict One-Page Templates */
+.cv-one-page-sheet,
+#cv-export-sheet[data-one-page="true"],
+#cv-export-sheet.cv-one-page-sheet {
+  height: 297mm;
+  max-height: 297mm;
+  overflow: hidden;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.resume-sheet-letter.cv-one-page-sheet,
+#cv-export-sheet.resume-sheet-letter[data-one-page="true"] {
+  height: 11in;
+  max-height: 11in;
+}
+
+@media print {
+  .cv-one-page-sheet,
+  #cv-export-sheet[data-one-page="true"],
+  #cv-export-sheet.cv-one-page-sheet {
+    height: 297mm !important;
+    max-height: 297mm !important;
+    overflow: hidden !important;
+    position: relative !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  .resume-sheet-letter.cv-one-page-sheet,
+  #cv-export-sheet.resume-sheet-letter[data-one-page="true"] {
+    height: 11in !important;
+    max-height: 11in !important;
+  }
+
+  .cv-multi-page-sheet,
+  #cv-export-sheet[data-one-page="false"] {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+
+/* Multi-Page Pagination Rules */
+.cv-item-avoid-break,
+.cv-experience-item,
+.cv-education-item,
+.cv-project-item,
+.cv-certification-item,
+.cv-reference-item,
+.break-inside-avoid,
+tr {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+}
+
+.cv-section-title,
+.cv-heading-avoid-break,
+h1,
+h2,
+h3 {
+  break-after: avoid !important;
+  page-break-after: avoid !important;
+}
+
+/* ==========================================================================
+   CSS Custom Property Dynamic Spacing Engine for One-Page Templates
+   ========================================================================== */
+#cv-export-sheet,
+.cv-one-page-sheet {
+  --cv-section-gap: 0.75rem;
+  --cv-item-gap: 0.45rem;
+  --cv-line-height: 1.375;
+  --cv-fit-scale: 1;
+}
+
+#cv-export-sheet.cv-one-page-sheet .space-y-3 > :not([hidden]) ~ :not([hidden]),
+#cv-export-sheet.cv-one-page-sheet .space-y-2\.5 > :not([hidden]) ~ :not([hidden]),
+#cv-export-sheet.cv-one-page-sheet .space-y-2 > :not([hidden]) ~ :not([hidden]),
+#cv-export-sheet.cv-one-page-sheet .cv-section-gap {
+  margin-top: var(--cv-section-gap, 0.75rem) !important;
+}
+
+#cv-export-sheet.cv-one-page-sheet .space-y-1\.5 > :not([hidden]) ~ :not([hidden]),
+#cv-export-sheet.cv-one-page-sheet .space-y-1 > :not([hidden]) ~ :not([hidden]),
+#cv-export-sheet.cv-one-page-sheet .cv-item-gap {
+  margin-top: var(--cv-item-gap, 0.45rem) !important;
+}
+
+#cv-export-sheet.cv-one-page-sheet p,
+#cv-export-sheet.cv-one-page-sheet li,
+#cv-export-sheet.cv-one-page-sheet .leading-relaxed,
+#cv-export-sheet.cv-one-page-sheet .leading-normal,
+#cv-export-sheet.cv-one-page-sheet .leading-snug {
+  line-height: var(--cv-line-height, 1.375) !important;
+}
+
 .cv-icon-row {
   display: flex;
   align-items: center;

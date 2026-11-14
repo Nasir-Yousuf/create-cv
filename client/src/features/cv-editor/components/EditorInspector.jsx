@@ -1,6 +1,11 @@
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { updateDesign, updatePersonalInfo, setTemplateId } from '../../../store/cvSlice';
+import {
+  updateDesign,
+  updatePersonalInfo,
+  setTemplateId,
+  setElementOverride,
+} from '../../../store/cvSlice';
 import {
   Bold,
   Italic,
@@ -29,6 +34,8 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
   const currentCV = useSelector((state) => state.cv.currentCV);
   const { design = {}, personalInfo = {}, templateId } = currentCV || {};
   const { activeSection, activeField } = useSelector((state) => state.ui);
+  const elementOverrides = currentCV?.elementOverrides || {};
+  const activeOverride = activeField ? elementOverrides[activeField] || {} : {};
 
   const primaryColor = design?.primaryColor || '#4f46e5';
 
@@ -81,21 +88,65 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
           <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
             <button
               type="button"
-              className="p-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 font-bold"
+              onClick={() => {
+                if (activeField) {
+                  const isBold =
+                    activeOverride.fontWeight === 'bold' || activeOverride.fontWeight === 700;
+                  dispatch(
+                    setElementOverride({
+                      path: activeField,
+                      overrides: { fontWeight: isBold ? 'normal' : 'bold' },
+                    })
+                  );
+                }
+              }}
+              className={`p-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 font-bold transition-colors ${
+                activeOverride.fontWeight === 'bold' || activeOverride.fontWeight === 700
+                  ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
+                  : ''
+              }`}
               title="Bold"
             >
               <Bold className="w-4 h-4" />
             </button>
             <button
               type="button"
-              className="p-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 italic"
+              onClick={() => {
+                if (activeField) {
+                  dispatch(
+                    setElementOverride({
+                      path: activeField,
+                      overrides: { italic: !activeOverride.italic },
+                    })
+                  );
+                }
+              }}
+              className={`p-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 italic transition-colors ${
+                activeOverride.italic
+                  ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
+                  : ''
+              }`}
               title="Italic"
             >
               <Italic className="w-4 h-4" />
             </button>
             <button
               type="button"
-              className="p-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 underline"
+              onClick={() => {
+                if (activeField) {
+                  dispatch(
+                    setElementOverride({
+                      path: activeField,
+                      overrides: { underline: !activeOverride.underline },
+                    })
+                  );
+                }
+              }}
+              className={`p-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 underline transition-colors ${
+                activeOverride.underline
+                  ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
+                  : ''
+              }`}
               title="Underline"
             >
               <Underline className="w-4 h-4" />
@@ -103,9 +154,19 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
             <div className="w-[1px] h-4 bg-slate-300 dark:bg-slate-700 mx-1" />
             <button
               type="button"
-              onClick={() => dispatch(updateDesign({ textAlignment: 'left' }))}
-              className={`p-1.5 rounded-lg ${
-                design?.textAlignment === 'left' ? 'bg-white dark:bg-slate-700 shadow-sm' : ''
+              onClick={() => {
+                if (activeField) {
+                  dispatch(setElementOverride({ path: activeField, overrides: { align: 'left' } }));
+                } else {
+                  dispatch(updateDesign({ textAlignment: 'left' }));
+                }
+              }}
+              className={`p-1.5 rounded-lg transition-colors ${
+                (activeField
+                  ? activeOverride.align === 'left'
+                  : design?.textAlignment === 'left')
+                  ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
+                  : ''
               }`}
               title="Align Left"
             >
@@ -113,9 +174,21 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
             </button>
             <button
               type="button"
-              onClick={() => dispatch(updateDesign({ textAlignment: 'center' }))}
-              className={`p-1.5 rounded-lg ${
-                design?.textAlignment === 'center' ? 'bg-white dark:bg-slate-700 shadow-sm' : ''
+              onClick={() => {
+                if (activeField) {
+                  dispatch(
+                    setElementOverride({ path: activeField, overrides: { align: 'center' } })
+                  );
+                } else {
+                  dispatch(updateDesign({ textAlignment: 'center' }));
+                }
+              }}
+              className={`p-1.5 rounded-lg transition-colors ${
+                (activeField
+                  ? activeOverride.align === 'center'
+                  : design?.textAlignment === 'center')
+                  ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
+                  : ''
               }`}
               title="Align Center"
             >
@@ -123,9 +196,21 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
             </button>
             <button
               type="button"
-              onClick={() => dispatch(updateDesign({ textAlignment: 'right' }))}
-              className={`p-1.5 rounded-lg ${
-                design?.textAlignment === 'right' ? 'bg-white dark:bg-slate-700 shadow-sm' : ''
+              onClick={() => {
+                if (activeField) {
+                  dispatch(
+                    setElementOverride({ path: activeField, overrides: { align: 'right' } })
+                  );
+                } else {
+                  dispatch(updateDesign({ textAlignment: 'right' }));
+                }
+              }}
+              className={`p-1.5 rounded-lg transition-colors ${
+                (activeField
+                  ? activeOverride.align === 'right'
+                  : design?.textAlignment === 'right')
+                  ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
+                  : ''
               }`}
               title="Align Right"
             >
@@ -133,9 +218,21 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
             </button>
             <button
               type="button"
-              onClick={() => dispatch(updateDesign({ textAlignment: 'justify' }))}
-              className={`p-1.5 rounded-lg ${
-                design?.textAlignment === 'justify' ? 'bg-white dark:bg-slate-700 shadow-sm' : ''
+              onClick={() => {
+                if (activeField) {
+                  dispatch(
+                    setElementOverride({ path: activeField, overrides: { align: 'justify' } })
+                  );
+                } else {
+                  dispatch(updateDesign({ textAlignment: 'justify' }));
+                }
+              }}
+              className={`p-1.5 rounded-lg transition-colors ${
+                (activeField
+                  ? activeOverride.align === 'justify'
+                  : design?.textAlignment === 'justify')
+                  ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
+                  : ''
               }`}
               title="Justify"
             >

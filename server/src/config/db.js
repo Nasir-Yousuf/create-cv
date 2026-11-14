@@ -1,10 +1,14 @@
 import mongoose from 'mongoose';
 
-let connectPromise = null;
-
 export const isDBConnected = () => mongoose.connection.readyState === 1;
 
+/**
+ * Connect to MongoDB with connection caching across serverless invocations.
+ * Caches the connection promise on global._mongoClientPromise so warm serverless
+ * containers reuse the connection in 0ms without redundant handshakes or pool exhaustion.
+ */
 export const connectDB = async () => {
+  // If connection is already open and ready, return immediately (0ms)
   if (mongoose.connection.readyState === 1) {
     return mongoose.connection;
   }
@@ -15,13 +19,23 @@ export const connectDB = async () => {
     return null;
   }
 
-  if (connectPromise) {
-    return connectPromise;
+  // Reuse existing promise if already connecting or cached on global
+  if (global._mongoClientPromise) {
+    try {
+      const conn = await global._mongoClientPromise;
+      if (mongoose.connection.readyState === 1) {
+        return conn;
+      }
+    } catch (_) {
+      // Clear poisoned or rejected promise so reconnect can be attempted
+      global._mongoClientPromise = null;
+    }
   }
 
-  connectPromise = mongoose
+  global._mongoClientPromise = mongoose
     .connect(uri, {
       serverSelectionTimeoutMS: 8000,
+      maxPoolSize: 10,
     })
     .then((conn) => {
       console.log(`✅ MongoDB Atlas Connected: ${conn.connection.host} (Database: ${conn.connection.name})`);
@@ -31,17 +45,15 @@ export const connectDB = async () => {
       console.error(`❌ MongoDB Connection Error: ${error.message}`);
       console.warn('⚠️ Tip: Make sure your current IP address is whitelisted in MongoDB Atlas Network Access (0.0.0.0/0).');
       console.warn('⚠️ Server will continue running so the API and preview engine remain accessible.');
+      global._mongoClientPromise = null;
       return null;
-    })
-    .finally(() => {
-      connectPromise = null;
     });
 
-  return connectPromise;
+  return global._mongoClientPromise;
 };
 
 mongoose.connection.on('disconnected', () => {
-  connectPromise = null;
+  global._mongoClientPromise = null;
   console.log('MongoDB disconnected.');
 });
 

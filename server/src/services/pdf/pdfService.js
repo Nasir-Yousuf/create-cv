@@ -6,7 +6,12 @@ import { fileURLToPath } from 'url';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium-min';
 import { resolveTemplateId, resolveTemplateMeta } from '../../../../shared/constants/cvDefaults.js';
-import { normalizeCvData } from '../../../../shared/utils/cvNormalize.js';
+import {
+  normalizeCvData,
+  getGoogleFontsUrl,
+  formatFontStack,
+  containsBanglaText,
+} from '../../../../shared/utils/cvNormalize.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,13 +19,44 @@ const require = createRequire(import.meta.url);
 
 // Match the Sparticuz chromium-min major version installed in server/package.json (v153.0.0)
 const SPARTICUZ_PACK_VERSION = 'v153.0.0';
-const GOOGLE_FONTS_CSS_URL =
-  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap';
 
 let cachedSSRModule = null;
 let cachedCompiledCss = null;
 let cachedChromiumPath = null;
 let pendingChromiumPathPromise = null;
+
+let cachedBrowser = null;
+let pendingBrowserPromise = null;
+
+const LOW_MEMORY_FLAGS = [
+  '--disable-dev-shm-usage',
+  '--no-zygote',
+  '--single-process',
+  '--disable-gpu',
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--font-render-hinting=none',
+];
+
+/**
+ * Checks whether a Puppeteer browser instance is alive and connected.
+ * Checks browser.isConnected() and falls back to browser.connected across Puppeteer versions.
+ */
+export const isBrowserConnected = (browser) => {
+  if (!browser) return false;
+  try {
+    if (typeof browser.isConnected === 'function') {
+      return browser.isConnected();
+    }
+    if (typeof browser.connected === 'boolean') {
+      return browser.connected;
+    }
+    const proc = typeof browser.process === 'function' ? browser.process() : null;
+    return Boolean(proc && !proc.killed);
+  } catch (_) {
+    return false;
+  }
+};
 
 /**
  * Loads the Vite-compiled React SSR template renderer so Preview and PDF use
@@ -162,12 +198,14 @@ export const resolveServerlessChromiumExecutablePath = async () => {
 
 /**
  * Launches Puppeteer using @sparticuz/chromium-min in serverless runtimes (Vercel/AWS Lambda)
- * or local Chromium/Chrome/Edge on desktop/Docker environments.
+ * or local Chromium/Chrome/Edge on desktop/Docker environments with low-memory flags.
  */
 const launchPdfBrowser = async (viewport) => {
   const isServerless = Boolean(
     process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT
   );
+
+  const defaultViewport = viewport || { width: 794, height: 1123, deviceScaleFactor: 2 };
 
   if (isServerless) {
     const explicitPath =
@@ -180,20 +218,22 @@ const launchPdfBrowser = async (viewport) => {
       return puppeteer.launch({
         headless: true,
         executablePath: explicitPath,
-        defaultViewport: viewport,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        defaultViewport,
+        args: Array.from(new Set(['--no-sandbox', '--disable-setuid-sandbox', ...LOW_MEMORY_FLAGS])),
       });
     }
 
     const executablePath = await resolveServerlessChromiumExecutablePath();
-    const serverlessArgs = await puppeteer.defaultArgs({
-      args: chromium.args,
-      headless: 'shell',
-    });
+    const serverlessArgs = Array.from(
+      new Set([
+        ...chromium.args,
+        ...LOW_MEMORY_FLAGS,
+      ])
+    );
 
     return puppeteer.launch({
       args: serverlessArgs,
-      defaultViewport: viewport,
+      defaultViewport,
       executablePath,
       headless: 'shell',
     });
@@ -212,29 +252,66 @@ const launchPdfBrowser = async (viewport) => {
   return puppeteer.launch({
     headless: true,
     executablePath,
-    defaultViewport: viewport,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--font-render-hinting=none',
-    ],
+    defaultViewport,
+    args: Array.from(
+      new Set([
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        ...LOW_MEMORY_FLAGS,
+      ])
+    ),
   });
 };
 
 /**
- * Formats CSS font-family safely without quoting multi-font fallback stacks.
+ * Retrieves the cached singleton browser instance or launches a new one if not connected.
+ * Ensures concurrent calls reuse the launch promise to avoid duplicate launches.
  */
-const formatFontStack = (rawFontFamily) => {
-  const cleaned = String(rawFontFamily || 'Inter').trim();
-  if (!cleaned) {
-    return "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+export const getSharedBrowser = async (viewport) => {
+  if (isBrowserConnected(cachedBrowser)) {
+    return cachedBrowser;
   }
-  if (cleaned.includes(',')) {
-    return cleaned;
+
+  if (pendingBrowserPromise) {
+    return pendingBrowserPromise;
   }
-  return `'${cleaned}', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`;
+
+  pendingBrowserPromise = (async () => {
+    if (cachedBrowser) {
+      try {
+        await cachedBrowser.close();
+      } catch (_) {}
+      cachedBrowser = null;
+    }
+
+    const browser = await launchPdfBrowser(viewport);
+    cachedBrowser = browser;
+
+    browser.once('disconnected', () => {
+      if (cachedBrowser === browser) {
+        cachedBrowser = null;
+      }
+    });
+
+    return browser;
+  })()
+    .finally(() => {
+      pendingBrowserPromise = null;
+    });
+
+  return pendingBrowserPromise;
+};
+
+/**
+ * Cleanly closes the cached singleton browser (used during teardown or fatal error recovery).
+ */
+export const closeSharedBrowser = async () => {
+  if (cachedBrowser) {
+    try {
+      await cachedBrowser.close();
+    } catch (_) {}
+    cachedBrowser = null;
+  }
 };
 
 /**
@@ -273,7 +350,13 @@ const buildPrintableDocument = ({ cvData, renderedHtml = '', customCss = '' }) =
         );
   const isLetter = design?.pageSize === 'Letter';
   const pageSize = isLetter ? 'Letter' : 'A4';
-  const fontStack = formatFontStack(design?.fontFamily);
+  const isBangla =
+    containsBanglaText(cvData) ||
+    String(cvData?.templateId || '').includes('bd') ||
+    String(cvData?.templateId || '').includes('bangladesh') ||
+    cvData?.category === 'Bangladesh Standards (BD)';
+  const fontStack = formatFontStack(design?.fontFamily, isBangla);
+  const fontsUrl = getGoogleFontsUrl(cvData);
   const safeName = (personalInfo?.fullName || cvData?.title || 'CV').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   const bodyContent =
@@ -297,20 +380,21 @@ const buildPrintableDocument = ({ cvData, renderedHtml = '', customCss = '' }) =
       <title>${safeName} - Resume</title>
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+      <link rel="stylesheet" href="${fontsUrl}" />
       ${shouldIncludeTailwindCdn ? '<script src="https://cdn.tailwindcss.com"></script>' : ''}
       ${compiledCss ? `<style>${compiledCss}</style>` : ''}
       <style>
         @page {
-          size: ${pageSize};
-          margin: 0;
+          size: ${pageSize} portrait;
+          margin: 0 !important;
         }
         * {
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
         }
         html, body {
-          margin: 0;
-          padding: 0;
+          margin: 0 !important;
+          padding: 0 !important;
           background: #ffffff !important;
           font-family: ${fontStack};
           -webkit-font-smoothing: antialiased;
@@ -325,22 +409,58 @@ const buildPrintableDocument = ({ cvData, renderedHtml = '', customCss = '' }) =
         .resume-sheet-a4,
         .resume-sheet-letter {
           width: ${isLetter ? '8.5in' : '210mm'} !important;
-          ${
-            isOnePage
-              ? `height: ${isLetter ? '11in' : '297mm'} !important; max-height: ${isLetter ? '11in' : '297mm'} !important; overflow: hidden !important;`
-              : `min-height: ${isLetter ? '10.95in' : '296.5mm'} !important; overflow: visible !important;`
-          }
+          box-sizing: border-box !important;
           box-shadow: none !important;
           border-radius: 0 !important;
           border: none !important;
           margin: 0 !important;
           transform: none !important;
+          position: relative !important;
         }
+        ${
+          isOnePage
+            ? `
+        #cv-export-sheet,
+        .resume-sheet-a4,
+        .resume-sheet-letter,
+        .cv-one-page-sheet {
+          height: ${isLetter ? '11in' : '297mm'} !important;
+          max-height: ${isLetter ? '11in' : '297mm'} !important;
+          overflow: hidden !important;
+          position: relative !important;
+          page-break-after: avoid !important;
+          break-after: avoid !important;
+        }
+        `
+            : `
+        #cv-export-sheet,
+        .resume-sheet-a4,
+        .resume-sheet-letter,
+        .cv-multi-page-sheet {
+          min-height: ${isLetter ? '11in' : '297mm'} !important;
+          height: auto !important;
+          max-height: none !important;
+          overflow: visible !important;
+        }
+        `
+        }
+        .cv-item-avoid-break,
+        .cv-experience-item,
+        .cv-education-item,
+        .cv-project-item,
+        .cv-certification-item,
+        .cv-reference-item,
         .avoid-break,
         .break-inside-avoid,
         tr {
-          break-inside: avoid;
-          page-break-inside: avoid;
+          break-inside: avoid !important;
+          page-break-inside: avoid !important;
+        }
+        .cv-section-title,
+        .cv-heading-avoid-break,
+        h1, h2, h3 {
+          break-after: avoid !important;
+          page-break-after: avoid !important;
         }
         .cv-editor-pip,
         .cv-placeholder,
@@ -386,10 +506,12 @@ export const generatePDF = async (rawCvData, renderedHtml = '', customCss = '') 
 
   const fullHtml = buildPrintableDocument({ cvData, renderedHtml, customCss });
 
-  let browser;
+  let browser = null;
+  let page = null;
   try {
-    browser = await launchPdfBrowser(viewport);
-    const page = await browser.newPage();
+    browser = await getSharedBrowser(viewport);
+    page = await browser.newPage();
+    await page.setViewport(viewport);
 
     // Evaluate CSS and media layout in screen mode (matching 794px desktop preview widths for sm:/md: classes)
     // while Chromium still honors @page size when printing PDF.
@@ -397,81 +519,100 @@ export const generatePDF = async (rawCvData, renderedHtml = '', customCss = '') 
 
     await page.setContent(fullHtml, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // Load Google Fonts non-blockingly so slow/offline networks never hang setContent()
-    await page.evaluate(
-      async ({ fontsUrl, isOnePage, isLetter }) => {
-        try {
-          await new Promise((resolve) => {
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = fontsUrl;
-            const timer = setTimeout(resolve, 2500);
-            link.addEventListener(
-              'load',
-              () => {
-                clearTimeout(timer);
-                resolve();
-              },
-              { once: true }
-            );
-            link.addEventListener(
-              'error',
-              () => {
-                clearTimeout(timer);
-                resolve();
-              },
-              { once: true }
-            );
-            document.head.appendChild(link);
-          });
-          if (document.fonts && document.fonts.ready) {
-            await Promise.race([
-              document.fonts.ready,
-              new Promise((resolve) => setTimeout(resolve, 2500)),
-            ]);
-          }
-        } catch (e) {}
+    // Wait for document.fonts.ready to ensure all web typography metrics are fully settled
+    try {
+      await Promise.race([
+        page.evaluateHandle('document.fonts.ready'),
+        new Promise((resolve) => setTimeout(resolve, 3500)),
+      ]);
+    } catch (_) {}
 
-        const imgs = Array.from(document.querySelectorAll('img'));
-        if (imgs.length > 0) {
-          await Promise.race([
-            Promise.all(
-              imgs.map((img) => {
-                if (img.complete) return Promise.resolve();
-                return new Promise((resolve) => {
-                  img.addEventListener('load', resolve, { once: true });
-                  img.addEventListener('error', resolve, { once: true });
-                  img.addEventListener('abort', resolve, { once: true });
-                  setTimeout(resolve, 2500);
-                });
-              })
-            ),
-            new Promise((resolve) => setTimeout(resolve, 3000)),
-          ]);
-        }
+    // Ensure all <img> tags (such as base64 or hosted profile photos) have completed loading
+    await page.evaluate(async () => {
+      const imgs = Array.from(document.querySelectorAll('img'));
+      if (imgs.length > 0) {
+        await Promise.race([
+          Promise.all(
+            imgs.map((img) => {
+              if (img.complete) return Promise.resolve();
+              return new Promise((resolve) => {
+                img.addEventListener('load', resolve, { once: true });
+                img.addEventListener('error', resolve, { once: true });
+                img.addEventListener('abort', resolve, { once: true });
+                setTimeout(resolve, 3000);
+              });
+            })
+          ),
+          new Promise((resolve) => setTimeout(resolve, 3500)),
+        ]);
+      }
+    });
 
-        // For One-Page CVs, measure if content overflows single-page boundary and auto-fit zoom
-        if (isOnePage) {
+    // For One-Page CVs, run deterministic 3-step auto-fit after fonts & images are ready
+    if (isOnePage) {
+      await page.evaluate(
+        async ({ isLetter }) => {
           const sheet =
             document.getElementById('cv-export-sheet') ||
-            document.querySelector('.resume-sheet-a4, .resume-sheet-letter') ||
+            document.querySelector('.cv-one-page-sheet, .resume-sheet-a4, .resume-sheet-letter') ||
             document.body.firstElementChild;
           if (sheet) {
             const targetPx = isLetter ? 1056 : 1122; // A4 297mm at 96 DPI = 1122.5px
+
+            // Step A: Reset and measure natural content height
+            sheet.style.setProperty('--cv-section-gap', '');
+            sheet.style.setProperty('--cv-item-gap', '');
+            sheet.style.setProperty('--cv-line-height', '');
+            sheet.style.setProperty('--cv-fit-scale', '1');
+            sheet.style.zoom = '1';
             sheet.style.maxHeight = 'none';
             sheet.style.overflow = 'visible';
-            const actualHeight = sheet.scrollHeight || sheet.offsetHeight;
-            if (actualHeight > targetPx + 4) {
-              const fitScale = Math.max(0.70, (targetPx - 2) / actualHeight);
-              sheet.style.zoom = String(fitScale);
+
+            const naturalHeight = sheet.scrollHeight || sheet.offsetHeight;
+
+            if (naturalHeight <= targetPx + 3) {
+              // Fits within 1 page budget
+              sheet.style.setProperty('--cv-section-gap', '0.75rem');
+              sheet.style.setProperty('--cv-item-gap', '0.45rem');
+              sheet.style.setProperty('--cv-line-height', '1.375');
+              sheet.style.setProperty('--cv-fit-scale', '1');
+              sheet.style.zoom = '1';
+              sheet.style.maxHeight = targetPx + 'px';
+              sheet.style.overflow = 'hidden';
+            } else {
+              // Step B: Progressively tighten custom properties up to 15% overflow
+              const overflowPx = naturalHeight - targetPx;
+              const tighteningFactor = Math.min(1.0, Math.max(0.1, overflowPx / (targetPx * 0.15)));
+              const sectionGap = (0.75 - tighteningFactor * 0.33).toFixed(3) + 'rem';
+              const itemGap = (0.45 - tighteningFactor * 0.20).toFixed(3) + 'rem';
+              const lineHeight = (1.375 - tighteningFactor * 0.155).toFixed(3);
+
+              sheet.style.setProperty('--cv-section-gap', sectionGap);
+              sheet.style.setProperty('--cv-item-gap', itemGap);
+              sheet.style.setProperty('--cv-line-height', lineHeight);
+
+              const tightenedHeight = sheet.scrollHeight || sheet.offsetHeight;
+
+              if (tightenedHeight <= targetPx + 3) {
+                sheet.style.setProperty('--cv-fit-scale', '1');
+                sheet.style.zoom = '1';
+                sheet.style.maxHeight = targetPx + 'px';
+                sheet.style.overflow = 'hidden';
+              } else {
+                // Step C: Apply proportional scale down to floor of 0.86
+                const rawScale = (targetPx - 2) / tightenedHeight;
+                const fitScale = Math.max(0.86, Math.min(1.0, Math.floor(rawScale * 1000) / 1000));
+                sheet.style.setProperty('--cv-fit-scale', String(fitScale));
+                sheet.style.zoom = String(fitScale);
+                sheet.style.maxHeight = targetPx + 'px';
+                sheet.style.overflow = 'hidden';
+              }
             }
-            sheet.style.maxHeight = targetPx + 'px';
-            sheet.style.overflow = 'hidden';
           }
-        }
-      },
-      { fontsUrl: GOOGLE_FONTS_CSS_URL, isOnePage, isLetter }
-    );
+        },
+        { isLetter }
+      );
+    }
 
     const pdfOptions = {
       format: pageSize,
@@ -493,10 +634,23 @@ export const generatePDF = async (rawCvData, renderedHtml = '', customCss = '') 
     return Buffer.from(pdfBuffer);
   } catch (err) {
     console.error('Puppeteer PDF Rendering Error:', err);
+    if (browser && !isBrowserConnected(browser)) {
+      try {
+        await browser.close().catch(() => {});
+      } catch (_) {}
+      cachedBrowser = null;
+    }
     throw err;
   } finally {
-    if (browser) {
-      await browser.close().catch(() => {});
+    // Always close the page to prevent memory leaks in the shared browser
+    if (page) {
+      try {
+        await page.close();
+      } catch (closeErr) {
+        if (browser && !isBrowserConnected(browser)) {
+          cachedBrowser = null;
+        }
+      }
     }
   }
 };

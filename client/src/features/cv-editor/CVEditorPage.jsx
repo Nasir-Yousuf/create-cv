@@ -11,6 +11,7 @@ import {
   undo,
   redo,
   setSavingState,
+  setSaveStatus,
 } from '../../store/cvSlice';
 import { openAuthModal } from '../../store/authSlice';
 import {
@@ -89,11 +90,32 @@ export const CVEditorPage = () => {
   const [searchParams] = useSearchParams();
   const canvasScrollContainerRef = useRef(null);
 
-  const { currentCV, cvId, version, isDirty, past, future, isAutosaving } = useSelector(
-    (state) => state.cv
-  );
+  const {
+    currentCV,
+    cvId,
+    version,
+    isDirty,
+    past,
+    future,
+    isAutosaving,
+    saveStatus,
+    lastSavedAt,
+  } = useSelector((state) => state.cv);
   const { previewScale, isDarkMode } = useSelector((state) => state.ui);
   const { isAuthenticated, user } = useSelector((state) => state.auth);
+
+  // Warn on tab/window close if there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (saveStatus === 'unsaved' || isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [saveStatus, isDirty]);
 
   // macOS App State
   const [templatesList, setTemplatesList] = useState(TEMPLATES_REGISTRY);
@@ -284,12 +306,12 @@ export const CVEditorPage = () => {
     syncCloudCV();
   }, [isAuthenticated, searchParams]);
 
-  // Debounced Autosave with optimistic version guard
+  // Debounced Autosave with optimistic version guard and saveStatus tracking
   useEffect(() => {
-    if (!isDirty || versionConflict) return;
+    if ((saveStatus !== 'unsaved' && !isDirty) || versionConflict) return;
 
     const timer = setTimeout(async () => {
-      dispatch(setSavingState(true));
+      dispatch(setSaveStatus('saving'));
       try {
         if (isAuthenticated) {
           if (cvId && !String(cvId).startsWith('sample-')) {
@@ -322,6 +344,7 @@ export const CVEditorPage = () => {
           }
         }
         localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
+        dispatch(setSaveStatus('saved'));
       } catch (err) {
         if (err?.status === 409) {
           setVersionConflict({
@@ -332,13 +355,12 @@ export const CVEditorPage = () => {
           console.warn('Autosave status:', err.message);
         }
         localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
-      } finally {
-        dispatch(setSavingState(false));
+        dispatch(setSaveStatus('error'));
       }
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [currentCV, isDirty, cvId, version, versionConflict, isAuthenticated, dispatch]);
+  }, [currentCV, isDirty, saveStatus, cvId, version, versionConflict, isAuthenticated, dispatch]);
 
   const handleReloadLatestCloud = async () => {
     if (!cvId) return;
@@ -363,7 +385,7 @@ export const CVEditorPage = () => {
   };
 
   const handleManualSave = async ({ forceOverwrite = false } = {}) => {
-    dispatch(setSavingState(true));
+    dispatch(setSaveStatus('saving'));
     try {
       if (isAuthenticated) {
         if (cvId && !String(cvId).startsWith('sample-')) {
@@ -395,6 +417,7 @@ export const CVEditorPage = () => {
         }
       }
       localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
+      dispatch(setSaveStatus('saved'));
       dispatch(
         showToast({
           message: isAuthenticated
@@ -419,8 +442,7 @@ export const CVEditorPage = () => {
         localStorage.setItem('resumecraft_draft', JSON.stringify(currentCV));
         dispatch(showToast({ message: 'Saved locally in browser cache.', type: 'info' }));
       }
-    } finally {
-      dispatch(setSavingState(false));
+      dispatch(setSaveStatus('error'));
     }
   };
 
@@ -1368,19 +1390,46 @@ export const CVEditorPage = () => {
                   <Sliders className="w-4 h-4" />
                 </button>
 
-                {/* [✔ Save Changes] Pill Button from Reference Image */}
+                {/* [✔ Save Changes] Pill Button with saveStatus tracking */}
                 <button
                   type="button"
                   onClick={handleManualSave}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-all active:scale-95 cursor-pointer"
+                  title={
+                    saveStatus === 'error'
+                      ? 'Error saving changes. Click to retry.'
+                      : saveStatus === 'unsaved'
+                      ? 'Unsaved changes. Click to save now.'
+                      : 'All changes saved.'
+                  }
                 >
-                  <CheckCircle2
-                    className={`w-3.5 h-3.5 ${
-                      isAutosaving ? 'animate-spin text-amber-500' : 'text-emerald-500'
-                    }`}
-                  />
-                  <span className="hidden sm:inline">{isAutosaving ? 'Saving...' : 'Save Changes'}</span>
-                  <span className="sm:hidden">{isAutosaving ? '...' : 'Save'}</span>
+                  {saveStatus === 'saving' || isAutosaving ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                  ) : saveStatus === 'error' ? (
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                  ) : saveStatus === 'unsaved' ? (
+                    <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  ) : (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {saveStatus === 'saving' || isAutosaving
+                      ? 'Saving...'
+                      : saveStatus === 'error'
+                      ? 'Save Error'
+                      : saveStatus === 'unsaved'
+                      ? 'Save Changes'
+                      : 'Saved'}
+                  </span>
+                  <span className="sm:hidden">
+                    {saveStatus === 'saving' || isAutosaving
+                      ? '...'
+                      : saveStatus === 'error'
+                      ? 'Retry'
+                      : saveStatus === 'unsaved'
+                      ? 'Save*'
+                      : 'Saved'}
+                  </span>
                 </button>
 
                 {/* [📥 Export ▾] Blue/Indigo Pill Button from Reference Image */}
@@ -1463,6 +1512,36 @@ export const CVEditorPage = () => {
               </div>
             )}
 
+            {/* Overflow Beyond Limit Banner */}
+            {onePageFit.isOnePageTemplate && onePageFit.isOverflowingBeyondLimit && (
+              <div className="mx-4 mt-3 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl flex flex-wrap items-center justify-between gap-2.5 text-xs text-amber-900 dark:text-amber-200 shadow-sm animate-fade-in z-10">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">⚠️</span>
+                  <span>
+                    <strong>Content exceeds 1-page capacity (~{onePageFit.wordCount} words):</strong> In a strict 1-page template, text beyond the minimum readable scale floor may spill or be trimmed.
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      dispatch(setTemplateId('bd-corporate-standard'));
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold cursor-pointer shadow-sm transition-all"
+                  >
+                    Switch to Multi-Page
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAI('summary')}
+                    className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/60 cursor-pointer transition-all"
+                  >
+                    Condense Content
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* -----------------------------------------------------------------
                 DOCUMENT CANVAS (Centered, Scaled, Fully Click-to-Edit WYSIWYG)
             ------------------------------------------------------------------ */}
@@ -1518,7 +1597,9 @@ export const CVEditorPage = () => {
                 {onePageFit.isOnePageTemplate && (
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      onePageFit.status === 'overflow'
+                      onePageFit.isOverflowingBeyondLimit
+                        ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-200'
+                        : onePageFit.status === 'overflow'
                         ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
                         : onePageFit.status === 'tight'
                           ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
@@ -1526,26 +1607,36 @@ export const CVEditorPage = () => {
                     }`}
                     title={onePageFit.suggestions?.[0] || 'Fits comfortably on one A4 page'}
                   >
-                    {onePageFit.status === 'overflow'
-                      ? `Exceeds 1 Page (~${onePageFit.wordCount}w)`
-                      : onePageFit.status === 'tight'
-                        ? `Tight 1-Page (${onePageFit.percentUsed}%)`
-                        : `1-Page Fit (${onePageFit.percentUsed}%)`}
+                    {onePageFit.isOverflowingBeyondLimit
+                      ? `Exceeds 1-Page Limit (~${onePageFit.wordCount}w)`
+                      : onePageFit.status === 'overflow'
+                        ? `Exceeds 1 Page (~${onePageFit.wordCount}w)`
+                        : onePageFit.status === 'tight'
+                          ? `Tight 1-Page (${onePageFit.percentUsed}%)`
+                          : `1-Page Fit (${onePageFit.percentUsed}%)`}
                   </span>
                 )}
 
-                {onePageFit.isOnePageTemplate && onePageFit.status === 'overflow' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsSidebarOpen(true);
-                      setActiveSidebarTab('templates');
-                      setTemplateFilter('Multiple-Page CVs');
-                    }}
-                    className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                  >
-                    Switch to Multi-Page
-                  </button>
+                {onePageFit.isOnePageTemplate && (onePageFit.isOverflowingBeyondLimit || onePageFit.status === 'overflow') && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        dispatch(setTemplateId('bd-corporate-standard'));
+                      }}
+                      className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    >
+                      Switch to Multi-Page
+                    </button>
+                    <span className="text-slate-300 dark:text-slate-600">•</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenAI('summary')}
+                      className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                    >
+                      Condense Content
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

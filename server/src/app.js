@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import compression from 'compression';
 
 import authRoutes from './routes/authRoutes.js';
 import cvRoutes from './routes/cvRoutes.js';
@@ -70,9 +71,16 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// Request parsers with 50mb limit for high-res photo uploads and rich template HTML
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Gzip/Brotli response compression for JSON/HTML/text assets (skips binary downloads)
+app.use(
+  compression({
+    threshold: 1024, // Only compress responses over 1KB
+  })
+);
+
+// Lightweight request parsers (10MB allows rich base64 photos while protecting against serverless OOM spikes)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
 // Healthcheck Endpoint

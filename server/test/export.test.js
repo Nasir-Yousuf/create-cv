@@ -1,8 +1,8 @@
-import { describe, it } from 'node:test';
+import { describe, it, after } from 'node:test';
 import assert from 'node:assert/strict';
 import zlib from 'zlib';
 import mongoose from 'mongoose';
-import { generatePDF, generateTemplateHtml } from '../src/services/pdf/pdfService.js';
+import { generatePDF, generateTemplateHtml, closeSharedBrowser } from '../src/services/pdf/pdfService.js';
 import { generateDOCX } from '../src/services/docx/docxService.js';
 import {
   exportPDF,
@@ -16,6 +16,9 @@ import {
   toDocxHex,
   stripTransientCvMeta,
   hasExportableCvContent,
+  getGoogleFontsUrl,
+  formatFontStack,
+  containsBanglaText,
 } from '../../shared/utils/cvNormalize.js';
 
 // 1. Minimal CV Data
@@ -683,5 +686,208 @@ describe('Export & Persistence Edge-Case Regression Suite', () => {
     assert.strictEqual(cleaned.unlockType, undefined);
     assert.strictEqual(cleaned.version, undefined);
     assert.strictEqual(cleaned.personalInfo.fullName, 'Kept User');
+  });
+
+  describe('Typography Presets and Google Fonts URL', () => {
+    it('should generate Google Fonts link with all primary typography presets', () => {
+      const url = getGoogleFontsUrl(MINIMAL_CV);
+      assert.ok(url.includes('family=Inter'), 'Must include Inter');
+      assert.ok(url.includes('family=JetBrains+Mono'), 'Must include JetBrains Mono');
+      assert.ok(url.includes('family=Lora'), 'Must include Lora');
+      assert.ok(url.includes('family=Merriweather'), 'Must include Merriweather');
+      assert.ok(url.includes('family=Outfit'), 'Must include Outfit');
+      assert.ok(url.includes('family=Plus+Jakarta+Sans'), 'Must include Plus Jakarta Sans');
+      assert.ok(url.includes('family=Poppins'), 'Must include Poppins');
+    });
+
+    it('should dynamically include Hind Siliguri and Noto Sans Bengali when Bangla text or BD template is present', () => {
+      const banglaCv = {
+        ...MINIMAL_CV,
+        personalInfo: { fullName: 'তাহমিদুর রহমান', summary: 'সফটওয়্যার ইঞ্জিনিয়ার' },
+      };
+      assert.strictEqual(containsBanglaText(banglaCv), true);
+      const banglaUrl = getGoogleFontsUrl(banglaCv);
+      assert.ok(banglaUrl.includes('family=Hind+Siliguri'), 'Must include Hind Siliguri for Bangla text');
+      assert.ok(banglaUrl.includes('family=Noto+Sans+Bengali'), 'Must include Noto Sans Bengali for Bangla text');
+
+      const bdTemplateCv = { templateId: 'bd-corporate-standard' };
+      const bdUrl = getGoogleFontsUrl(bdTemplateCv);
+      assert.ok(bdUrl.includes('family=Hind+Siliguri'), 'Must include Hind Siliguri for BD templates');
+      assert.ok(bdUrl.includes('family=Noto+Sans+Bengali'), 'Must include Noto Sans Bengali for BD templates');
+    });
+
+    it('should format font stacks safely with Bangla fallbacks', () => {
+      const standardStack = formatFontStack('Plus Jakarta Sans', false);
+      assert.strictEqual(
+        standardStack,
+        "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+      );
+
+      const banglaStack = formatFontStack('Inter', true);
+      assert.ok(banglaStack.includes("'Hind Siliguri'"), 'Bangla stack must include Hind Siliguri fallback');
+      assert.ok(banglaStack.includes("'Noto Sans Bengali'"), 'Bangla stack must include Noto Sans Bengali fallback');
+    });
+  });
+
+  describe('PDF Vector Text Verification', () => {
+    it('should generate genuine vector PDF with font descriptors and text operators, not raster screenshots', async () => {
+      const pdfBuffer = await generatePDF(MINIMAL_CV);
+      assert.ok(Buffer.isBuffer(pdfBuffer), 'Must return a Buffer');
+      assert.ok(pdfBuffer.length > 5000, 'PDF buffer must have valid size');
+
+      // Verify PDF file signature
+      const signature = pdfBuffer.subarray(0, 5).toString('ascii');
+      assert.strictEqual(signature, '%PDF-', 'Must start with %PDF- header');
+
+      const pdfString = pdfBuffer.toString('latin1');
+
+      // Vector PDFs contain /Font dictionaries and text blocks (BT = Begin Text, ET = End Text)
+      const hasFontDescriptor =
+        pdfString.includes('/Font') ||
+        pdfString.includes('/Type /Font') ||
+        pdfString.includes('/Type/Font') ||
+        pdfString.includes('/Subtype /TrueType') ||
+        pdfString.includes('/Subtype /Type0');
+      assert.ok(hasFontDescriptor, 'PDF must contain true font descriptors');
+
+      // Decompress FlateDecode content streams to verify vector text operators (BT / ET)
+      const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+      let match;
+      let hasTextOperators = false;
+      while ((match = streamRegex.exec(pdfString)) !== null) {
+        try {
+          const decompressed = zlib.inflateSync(Buffer.from(match[1], 'latin1')).toString('latin1');
+          if (decompressed.includes('BT') && decompressed.includes('ET')) {
+            hasTextOperators = true;
+            break;
+          }
+        } catch (_) {}
+      }
+      assert.ok(hasTextOperators, 'PDF must contain PostScript/PDF text stream operators (BT / ET)');
+    });
+  });
+
+  describe('DOCX Dynamic Section Order & Null-Safety Verification', () => {
+    const extractZipEntry = (zipBuffer, targetFilename) => {
+      let offset = 0;
+      while (offset < zipBuffer.length - 30) {
+        if (zipBuffer.readUInt32LE(offset) !== 0x04034b50) {
+          break;
+        }
+        const compMethod = zipBuffer.readUInt16LE(offset + 8);
+        const compSize = zipBuffer.readUInt32LE(offset + 18);
+        const fileNameLen = zipBuffer.readUInt16LE(offset + 26);
+        const extraFieldLen = zipBuffer.readUInt16LE(offset + 28);
+        const fileName = zipBuffer.toString('utf8', offset + 30, offset + 30 + fileNameLen);
+        const dataOffset = offset + 30 + fileNameLen + extraFieldLen;
+        const dataSlice = zipBuffer.subarray(dataOffset, dataOffset + compSize);
+
+        if (fileName === targetFilename) {
+          if (compMethod === 8) {
+            return zlib.inflateRawSync(dataSlice).toString('utf8');
+          }
+          return dataSlice.toString('utf8');
+        }
+        offset = dataOffset + compSize;
+      }
+      return null;
+    };
+
+    it('should export Word document respecting user-configured sectionOrder', async () => {
+      const customOrderCV = {
+        ...FULL_CV,
+        design: {
+          ...FULL_CV.design,
+          sectionOrder: ['personalDetails', 'education', 'skills', 'experience', 'summary'],
+        },
+      };
+
+      const docxBuffer = await generateDOCX(customOrderCV);
+      assert.ok(Buffer.isBuffer(docxBuffer), 'Must return a Buffer');
+      assert.strictEqual(docxBuffer.subarray(0, 4).toString('hex'), '504b0304', 'Must be valid PK zip');
+
+      const docXml = extractZipEntry(docxBuffer, 'word/document.xml');
+      assert.ok(docXml, 'Must extract word/document.xml from DOCX');
+
+      const idxPersonal = docXml.indexOf('PERSONAL DETAILS');
+      const idxEducation = docXml.indexOf('ACADEMIC QUALIFICATIONS');
+      const idxSkills = docXml.indexOf('SKILLS &amp; COMPETENCIES');
+      const idxExperience = docXml.indexOf('WORK EXPERIENCE');
+      const idxSummary = docXml.indexOf('PROFESSIONAL SUMMARY');
+
+      assert.ok(idxPersonal !== -1, 'Personal Details section must be present');
+      assert.ok(idxEducation !== -1, 'Education section must be present');
+      assert.ok(idxSkills !== -1, 'Skills section must be present');
+      assert.ok(idxExperience !== -1, 'Experience section must be present');
+      assert.ok(idxSummary !== -1, 'Summary section must be present');
+
+      // Assert user's chosen section order is strictly preserved
+      assert.ok(
+        idxPersonal < idxEducation,
+        `Personal Details (${idxPersonal}) must precede Education (${idxEducation})`
+      );
+      assert.ok(
+        idxEducation < idxSkills,
+        `Education (${idxEducation}) must precede Skills (${idxSkills})`
+      );
+      assert.ok(
+        idxSkills < idxExperience,
+        `Skills (${idxSkills}) must precede Experience (${idxExperience})`
+      );
+      assert.ok(
+        idxExperience < idxSummary,
+        `Experience (${idxExperience}) must precede Summary (${idxSummary})`
+      );
+    });
+
+    it('should export cleanly without crashing on missing optional fields or null highlights', async () => {
+      const sparseCV = {
+        templateId: 'bd-corporate-standard',
+        personalInfo: { fullName: 'Sparse User', summary: null },
+        personalDetails: { fatherName: 'Father Only' },
+        experience: [
+          { jobTitle: 'Developer', company: null, description: null, highlights: null },
+          { jobTitle: null, company: 'Company Only', highlights: ['', null] },
+        ],
+        education: [
+          { degree: 'B.Sc.', institution: null, grade: null },
+        ],
+        skills: [null, 'JavaScript', { name: 'Python', level: null }],
+        projects: [
+          { title: 'Project 1', description: null, technologies: null },
+        ],
+        certifications: [
+          { name: 'Cert 1', issuer: null, date: null },
+        ],
+        languages: [
+          null,
+          'English',
+          { language: 'Bengali', proficiency: null },
+        ],
+        references: [
+          { name: 'Ref 1', designation: null, company: null },
+        ],
+        customSections: [
+          { title: 'Empty Section', content: null, items: [] },
+          { title: 'Active Section', content: 'Some custom content', items: [{ title: 'Item 1', description: null }] },
+        ],
+        declaration: { signedBy: 'Sparse User', text: null },
+      };
+
+      const docxBuffer = await generateDOCX(sparseCV);
+      assert.ok(Buffer.isBuffer(docxBuffer), 'Must return a Buffer');
+      assert.strictEqual(docxBuffer.subarray(0, 4).toString('hex'), '504b0304', 'Must be valid PK zip');
+
+      const docXml = extractZipEntry(docxBuffer, 'word/document.xml');
+      assert.ok(docXml, 'Must extract word/document.xml from sparse DOCX');
+      assert.ok(docXml.includes('Sparse User'), 'Must contain user name');
+      assert.ok(docXml.includes('Father Only'), 'Must contain father name');
+      assert.ok(docXml.includes('ACTIVE SECTION'), 'Must contain active custom section title');
+      assert.ok(docXml.includes('Some custom content'), 'Must contain active custom section content');
+    });
+  });
+
+  after(async () => {
+    await closeSharedBrowser();
   });
 });

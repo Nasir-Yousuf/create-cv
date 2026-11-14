@@ -1,4 +1,4 @@
-import { generatePDF } from '../src/services/pdf/pdfService.js';
+import { generatePDF, closeSharedBrowser } from '../src/services/pdf/pdfService.js';
 import { generateDOCX } from '../src/services/docx/docxService.js';
 import fs from 'fs';
 import path from 'path';
@@ -403,6 +403,8 @@ async function runAudit() {
   console.log(`DOCX Tests: ${docxSuccess} passed, ${docxFail} failed`);
   console.log(`Discovered Issues: ${issues.length}`);
   console.log('====================================================');
+
+  await closeSharedBrowser().catch(() => {});
 
   if (issues.length > 0) {
     console.log('Issues details:', JSON.stringify(issues, null, 2));

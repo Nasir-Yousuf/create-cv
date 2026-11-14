@@ -276,22 +276,22 @@ export const generateDOCX = async (rawCvData) => {
       ],
     });
 
-  // 3. CAREER SUMMARY
-  if (personalInfo.summary) {
-    paragraphs.push(createHeading('Professional Summary'));
-    paragraphs.push(
+  // Modular Section Generators
+  const renderSummary = () => {
+    const summaryText = personalInfo.summary || personalInfo.objective;
+    if (!summaryText) return [];
+    return [
+      createHeading(personalInfo.summary ? 'Professional Summary' : 'Career Objective'),
       new Paragraph({
         spacing: { after: 160, line: 260 },
-        children: [
-          safeRun(personalInfo.summary, { size: 20, color: darkTextHex }),
-        ],
-      })
-    );
-  }
+        children: [safeRun(summaryText, { size: 20, color: darkTextHex })],
+      }),
+    ];
+  };
 
-  // 4. WORK EXPERIENCE
-  if (experience && experience.length > 0) {
-    paragraphs.push(createHeading('Work Experience'));
+  const renderExperience = () => {
+    if (!experience || experience.length === 0) return [];
+    const items = [createHeading('Work Experience')];
 
     experience.forEach((exp) => {
       const dateRange = [
@@ -299,7 +299,7 @@ export const generateDOCX = async (rawCvData) => {
         exp.current ? 'Present' : exp.endDate,
       ].filter(Boolean).join(' – ');
 
-      paragraphs.push(
+      items.push(
         new Paragraph({
           spacing: { before: 100, after: 30 },
           children: [
@@ -323,7 +323,7 @@ export const generateDOCX = async (rawCvData) => {
 
       const compLoc = [exp.company, exp.location].filter(Boolean).join(' • ');
       if (compLoc) {
-        paragraphs.push(
+        items.push(
           new Paragraph({
             spacing: { after: 50 },
             children: [
@@ -334,7 +334,7 @@ export const generateDOCX = async (rawCvData) => {
       }
 
       if (exp.description) {
-        paragraphs.push(
+        items.push(
           new Paragraph({
             spacing: { after: 50, line: 240 },
             children: [
@@ -347,7 +347,7 @@ export const generateDOCX = async (rawCvData) => {
       if (Array.isArray(exp.highlights) && exp.highlights.length > 0) {
         exp.highlights.forEach((h) => {
           if (typeof h === 'string' && h.trim()) {
-            paragraphs.push(
+            items.push(
               new Paragraph({
                 bullet: { level: 0 },
                 spacing: { after: 30, line: 240 },
@@ -360,13 +360,14 @@ export const generateDOCX = async (rawCvData) => {
         });
       }
     });
-  }
 
-  // 5. EDUCATION & QUALIFICATIONS
-  if (education && education.length > 0) {
-    paragraphs.push(createHeading('Academic Qualifications'));
+    return items;
+  };
 
-    // Check if Bangladesh Standard: Render Table
+  const renderEducation = () => {
+    if (!education || education.length === 0) return [];
+    const items = [createHeading('Academic Qualifications')];
+
     if ((templateId.includes('bd') || templateId.includes('bangladesh')) && education.length > 0) {
       const headerRow = new TableRow({
         children: [
@@ -453,19 +454,16 @@ export const generateDOCX = async (rawCvData) => {
           })
       );
 
-      if (dataRows.length > 0) {
-        paragraphs.push(
-          new Table({
-            width: { size: 100, type: WidthType.PERCENTAGE },
-            rows: [headerRow, ...dataRows],
-          })
-        );
-      }
+      items.push(
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [headerRow, ...dataRows],
+        })
+      );
     } else {
-      // Standard List Style
       education.forEach((edu) => {
         const dateRange = [edu.startDate, edu.endDate].filter(Boolean).join(' – ');
-        paragraphs.push(
+        items.push(
           new Paragraph({
             spacing: { before: 80, after: 20 },
             children: [
@@ -494,7 +492,7 @@ export const generateDOCX = async (rawCvData) => {
         ].filter(Boolean).join(' • ');
 
         if (eduDetails) {
-          paragraphs.push(
+          items.push(
             new Paragraph({
               spacing: { after: 50 },
               children: [
@@ -505,38 +503,39 @@ export const generateDOCX = async (rawCvData) => {
         }
       });
     }
-  }
 
-  // 6. SKILLS
-  if (skills && skills.length > 0) {
+    return items;
+  };
+
+  const renderSkills = () => {
+    if (!skills || skills.length === 0) return [];
     const skillList = skills
       .map((s) => (typeof s === 'string' ? s : s?.name))
       .filter(Boolean);
 
-    if (skillList.length > 0) {
-      paragraphs.push(createHeading('Skills & Competencies'));
-      paragraphs.push(
-        new Paragraph({
-          spacing: { after: 140, line: 260 },
-          children: [
-            safeRun(skillList.join('   •   '), {
-              bold: true,
-              size: 20,
-              color: darkTextHex,
-            }),
-          ],
-        })
-      );
-    }
-  }
+    if (skillList.length === 0) return [];
+    return [
+      createHeading('Skills & Competencies'),
+      new Paragraph({
+        spacing: { after: 140, line: 260 },
+        children: [
+          safeRun(skillList.join('   •   '), {
+            bold: true,
+            size: 20,
+            color: darkTextHex,
+          }),
+        ],
+      }),
+    ];
+  };
 
-  // 7. KEY PROJECTS
-  if (projects && projects.length > 0) {
-    paragraphs.push(createHeading('Key Projects'));
+  const renderProjects = () => {
+    if (!projects || projects.length === 0) return [];
+    const items = [createHeading('Key Projects')];
 
     projects.forEach((proj) => {
       const hasTech = Array.isArray(proj.technologies) && proj.technologies.length > 0;
-      paragraphs.push(
+      items.push(
         new Paragraph({
           spacing: { before: 80, after: 20 },
           children: [
@@ -559,7 +558,7 @@ export const generateDOCX = async (rawCvData) => {
       );
 
       if (proj.description) {
-        paragraphs.push(
+        items.push(
           new Paragraph({
             spacing: { after: 50, line: 240 },
             children: [
@@ -569,14 +568,17 @@ export const generateDOCX = async (rawCvData) => {
         );
       }
     });
-  }
 
-  // 8. CERTIFICATIONS & LANGUAGES
-  if (certifications && certifications.length > 0) {
-    paragraphs.push(createHeading('Certifications & Licenses'));
+    return items;
+  };
+
+  const renderCertifications = () => {
+    if (!certifications || certifications.length === 0) return [];
+    const items = [createHeading('Certifications & Licenses')];
+
     certifications.forEach((cert) => {
       const certInfo = [cert.issuer, cert.date || cert.year].filter(Boolean).join(' • ');
-      paragraphs.push(
+      items.push(
         new Paragraph({
           bullet: { level: 0 },
           spacing: { after: 30 },
@@ -599,9 +601,12 @@ export const generateDOCX = async (rawCvData) => {
         })
       );
     });
-  }
 
-  if (languages && languages.length > 0) {
+    return items;
+  };
+
+  const renderLanguages = () => {
+    if (!languages || languages.length === 0) return [];
     const langItems = languages
       .map((lang) => {
         if (typeof lang === 'string') return lang;
@@ -609,39 +614,38 @@ export const generateDOCX = async (rawCvData) => {
       })
       .filter(Boolean);
 
-    if (langItems.length > 0) {
-      paragraphs.push(createHeading('Languages'));
-      paragraphs.push(
-        new Paragraph({
-          spacing: { after: 120 },
-          children: [
-            safeRun(langItems.join('   •   '), { size: 20, color: darkTextHex }),
-          ],
-        })
-      );
-    }
-  }
+    if (langItems.length === 0) return [];
+    return [
+      createHeading('Languages'),
+      new Paragraph({
+        spacing: { after: 120 },
+        children: [
+          safeRun(langItems.join('   •   '), { size: 20, color: darkTextHex }),
+        ],
+      }),
+    ];
+  };
 
-  // 9. PERSONAL DETAILS (BD Standard)
-  const isBdTemplate = templateId.includes('bd') || templateId.includes('bangladesh');
-  const bdFields = [
-    { label: "Father's Name", value: personalDetails.fatherName },
-    { label: "Mother's Name", value: personalDetails.motherName },
-    { label: 'Date of Birth', value: personalDetails.dob || personalDetails.dateOfBirth },
-    { label: 'Gender', value: personalDetails.gender },
-    { label: 'Marital Status', value: personalDetails.maritalStatus },
-    {
-      label: 'Nationality',
-      value: personalDetails.nationality || (isBdTemplate ? 'Bangladeshi' : ''),
-    },
-    { label: 'National ID (NID)', value: personalDetails.nid || personalDetails.nationalId },
-    { label: 'Blood Group', value: personalDetails.bloodGroup },
-    { label: 'Present Address', value: personalDetails.presentAddress },
-    { label: 'Permanent Address', value: personalDetails.permanentAddress },
-  ].filter((f) => Boolean(f.value));
+  const renderPersonalDetails = () => {
+    const isBdTemplate = templateId.includes('bd') || templateId.includes('bangladesh');
+    const bdFields = [
+      { label: "Father's Name", value: personalDetails.fatherName },
+      { label: "Mother's Name", value: personalDetails.motherName },
+      { label: 'Date of Birth', value: personalDetails.dob || personalDetails.dateOfBirth },
+      { label: 'Gender', value: personalDetails.gender },
+      { label: 'Marital Status', value: personalDetails.maritalStatus },
+      {
+        label: 'Nationality',
+        value: personalDetails.nationality || (isBdTemplate ? 'Bangladeshi' : ''),
+      },
+      { label: 'National ID (NID)', value: personalDetails.nid || personalDetails.nationalId },
+      { label: 'Blood Group', value: personalDetails.bloodGroup },
+      { label: 'Religion', value: personalDetails.religion },
+      { label: 'Present Address', value: personalDetails.presentAddress },
+      { label: 'Permanent Address', value: personalDetails.permanentAddress },
+    ].filter((f) => Boolean(f.value));
 
-  if (bdFields.length > 0) {
-    paragraphs.push(createHeading('Personal Details'));
+    if (bdFields.length === 0) return [];
 
     const rows = bdFields.map(
       (field) =>
@@ -689,7 +693,8 @@ export const generateDOCX = async (rawCvData) => {
         })
     );
 
-    paragraphs.push(
+    return [
+      createHeading('Personal Details'),
       new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         borders: {
@@ -701,16 +706,16 @@ export const generateDOCX = async (rawCvData) => {
           insideVertical: { style: BorderStyle.NONE },
         },
         rows,
-      })
-    );
-  }
+      }),
+    ];
+  };
 
-  // 10. REFERENCES
-  if (references && references.length > 0) {
-    paragraphs.push(createHeading('References'));
+  const renderReferences = () => {
+    if (!references || references.length === 0) return [];
+    const items = [createHeading('References')];
 
     references.forEach((ref) => {
-      paragraphs.push(
+      items.push(
         new Paragraph({
           spacing: { before: 60, after: 20 },
           children: [
@@ -731,7 +736,7 @@ export const generateDOCX = async (rawCvData) => {
       ].filter(Boolean).join('   |   ');
 
       if (refDetails) {
-        paragraphs.push(
+        items.push(
           new Paragraph({
             spacing: { after: 50 },
             children: [
@@ -741,18 +746,39 @@ export const generateDOCX = async (rawCvData) => {
         );
       }
     });
-  }
 
-  // 11. CUSTOM SECTIONS
-  if (customSections && customSections.length > 0) {
+    return items;
+  };
+
+  const renderInterests = () => {
+    const list = (Array.isArray(cvData.interests) ? cvData.interests : [])
+      .map((item) => (typeof item === 'string' ? item.trim() : item?.name || ''))
+      .filter(Boolean);
+
+    if (list.length === 0) return [];
+    return [
+      createHeading('Interests & Activities'),
+      new Paragraph({
+        spacing: { after: 120 },
+        children: [
+          safeRun(list.join('   •   '), { size: 19, color: darkTextHex }),
+        ],
+      }),
+    ];
+  };
+
+  const renderCustomSections = () => {
+    if (!customSections || customSections.length === 0) return [];
+    const items = [];
+
     customSections.forEach((sec) => {
       if (!sec || (!sec.content && (!Array.isArray(sec.items) || sec.items.length === 0))) {
         return;
       }
-      paragraphs.push(createHeading(sec.title || 'Additional Information'));
+      items.push(createHeading(sec.title || 'Additional Information'));
 
       if (sec.content) {
-        paragraphs.push(
+        items.push(
           new Paragraph({
             spacing: { after: 80, line: 240 },
             children: [
@@ -766,7 +792,7 @@ export const generateDOCX = async (rawCvData) => {
         sec.items.forEach((item) => {
           const headline = [item.title, item.subtitle, item.date].filter(Boolean).join(' • ');
           if (headline) {
-            paragraphs.push(
+            items.push(
               new Paragraph({
                 bullet: { level: 0 },
                 spacing: { after: 30, line: 240 },
@@ -777,7 +803,7 @@ export const generateDOCX = async (rawCvData) => {
             );
           }
           if (item.description) {
-            paragraphs.push(
+            items.push(
               new Paragraph({
                 spacing: { after: 40, line: 240 },
                 children: [
@@ -789,12 +815,14 @@ export const generateDOCX = async (rawCvData) => {
         });
       }
     });
-  }
 
-  // 12. DECLARATION
-  if (declaration && (declaration.signedBy || declaration.text)) {
-    paragraphs.push(createHeading('Declaration'));
-    paragraphs.push(
+    return items;
+  };
+
+  const renderDeclaration = () => {
+    if (!declaration || (!declaration.signedBy && !declaration.text)) return [];
+    return [
+      createHeading('Declaration'),
       new Paragraph({
         spacing: { after: 120, line: 240 },
         children: [
@@ -803,9 +831,7 @@ export const generateDOCX = async (rawCvData) => {
             { italics: true, size: 19, color: darkTextHex }
           ),
         ],
-      })
-    );
-    paragraphs.push(
+      }),
       new Paragraph({
         alignment: AlignmentType.RIGHT,
         spacing: { before: 120, after: 60 },
@@ -815,8 +841,90 @@ export const generateDOCX = async (rawCvData) => {
             { bold: true, size: 20, color: primaryHex }
           ),
         ],
-      })
-    );
+      }),
+    ];
+  };
+
+  const sectionGenerators = {
+    summary: renderSummary,
+    experience: renderExperience,
+    education: renderEducation,
+    skills: renderSkills,
+    projects: renderProjects,
+    certifications: renderCertifications,
+    languages: renderLanguages,
+    personalDetails: renderPersonalDetails,
+    references: renderReferences,
+    interests: renderInterests,
+    customSections: renderCustomSections,
+    declaration: renderDeclaration,
+  };
+
+  const mapSectionKey = (key) => {
+    if (!key || typeof key !== 'string') return null;
+    const lower = key.trim().toLowerCase();
+    if (lower === 'summary' || lower === 'objective' || lower === 'about' || lower === 'professionalsummary') return 'summary';
+    if (lower === 'experience' || lower === 'work' || lower === 'workexperience' || lower === 'employment') return 'experience';
+    if (lower === 'education' || lower === 'academic' || lower === 'qualifications') return 'education';
+    if (lower === 'skills' || lower === 'competencies' || lower === 'technicalskills') return 'skills';
+    if (lower === 'projects' || lower === 'keyprojects' || lower === 'portfolio') return 'projects';
+    if (lower === 'certifications' || lower === 'certificates' || lower === 'licenses') return 'certifications';
+    if (lower === 'languages' || lower === 'language') return 'languages';
+    if (lower === 'personaldetails' || lower === 'personal_details' || lower === 'bdpersonaldetails') return 'personalDetails';
+    if (lower === 'references' || lower === 'reference') return 'references';
+    if (lower === 'interests' || lower === 'hobbies') return 'interests';
+    if (lower === 'declaration' || lower === 'signature') return 'declaration';
+    if (lower === 'customsections' || lower === 'custom_sections' || lower.startsWith('custom')) return 'customSections';
+    return lower;
+  };
+
+  const defaultOrder = [
+    'summary',
+    'experience',
+    'education',
+    'skills',
+    'projects',
+    'certifications',
+    'languages',
+    'personalDetails',
+    'references',
+    'interests',
+    'customSections',
+    'declaration',
+  ];
+
+  const rawOrder = Array.isArray(design?.sectionOrder) && design.sectionOrder.length > 0
+    ? design.sectionOrder
+    : defaultOrder;
+
+  const executedSections = new Set();
+  const orderedKeys = [];
+
+  for (const rawKey of rawOrder) {
+    const canonicalKey = mapSectionKey(rawKey);
+    if (canonicalKey && sectionGenerators[canonicalKey] && !executedSections.has(canonicalKey)) {
+      executedSections.add(canonicalKey);
+      orderedKeys.push(canonicalKey);
+    }
+  }
+
+  // Fallback append any sections not specified in sectionOrder to guarantee zero data loss
+  for (const fallbackKey of defaultOrder) {
+    if (!executedSections.has(fallbackKey)) {
+      executedSections.add(fallbackKey);
+      orderedKeys.push(fallbackKey);
+    }
+  }
+
+  // Render all sections in user's chosen sectionOrder
+  for (const key of orderedKeys) {
+    const generator = sectionGenerators[key];
+    if (generator) {
+      const generatedItems = generator();
+      if (Array.isArray(generatedItems) && generatedItems.length > 0) {
+        paragraphs.push(...generatedItems);
+      }
+    }
   }
 
   // Construct Document with accurate page dimensions

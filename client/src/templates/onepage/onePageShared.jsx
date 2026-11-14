@@ -1,5 +1,6 @@
 import React from 'react';
 import { useDispatch } from 'react-redux';
+import '../shared/cvElements.css';
 import {
   updatePersonalInfo,
   updateExperience,
@@ -122,7 +123,7 @@ export const CompactSectionTitle = ({
   if (variant === 'pill') {
     return (
       <h2
-        className="text-[10.5px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded inline-block mb-1.5"
+        className="cv-section-title cv-heading-avoid-break text-[10.5px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded inline-block mb-1.5"
         style={{ color, backgroundColor: `${color}15` }}
       >
         {title}
@@ -133,7 +134,7 @@ export const CompactSectionTitle = ({
   if (variant === 'plain') {
     return (
       <h2
-        className="text-[11px] font-bold uppercase tracking-widest pb-0.5 mb-1.5 border-b"
+        className="cv-section-title cv-heading-avoid-break text-[11px] font-bold uppercase tracking-widest pb-0.5 mb-1.5 border-b"
         style={{ color, borderColor: '#cbd5e1' }}
       >
         {title}
@@ -143,7 +144,7 @@ export const CompactSectionTitle = ({
 
   if (variant === 'bar') {
     return (
-      <div className="flex items-center gap-2 mb-1.5">
+      <div className="cv-section-title cv-heading-avoid-break flex items-center gap-2 mb-1.5">
         <span className="w-1 h-3.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
         <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-900">
           {title}
@@ -154,7 +155,7 @@ export const CompactSectionTitle = ({
 
   return (
     <h2
-      className="text-[11px] font-extrabold uppercase tracking-wider pb-0.5 mb-1.5 border-b-2"
+      className="cv-section-title cv-heading-avoid-break text-[11px] font-extrabold uppercase tracking-wider pb-0.5 mb-1.5 border-b-2"
       style={{ color, borderColor: color }}
     >
       {title}
@@ -173,7 +174,7 @@ export const OnePageExperienceList = ({
   return (
     <div className={compact ? 'space-y-2' : 'space-y-2.5'}>
       {experience.map((exp, index) => (
-        <div key={exp.id || index} className="leading-snug">
+        <div key={exp.id || index} className="leading-snug cv-experience-item cv-item-avoid-break">
           <div className="flex items-baseline justify-between gap-2">
             <div className="flex flex-wrap items-baseline gap-x-1.5 min-w-0">
               <EditableElement
@@ -260,7 +261,7 @@ export const OnePageEducationList = ({
   return (
     <div className="space-y-1.5">
       {education.map((edu, index) => (
-        <div key={edu.id || index} className="leading-snug">
+        <div key={edu.id || index} className="leading-snug cv-education-item cv-item-avoid-break">
           <div className="flex items-baseline justify-between gap-2">
             <EditableElement
               section="education"
@@ -322,7 +323,7 @@ export const OnePageProjectsGrid = ({
       {projects.map((proj, index) => (
         <div
           key={proj.id || index}
-          className="p-2 rounded-lg border border-slate-200/90 bg-slate-50/70 leading-snug"
+          className="p-2 rounded-lg border border-slate-200/90 bg-slate-50/70 leading-snug cv-project-item cv-item-avoid-break"
         >
           <div className="flex items-baseline justify-between gap-1.5">
             <EditableElement

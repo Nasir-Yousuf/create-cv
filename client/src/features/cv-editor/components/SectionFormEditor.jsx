@@ -28,6 +28,26 @@ import {
   updateReference,
   removeReference,
   updateCustomSection,
+  updateCareerObjective,
+  updateSummary,
+  addInternship,
+  updateInternship,
+  removeInternship,
+  addAchievement,
+  updateAchievement,
+  removeAchievement,
+  addVolunteer,
+  updateVolunteer,
+  removeVolunteer,
+  addPublication,
+  updatePublication,
+  removePublication,
+  addAdditionalInfo,
+  updateAdditionalInfo,
+  removeAdditionalInfo,
+  addCustomSectionItem,
+  updateCustomSectionItem,
+  removeCustomSectionItem,
 } from '../../../store/cvSlice';
 import { openAIModal } from '../../../store/uiSlice';
 import {
@@ -184,8 +204,10 @@ export const SectionFormEditor = ({ onOpenPhotoModal }) => {
             </label>
             <input
               type="text"
-              value={personalInfo.website || ''}
-              onChange={(e) => dispatch(updatePersonalInfo({ website: e.target.value }))}
+              value={personalInfo.website || personalInfo.portfolio || ''}
+              onChange={(e) =>
+                dispatch(updatePersonalInfo({ website: e.target.value, portfolio: e.target.value }))
+              }
               placeholder="https://alexmorgan.dev"
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
@@ -957,6 +979,556 @@ export const SectionFormEditor = ({ onOpenPhotoModal }) => {
             placeholder="Your Full Name"
             className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
           />
+        </div>
+      </div>
+    );
+  }
+
+  // 12. Career Objective Editor
+  if (activeSection === 'careerObjective') {
+    const objectiveText = cvData.careerObjective || cvData.personalInfo?.careerObjective || '';
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              Career Objective
+            </h3>
+            <p className="text-[11px] text-slate-500">
+              Targeted career goals and value proposition for entry or transitioning roles.
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Sparkles}
+            onClick={() => dispatch(openAIModal({ mode: 'summary' }))}
+          >
+            Improve with AI
+          </Button>
+        </div>
+
+        <textarea
+          rows={5}
+          value={objectiveText}
+          onChange={(e) => dispatch(updateCareerObjective(e.target.value))}
+          placeholder="Seeking a challenging role in software engineering to contribute..."
+          className="w-full p-3.5 text-xs leading-relaxed rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      </div>
+    );
+  }
+
+  // 13. Internships Editor
+  if (activeSection === 'internships') {
+    const internships = cvData.internships || [];
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              Internships ({internships.length})
+            </h3>
+            <p className="text-[11px] text-slate-500">Internship and trainee experiences.</p>
+          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={() => dispatch(addInternship())}
+          >
+            Add Internship
+          </Button>
+        </div>
+
+        <div className="space-y-4">
+          {internships.map((item, index) => (
+            <div key={item.id || index} className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-900 dark:text-white">
+                  {item.role || 'New Internship'} {item.company ? `at ${item.company}` : ''}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => dispatch(removeInternship(index))}
+                  className="text-slate-400 hover:text-rose-500 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="Role / Job Title *"
+                  value={item.role || ''}
+                  onChange={(e) => dispatch(updateInternship({ index, data: { role: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+                <input
+                  type="text"
+                  placeholder="Company / Organization *"
+                  value={item.company || ''}
+                  onChange={(e) => dispatch(updateInternship({ index, data: { company: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+                <input
+                  type="text"
+                  placeholder="Location (e.g. Dhaka, Bangladesh)"
+                  value={item.location || ''}
+                  onChange={(e) => dispatch(updateInternship({ index, data: { location: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Start Date"
+                    value={item.startDate || ''}
+                    onChange={(e) => dispatch(updateInternship({ index, data: { startDate: e.target.value } }))}
+                    className="w-1/2 px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                  />
+                  <input
+                    type="text"
+                    placeholder="End Date"
+                    value={item.endDate || ''}
+                    onChange={(e) => dispatch(updateInternship({ index, data: { endDate: e.target.value } }))}
+                    className="w-1/2 px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                  />
+                </div>
+              </div>
+              <textarea
+                rows={3}
+                placeholder="Key responsibilities and achievements..."
+                value={item.description || ''}
+                onChange={(e) => dispatch(updateInternship({ index, data: { description: e.target.value } }))}
+                className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 14. Achievements Editor
+  if (activeSection === 'achievements') {
+    const achievements = cvData.achievements || [];
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              Key Achievements & Honors ({achievements.length})
+            </h3>
+            <p className="text-[11px] text-slate-500">Awards, honors, competitions, and notable milestones.</p>
+          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={() => dispatch(addAchievement())}
+          >
+            Add Achievement
+          </Button>
+        </div>
+
+        <div className="space-y-3">
+          {achievements.map((item, index) => (
+            <div key={item.id || index} className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-900 dark:text-white">
+                  {item.title || 'New Achievement'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => dispatch(removeAchievement(index))}
+                  className="text-slate-400 hover:text-rose-500 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="Achievement / Award Title *"
+                  value={item.title || ''}
+                  onChange={(e) => dispatch(updateAchievement({ index, data: { title: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+                <input
+                  type="text"
+                  placeholder="Issuer / Organization"
+                  value={item.issuer || item.organization || ''}
+                  onChange={(e) =>
+                    dispatch(
+                      updateAchievement({
+                        index,
+                        data: { issuer: e.target.value, organization: e.target.value },
+                      })
+                    )
+                  }
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+                <input
+                  type="text"
+                  placeholder="Date (e.g. 2024 or Nov 2023)"
+                  value={item.date || ''}
+                  onChange={(e) => dispatch(updateAchievement({ index, data: { date: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+              </div>
+              <textarea
+                rows={2}
+                placeholder="Brief description of the impact or distinction..."
+                value={item.description || ''}
+                onChange={(e) => dispatch(updateAchievement({ index, data: { description: e.target.value } }))}
+                className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 15. Volunteer Experience Editor
+  if (activeSection === 'volunteer') {
+    const volunteer = cvData.volunteer || [];
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              Volunteer Experience ({volunteer.length})
+            </h3>
+            <p className="text-[11px] text-slate-500">Community service, leadership, and non-profit roles.</p>
+          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={() => dispatch(addVolunteer())}
+          >
+            Add Volunteer
+          </Button>
+        </div>
+
+        <div className="space-y-3">
+          {volunteer.map((item, index) => (
+            <div key={item.id || index} className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-900 dark:text-white">
+                  {item.role || 'Volunteer Role'} {item.organization ? `at ${item.organization}` : ''}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => dispatch(removeVolunteer(index))}
+                  className="text-slate-400 hover:text-rose-500 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="Role Title *"
+                  value={item.role || ''}
+                  onChange={(e) => dispatch(updateVolunteer({ index, data: { role: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+                <input
+                  type="text"
+                  placeholder="Organization *"
+                  value={item.organization || ''}
+                  onChange={(e) =>
+                    dispatch(updateVolunteer({ index, data: { organization: e.target.value } }))
+                  }
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+                <input
+                  type="text"
+                  placeholder="Start Date"
+                  value={item.startDate || ''}
+                  onChange={(e) => dispatch(updateVolunteer({ index, data: { startDate: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+                <input
+                  type="text"
+                  placeholder="End Date"
+                  value={item.endDate || ''}
+                  onChange={(e) => dispatch(updateVolunteer({ index, data: { endDate: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+              </div>
+              <textarea
+                rows={2}
+                placeholder="Description of activities..."
+                value={item.description || ''}
+                onChange={(e) => dispatch(updateVolunteer({ index, data: { description: e.target.value } }))}
+                className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 16. Publications Editor
+  if (activeSection === 'publications') {
+    const publications = cvData.publications || [];
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              Publications & Research ({publications.length})
+            </h3>
+            <p className="text-[11px] text-slate-500">Academic papers, journal publications, and articles.</p>
+          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={() => dispatch(addPublication())}
+          >
+            Add Publication
+          </Button>
+        </div>
+
+        <div className="space-y-3">
+          {publications.map((item, index) => (
+            <div key={item.id || index} className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-900 dark:text-white">
+                  {item.title || 'New Publication'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => dispatch(removePublication(index))}
+                  className="text-slate-400 hover:text-rose-500 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <input
+                type="text"
+                placeholder="Publication Title *"
+                value={item.title || ''}
+                onChange={(e) => dispatch(updatePublication({ index, data: { title: e.target.value } }))}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="Publisher / Journal / Conference"
+                  value={item.publisher || ''}
+                  onChange={(e) => dispatch(updatePublication({ index, data: { publisher: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+                <input
+                  type="text"
+                  placeholder="Date / Year"
+                  value={item.date || ''}
+                  onChange={(e) => dispatch(updatePublication({ index, data: { date: e.target.value } }))}
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+              </div>
+              <input
+                type="text"
+                placeholder="URL / DOI Link"
+                value={item.url || ''}
+                onChange={(e) => dispatch(updatePublication({ index, data: { url: e.target.value } }))}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 17. Additional Information Editor
+  if (activeSection === 'additionalInfo') {
+    const additionalInfo = cvData.additionalInfo || [];
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              Additional Information ({additionalInfo.length})
+            </h3>
+            <p className="text-[11px] text-slate-500">Hobbies, security clearances, affiliations, or other details.</p>
+          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={() => dispatch(addAdditionalInfo())}
+          >
+            Add Item
+          </Button>
+        </div>
+
+        <div className="space-y-3">
+          {additionalInfo.map((item, index) => (
+            <div key={item.id || index} className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-900 dark:text-white">
+                  {item.title || 'Information Item'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => dispatch(removeAdditionalInfo(index))}
+                  className="text-slate-400 hover:text-rose-500 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <input
+                type="text"
+                placeholder="Title / Category (e.g. Interests, Clearance)"
+                value={item.title || ''}
+                onChange={(e) => dispatch(updateAdditionalInfo({ index, data: { title: e.target.value } }))}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+              />
+              <textarea
+                rows={2}
+                placeholder="Details..."
+                value={item.description || ''}
+                onChange={(e) =>
+                  dispatch(updateAdditionalInfo({ index, data: { description: e.target.value } }))
+                }
+                className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 18. Custom Sections Editor
+  const activeCustomSection = (cvData.customSections || []).find((s) => s.id === activeSection);
+  if (activeCustomSection) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              {activeCustomSection.title || 'Custom Section'}
+            </h3>
+            <p className="text-[11px] text-slate-500">Custom user-defined section items.</p>
+          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={() => dispatch(addCustomSectionItem({ sectionId: activeCustomSection.id }))}
+          >
+            Add Item
+          </Button>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+            Section Title
+          </label>
+          <input
+            type="text"
+            value={activeCustomSection.title || ''}
+            onChange={(e) =>
+              dispatch(updateCustomSection({ id: activeCustomSection.id, title: e.target.value }))
+            }
+            className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+          />
+        </div>
+
+        <div className="space-y-3">
+          {(activeCustomSection.items || []).map((item, index) => (
+            <div
+              key={item.id || index}
+              className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5"
+            >
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-900 dark:text-white">
+                  {item.title || 'Item #' + (index + 1)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    dispatch(
+                      removeCustomSectionItem({ sectionId: activeCustomSection.id, index })
+                    )
+                  }
+                  className="text-slate-400 hover:text-rose-500 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="Title / Role / Name"
+                  value={item.title || ''}
+                  onChange={(e) =>
+                    dispatch(
+                      updateCustomSectionItem({
+                        sectionId: activeCustomSection.id,
+                        index,
+                        data: { title: e.target.value },
+                      })
+                    )
+                  }
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+                <input
+                  type="text"
+                  placeholder="Subtitle / Organization"
+                  value={item.subtitle || ''}
+                  onChange={(e) =>
+                    dispatch(
+                      updateCustomSectionItem({
+                        sectionId: activeCustomSection.id,
+                        index,
+                        data: { subtitle: e.target.value },
+                      })
+                    )
+                  }
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+                <input
+                  type="text"
+                  placeholder="Date / Year"
+                  value={item.date || ''}
+                  onChange={(e) =>
+                    dispatch(
+                      updateCustomSectionItem({
+                        sectionId: activeCustomSection.id,
+                        index,
+                        data: { date: e.target.value },
+                      })
+                    )
+                  }
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+                />
+              </div>
+              <textarea
+                rows={2}
+                placeholder="Description / Details..."
+                value={item.description || ''}
+                onChange={(e) =>
+                  dispatch(
+                    updateCustomSectionItem({
+                      sectionId: activeCustomSection.id,
+                      index,
+                      data: { description: e.target.value },
+                    })
+                  )
+                }
+                className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
+              />
+            </div>
+          ))}
         </div>
       </div>
     );

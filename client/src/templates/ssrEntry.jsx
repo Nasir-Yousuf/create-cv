@@ -28,4 +28,6 @@ export const renderCVToStaticHtml = (cvData) => {
   );
 };
 
+export { getGoogleFontsUrl, formatFontStack, containsBanglaText } from '@shared/utils/cvNormalize.js';
+
 export default renderCVToStaticHtml;

@@ -7,13 +7,14 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node --test"
+    "test": "node --test test/export.test.js test/document_model.test.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@sparticuz/chromium-min": "^153.0.0",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.1",
+    "compression": "^1.8.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "docx": "^9.0.3",

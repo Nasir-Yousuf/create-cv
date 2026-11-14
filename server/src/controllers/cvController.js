@@ -7,19 +7,32 @@ import {
 } from '../../../shared/constants/cvDefaults.js';
 import { normalizeCvData } from '../../../shared/utils/cvNormalize.js';
 
-const ALLOWED_CV_FIELDS = [
+export const ALLOWED_CV_FIELDS = [
   'title',
   'templateId',
+  'category',
+  'isOnePage',
   'personalInfo',
   'personalDetails',
+  'summary',
+  'careerObjective',
   'design',
+  'designTokens',
+  'sectionConfig',
+  'elementOverrides',
+  'customElements',
   'experience',
+  'internships',
   'education',
   'skills',
   'projects',
   'certifications',
   'languages',
+  'achievements',
+  'volunteer',
+  'publications',
   'references',
+  'additionalInfo',
   'declaration',
   'customSections',
 ];

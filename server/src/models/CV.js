@@ -27,6 +27,14 @@ const cvSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    summary: {
+      type: String,
+      default: '',
+    },
+    careerObjective: {
+      type: String,
+      default: '',
+    },
     personalInfo: {
       fullName: { type: String, default: '' },
       jobTitle: { type: String, default: '' },
@@ -37,18 +45,42 @@ const cvSchema = new mongoose.Schema(
       website: { type: String, default: '' },
       linkedin: { type: String, default: '' },
       github: { type: String, default: '' },
+      portfolio: { type: String, default: '' },
       photo: { type: String, default: null },
+      photoUrl: { type: String, default: null },
       photoStyle: {
         type: String,
         enum: ['circle', 'square', 'rounded', 'portrait'],
         default: 'circle',
       },
+      photoConfig: {
+        shape: { type: String, default: 'circle' },
+        zoom: { type: Number, default: 1 },
+        aspect: { type: Number, default: 1 },
+        borderWidth: { type: Number, default: 2 },
+        borderColor: { type: String, default: '' },
+      },
       summary: { type: String, default: '' },
+      careerObjective: { type: String, default: '' },
+      // Optional Bangladesh / Gov civil service fields
+      fatherName: { type: String, default: '' },
+      motherName: { type: String, default: '' },
+      dob: { type: String, default: '' },
+      dateOfBirth: { type: String, default: '' },
+      nationality: { type: String, default: '' },
+      nid: { type: String, default: '' },
+      religion: { type: String, default: '' },
+      maritalStatus: { type: String, default: '' },
+      permanentAddress: { type: String, default: '' },
+      bloodGroup: { type: String, default: '' },
+      gender: { type: String, default: '' },
+      presentAddress: { type: String, default: '' },
     },
     personalDetails: {
       fatherName: { type: String, default: '' },
       motherName: { type: String, default: '' },
       dateOfBirth: { type: String, default: '' },
+      dob: { type: String, default: '' },
       gender: { type: String, default: '' },
       maritalStatus: { type: String, default: '' },
       nationality: { type: String, default: '' },
@@ -58,6 +90,16 @@ const cvSchema = new mongoose.Schema(
       presentAddress: { type: String, default: '' },
       permanentAddress: { type: String, default: '' },
     },
+    sectionConfig: [mongoose.Schema.Types.Mixed],
+    designTokens: {
+      type: mongoose.Schema.Types.Mixed,
+      default: () => ({}),
+    },
+    elementOverrides: {
+      type: mongoose.Schema.Types.Mixed,
+      default: () => ({}),
+    },
+    customElements: [mongoose.Schema.Types.Mixed],
     design: {
       primaryColor: { type: String, default: '#2563eb' },
       accentColor: { type: String, default: '#0ea5e9' },
@@ -98,6 +140,21 @@ const cvSchema = new mongoose.Schema(
         current: Boolean,
         description: String,
         highlights: [String],
+        visible: { type: Boolean, default: true },
+      },
+    ],
+    internships: [
+      {
+        id: String,
+        jobTitle: String,
+        company: String,
+        location: String,
+        startDate: String,
+        endDate: String,
+        current: Boolean,
+        description: String,
+        highlights: [String],
+        visible: { type: Boolean, default: true },
       },
     ],
     education: [
@@ -112,6 +169,7 @@ const cvSchema = new mongoose.Schema(
         grade: String,
         description: String,
         highlights: [String],
+        visible: { type: Boolean, default: true },
       },
     ],
     skills: [
@@ -120,6 +178,7 @@ const cvSchema = new mongoose.Schema(
         name: String,
         level: String,
         category: String,
+        visible: { type: Boolean, default: true },
       },
     ],
     projects: [
@@ -136,6 +195,7 @@ const cvSchema = new mongoose.Schema(
         endDate: String,
         description: String,
         technologies: [String],
+        visible: { type: Boolean, default: true },
       },
     ],
     certifications: [
@@ -145,6 +205,7 @@ const cvSchema = new mongoose.Schema(
         issuer: String,
         date: String,
         link: String,
+        visible: { type: Boolean, default: true },
       },
     ],
     languages: [
@@ -153,6 +214,42 @@ const cvSchema = new mongoose.Schema(
         name: String,
         language: String,
         proficiency: String,
+        visible: { type: Boolean, default: true },
+      },
+    ],
+    achievements: [
+      {
+        id: String,
+        title: String,
+        issuer: String,
+        date: String,
+        description: String,
+        visible: { type: Boolean, default: true },
+      },
+    ],
+    volunteer: [
+      {
+        id: String,
+        role: String,
+        organization: String,
+        location: String,
+        startDate: String,
+        endDate: String,
+        current: Boolean,
+        description: String,
+        highlights: [String],
+        visible: { type: Boolean, default: true },
+      },
+    ],
+    publications: [
+      {
+        id: String,
+        title: String,
+        publisher: String,
+        date: String,
+        url: String,
+        description: String,
+        visible: { type: Boolean, default: true },
       },
     ],
     references: [
@@ -163,6 +260,15 @@ const cvSchema = new mongoose.Schema(
         company: String,
         email: String,
         phone: String,
+        visible: { type: Boolean, default: true },
+      },
+    ],
+    additionalInfo: [
+      {
+        id: String,
+        title: String,
+        description: String,
+        visible: { type: Boolean, default: true },
       },
     ],
     declaration: {

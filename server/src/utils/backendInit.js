@@ -2,9 +2,6 @@ import connectDB, { isDBConnected } from '../config/db.js';
 import { bootstrapAdminUser } from './adminBootstrap.js';
 import { seedTemplates } from '../controllers/templateController.js';
 
-let initialized = false;
-let initPromise = null;
-
 /**
  * Ensures MongoDB connection, admin bootstrap, and canonical templates are initialized
  * once per server process or warm serverless container. Safe under concurrent calls.
@@ -13,30 +10,30 @@ export const ensureBackendReady = async () => {
   await connectDB();
 
   if (!isDBConnected()) {
-    initialized = false;
+    global._backendInitialized = false;
     return false;
   }
 
-  if (initialized) {
+  if (global._backendInitialized) {
     return true;
   }
 
-  if (!initPromise) {
-    initPromise = (async () => {
+  if (!global._backendInitPromise) {
+    global._backendInitPromise = (async () => {
       await bootstrapAdminUser();
       await seedTemplates();
-      initialized = true;
+      global._backendInitialized = true;
     })()
       .catch((err) => {
         console.error('Backend initialization warning:', err.message);
-        initialized = false;
+        global._backendInitialized = false;
       })
       .finally(() => {
-        initPromise = null;
+        global._backendInitPromise = null;
       });
   }
 
-  await initPromise;
+  await global._backendInitPromise;
   return isDBConnected();
 };
 
