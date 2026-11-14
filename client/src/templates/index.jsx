@@ -1,10 +1,32 @@
 import React from 'react';
 import {
+  TEMPLATES_REGISTRY,
+  TEMPLATE_CATEGORIES,
+  PREFERRED_CATEGORY_ORDER,
   resolveTemplateId,
   resolveTemplateMeta,
+  templateMatchesCategory,
+  getDynamicCategories,
   TEMPLATE_ALIAS_COLORS,
 } from '@shared/constants/cvDefaults.js';
 import { normalizeCvData } from '@shared/utils/cvNormalize.js';
+import {
+  resolveDesignTokens,
+  getSectionVisibility,
+  getOrderedSectionKeys,
+  CVSection,
+  CVSectionTitle,
+  CVPersonalDetailsTable,
+  CVCustomSections,
+  CVDeclaration,
+} from './shared/cvElements';
+import EditableElement from '../features/cv-editor/components/EditableElement';
+import {
+  CompactSectionTitle,
+  OnePageExperienceList,
+  OnePageEducationList,
+  OnePageProjectsGrid,
+} from './onepage/onePageShared';
 
 // Multiple-Page Templates
 import { BangladeshStandard } from './BangladeshStandard';
@@ -98,15 +120,72 @@ export const RenderCVTemplate = ({ cvData, scale = 1, onOpenPhotoModal }) => {
             templateMeta?.categories?.includes('One-Page CVs')
         );
 
+  const designTokens = resolveDesignTokens(
+    {
+      ...safeCvData,
+      design: {
+        ...safeCvData.design,
+        primaryColor: appliedPrimary,
+        accentColor: appliedAccent,
+      },
+    },
+    templateMeta?.defaultDesignTokens
+  );
+
+  const sectionConfig = safeCvData?.sectionConfig || {
+    order: safeCvData?.design?.sectionOrder || [
+      'summary',
+      'experience',
+      'education',
+      'skills',
+      'languages',
+      'projects',
+      'certifications',
+    ],
+    hidden: [],
+    bdFields: {
+      fatherName: true,
+      motherName: true,
+      dob: true,
+      nid: true,
+      maritalStatus: true,
+      bloodGroup: true,
+      permanentAddress: true,
+    },
+  };
+
+  const elementOverrides = safeCvData?.elementOverrides || {};
+
   const mergedCvData = {
     ...safeCvData,
     isOnePage,
+    designTokens,
+    sectionConfig,
+    elementOverrides,
     design: {
       ...safeCvData.design,
-      primaryColor: appliedPrimary,
-      accentColor: appliedAccent,
+      primaryColor: designTokens.primaryColor,
+      accentColor: designTokens.accentColor,
     },
   };
+
+  const fontSizeCss =
+    designTokens.fontSize === 'compact'
+      ? '9.5pt'
+      : designTokens.fontSize === 'relaxed'
+      ? '11.5pt'
+      : typeof designTokens.fontSize === 'number'
+      ? `${designTokens.fontSize}pt`
+      : '10.5pt';
+
+  const lineSpacingCss =
+    designTokens.lineSpacing === 'tight'
+      ? '1.25'
+      : designTokens.lineSpacing === 'relaxed'
+      ? '1.6'
+      : typeof designTokens.lineSpacing === 'number'
+      ? `${designTokens.lineSpacing}`
+      : '1.4';
 
   return (
     <div
@@ -122,11 +201,50 @@ export const RenderCVTemplate = ({ cvData, scale = 1, onOpenPhotoModal }) => {
         } ${isOnePage ? 'cv-one-page-sheet' : 'cv-multi-page-sheet'} bg-white shadow-2xl rounded-sm`}
         id="cv-export-sheet"
         data-one-page={isOnePage ? 'true' : 'false'}
+        style={{
+          '--cv-primary': designTokens.primaryColor,
+          '--cv-accent': designTokens.accentColor,
+          '--cv-heading-color': designTokens.headingColor,
+          '--cv-body-color': designTokens.bodyColor,
+          '--cv-heading-font': designTokens.headingFont,
+          '--cv-body-font': designTokens.bodyFont,
+          '--cv-font-size': fontSizeCss,
+          '--cv-line-spacing': lineSpacingCss,
+          '--cv-section-spacing': `${designTokens.sectionSpacing || 14}px`,
+          '--cv-item-spacing': `${designTokens.itemSpacing || 10}px`,
+          '--cv-divider-thickness': `${designTokens.dividerThickness || 1}px`,
+          fontFamily: designTokens.bodyFont || designTokens.fontFamily || 'Inter, sans-serif',
+          color: designTokens.bodyColor || '#334155',
+          backgroundColor: designTokens.backgroundColor || '#ffffff',
+        }}
       >
         <Component cvData={mergedCvData} onOpenPhotoModal={onOpenPhotoModal} />
       </div>
     </div>
   );
+};
+
+export {
+  TEMPLATES_REGISTRY,
+  TEMPLATE_CATEGORIES,
+  PREFERRED_CATEGORY_ORDER,
+  resolveTemplateId,
+  resolveTemplateMeta,
+  templateMatchesCategory,
+  getDynamicCategories,
+  resolveDesignTokens,
+  getSectionVisibility,
+  getOrderedSectionKeys,
+  CVSection,
+  CVSectionTitle,
+  CVPersonalDetailsTable,
+  CVCustomSections,
+  CVDeclaration,
+  EditableElement,
+  CompactSectionTitle,
+  OnePageExperienceList,
+  OnePageEducationList,
+  OnePageProjectsGrid,
 };
 
 export default RenderCVTemplate;

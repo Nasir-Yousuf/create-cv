@@ -213,3 +213,848 @@ export const isSectionSuggestedForPersona = (sectionId, personaId) => {
   const persona = getPersonaById(personaId);
   return persona.suggestedSections.includes(sectionId);
 };
+
+// ============================================================================
+// Complete Realistic Persona CV Datasets (Never Lorem Ipsum)
+// ============================================================================
+
+export const PERSONA_TECH_LEAD = {
+  title: "Daniel Carter - Senior Cloud Architect Resume",
+  personalInfo: {
+    fullName: "Daniel Carter",
+    jobTitle: "Senior Full-Stack & Cloud Solutions Architect",
+    email: "daniel.carter@example.com",
+    phone: "+1 (555) 389-2041",
+    location: "San Francisco, CA",
+    website: "https://danielcarter.dev",
+    linkedin: "linkedin.com/in/danielcarter-cloud",
+    github: "github.com/danielcarter",
+    summary: "Senior Full-Stack & Cloud Solutions Architect with 6+ years of experience leading high-throughput distributed architectures, microservices in Node.js/Go, and modern React/TypeScript user experiences. Proven track record scaling systems from 50k to 5M+ DAU with 99.99% uptime.",
+    photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80",
+    photoStyle: "circle"
+  },
+  experience: [
+    {
+      id: "exp-tech-1",
+      jobTitle: "Staff Cloud Architect & Engineering Lead",
+      company: "CloudScale Technologies",
+      location: "San Francisco, CA",
+      startDate: "2022",
+      endDate: "Present",
+      current: true,
+      description: "Direct distributed systems architecture and mentor 18 backend/frontend software engineers.",
+      highlights: [
+        "Architected event-driven microservices processing 120M+ daily events using Kafka, Node.js, and Redis.",
+        "Reduced p99 API query latency by 44% by implementing multi-tiered distributed caching.",
+        "Spearheaded cloud migration to Kubernetes (EKS), slashing AWS infrastructure costs by $180k/yr."
+      ]
+    },
+    {
+      id: "exp-tech-2",
+      jobTitle: "Senior Software Engineer",
+      company: "Stripe Partner Engineering",
+      location: "San Francisco, CA",
+      startDate: "2019",
+      endDate: "2022",
+      current: false,
+      description: "Engineered high-security payment processing integrations and developer portal dashboards.",
+      highlights: [
+        "Built responsive developer dashboard and billing UI in React, TypeScript, and GraphQL.",
+        "Engineered automated webhook delivery engine processing 15M webhooks daily with 99.98% SLA."
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-tech-1",
+      degree: "B.S. in Computer Science & Engineering",
+      institution: "University of California, Berkeley",
+      location: "Berkeley, CA",
+      startDate: "2015",
+      endDate: "2019",
+      grade: "3.86 GPA",
+      highlights: ["Dean's Honor List across all 8 semesters."]
+    }
+  ],
+  skills: [
+    { name: "React & Next.js" },
+    { name: "TypeScript" },
+    { name: "Node.js & Go" },
+    { name: "AWS (EKS, RDS, S3)" },
+    { name: "Apache Kafka" },
+    { name: "PostgreSQL & Redis" },
+    { name: "Docker & Kubernetes" },
+    { name: "CI/CD & Terraform" }
+  ],
+  projects: [
+    {
+      id: "proj-tech-1",
+      name: "HyperScale KV",
+      role: "Lead Author",
+      description: "Distributed in-memory key-value cache with Raft consensus protocol in Go.",
+      technologies: ["Go", "Raft", "gRPC", "Docker"]
+    },
+    {
+      id: "proj-tech-2",
+      name: "NextAuth Connect",
+      role: "Maintainer",
+      description: "Zero-config OAuth2 SSO gateway for enterprise multi-tenant microservices.",
+      technologies: ["TypeScript", "React", "OAuth2", "Redis"]
+    }
+  ],
+  certifications: [
+    { name: "AWS Certified Solutions Architect - Professional", issuer: "Amazon Web Services", date: "2023" },
+    { name: "Certified Kubernetes Administrator (CKA)", issuer: "Cloud Native Computing Foundation", date: "2022" }
+  ],
+  languages: [
+    { name: "English", proficiency: "Native" },
+    { name: "Spanish", proficiency: "Conversational" }
+  ]
+};
+
+export const PERSONA_BD_BANKING_MTO = {
+  title: "Tanvir Hasan Chowdhury - Commercial Banking CV",
+  personalInfo: {
+    fullName: "Tanvir Hasan Chowdhury",
+    jobTitle: "Management Trainee Officer (MTO) & Commercial Banking Specialist",
+    email: "tanvir.chowdhury@example.com",
+    phone: "+880 1711-987654",
+    location: "Gulshan-2, Dhaka",
+    linkedin: "linkedin.com/in/tanvir-hasan-chowdhury",
+    summary: "Results-driven IBA graduate (CGPA 3.82/4.00) with proven analytical and leadership capabilities across SME credit appraisal, corporate treasury operations, and digital banking workflows. Experienced in financial modeling, credit risk assessment, and client relationship management.",
+    photo: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80",
+    photoStyle: "portrait"
+  },
+  personalDetails: {
+    fatherName: "Rafiqul Hasan Chowdhury",
+    motherName: "Nasreen Sultana",
+    dateOfBirth: "1999-10-14",
+    dob: "1999-10-14",
+    gender: "Male",
+    maritalStatus: "Single",
+    nationality: "Bangladeshi",
+    nationalId: "19992691234567890",
+    nid: "19992691234567890",
+    religion: "Islam",
+    bloodGroup: "B+",
+    permanentAddress: "Chowdhury Bari, Village: Noapara, P.S: Raozan, District: Chattogram",
+    presentAddress: "House 24, Road 11, Block D, Gulshan-2, Dhaka 1212"
+  },
+  experience: [
+    {
+      id: "exp-mto-1",
+      jobTitle: "Management Trainee Officer (MTO)",
+      company: "BRAC Bank Limited (Corporate Head Office)",
+      location: "Dhaka, Bangladesh",
+      startDate: "Jan 2024",
+      endDate: "Present",
+      current: true,
+      description: "Rotate across Corporate Banking Division, Treasury, and SME Credit Underwriting units.",
+      highlights: [
+        "Analyzed credit appraisals for 35+ corporate clients with total disbursed sanctions exceeding BDT 45 Crore.",
+        "Formulated financial risk assessment scorecards reducing turnaround time for SME loan approvals by 30%.",
+        "Coordinated with Bangladesh Bank regulatory compliance teams for quarterly liquidity and CRR audits."
+      ]
+    },
+    {
+      id: "exp-mto-2",
+      jobTitle: "Financial Analyst Intern",
+      company: "bKash Limited (Commercial Strategy)",
+      location: "Dhaka, Bangladesh",
+      startDate: "Jun 2023",
+      endDate: "Dec 2023",
+      current: false,
+      description: "Conducted financial feasibility analysis for new micro-merchant QR payment integrations.",
+      highlights: [
+        "Built automated merchant settlement dashboards in SQL and Power BI tracking BDT 12 Crore daily turnover."
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-mto-1",
+      degree: "BBA in Finance & Accounting",
+      institution: "Institute of Business Administration (IBA), University of Dhaka",
+      location: "Dhaka",
+      startDate: "2019",
+      endDate: "2023",
+      grade: "CGPA 3.82 / 4.00",
+      highlights: ["Dean's Honor Roll recipient. Executive Member, IBA Finance Club."]
+    },
+    {
+      id: "edu-mto-2",
+      degree: "Higher Secondary Certificate (HSC)",
+      institution: "Notre Dame College, Dhaka",
+      location: "Dhaka",
+      startDate: "2016",
+      endDate: "2018",
+      grade: "GPA 5.00 / 5.00",
+      highlights: ["Science Group. Champion, Notre Dame College Business Quiz 2018."]
+    },
+    {
+      id: "edu-mto-3",
+      degree: "Secondary School Certificate (SSC)",
+      institution: "Dhaka Residential Model College",
+      location: "Dhaka",
+      startDate: "2014",
+      endDate: "2016",
+      grade: "GPA 5.00 / 5.00",
+      highlights: ["Science Group. Board General Scholarship."]
+    }
+  ],
+  skills: [
+    { name: "Credit Risk Appraisal" },
+    { name: "Financial Modeling & Valuation" },
+    { name: "Corporate Treasury Operations" },
+    { name: "Bangladesh Bank Regulations" },
+    { name: "Advanced MS Excel & VBA" },
+    { name: "Power BI & SQL" },
+    { name: "SME Loan Structuring" },
+    { name: "Client Relationship Management" }
+  ],
+  certifications: [
+    { name: "Financial Modeling & Valuation Analyst (FMVA®)", issuer: "Corporate Finance Institute (CFI)", date: "2023" },
+    { name: "Certified Anti-Money Laundering Specialist (CAMS) Candidate", issuer: "ACAMS", date: "2024" }
+  ],
+  languages: [
+    { name: "Bengali", proficiency: "Native" },
+    { name: "English", proficiency: "Fluent (IELTS 8.0)" }
+  ],
+  references: [
+    {
+      id: "ref-mto-1",
+      name: "Dr. Syed Farhat Anwar",
+      designation: "Professor & Former Director",
+      company: "IBA, University of Dhaka",
+      phone: "+880 1819-111111",
+      email: "farhat@iba-du.edu"
+    },
+    {
+      id: "ref-mto-2",
+      name: "Kazi Asaduzzaman",
+      designation: "Senior Vice President & Head of Corporate Banking",
+      company: "BRAC Bank Limited",
+      phone: "+880 1713-222222",
+      email: "asad.kazi@bracbank.com"
+    }
+  ],
+  declaration: {
+    text: "I hereby solemnly declare that all information furnished above is true, authentic and complete to the best of my knowledge and belief.",
+    date: new Date().toLocaleDateString('en-GB'),
+    signedBy: "Tanvir Hasan Chowdhury"
+  }
+};
+
+export const PERSONA_BD_BCS_CADRE = {
+  title: "Mohammad Shakil Ahmed - Civil Service CV",
+  personalInfo: {
+    fullName: "Mohammad Shakil Ahmed",
+    jobTitle: "Assistant Commissioner & Executive Magistrate (38th BCS Administration Cadre)",
+    email: "shakil.ahmed.bcs@example.com",
+    phone: "+880 1812-456789",
+    location: "Divisional Commissioner Office, Chattogram",
+    summary: "Dedicated civil service officer with 4+ years of grassroots administrative experience in revenue administration, public grievance redressal, law and order maintenance, and mobile court operations. Committed to transparent, citizen-centric public governance and digital service delivery.",
+    photo: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&auto=format&fit=crop&q=80",
+    photoStyle: "portrait"
+  },
+  personalDetails: {
+    fatherName: "Nurul Islam Ahmed",
+    motherName: "Salma Begum",
+    dateOfBirth: "1995-03-22",
+    dob: "1995-03-22",
+    gender: "Male",
+    maritalStatus: "Married",
+    nationality: "Bangladeshi",
+    nationalId: "19952693456789012",
+    nid: "19952693456789012",
+    religion: "Islam",
+    bloodGroup: "O+",
+    permanentAddress: "Holding 45, Masterpara, P.S: Kotwali, District: Chattogram",
+    presentAddress: "Circuit House Residential Complex, Chattogram"
+  },
+  experience: [
+    {
+      id: "exp-bcs-1",
+      jobTitle: "Assistant Commissioner (Land) & Executive Magistrate",
+      company: "Office of the Deputy Commissioner, Chattogram",
+      location: "Chattogram, Bangladesh",
+      startDate: "2022",
+      endDate: "Present",
+      current: true,
+      description: "Supervise upazila land administration, e-mutation portals, and judicial mobile court enforcement.",
+      highlights: [
+        "Supervised digital land e-mutation system, processing 4,200+ citizen mutation applications with zero backlog.",
+        "Conducted 120+ mobile courts for consumer rights protection, illegal encroachment removal, and environmental conservation.",
+        "Coordinated disaster management and emergency relief distribution reaching 28,000 vulnerable families."
+      ]
+    },
+    {
+      id: "exp-bcs-2",
+      jobTitle: "Assistant Commissioner",
+      company: "Office of the Divisional Commissioner, Dhaka",
+      location: "Dhaka, Bangladesh",
+      startDate: "2020",
+      endDate: "2022",
+      current: false,
+      description: "Managed executive coordination and inter-agency development taskforces.",
+      highlights: [
+        "Handled protocol, general administration, and executive coordination for inter-ministerial development projects."
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-bcs-1",
+      degree: "M.S.S. in Public Administration",
+      institution: "University of Dhaka",
+      location: "Dhaka",
+      startDate: "2017",
+      endDate: "2018",
+      grade: "First Class (1st Position)",
+      highlights: ["Awarded Dean's Gold Medal for academic distinction."]
+    },
+    {
+      id: "edu-bcs-2",
+      degree: "B.S.S. in Public Administration",
+      institution: "University of Dhaka",
+      location: "Dhaka",
+      startDate: "2013",
+      endDate: "2017",
+      grade: "CGPA 3.88 / 4.00",
+      highlights: ["Faculty Merit Scholarship."]
+    }
+  ],
+  skills: [
+    { name: "Land Revenue Administration" },
+    { name: "Code of Criminal Procedure (CrPC)" },
+    { name: "Public Procurement Rules (PPR/e-GP)" },
+    { name: "Grievance Redress System (GRS)" },
+    { name: "Disaster Risk Reduction" },
+    { name: "Executive Law Enforcement" }
+  ],
+  declaration: {
+    text: "I hereby declare under official oath that all information submitted in this curriculum vitae is completely authentic and verifiable from service records.",
+    date: new Date().toLocaleDateString('en-GB'),
+    signedBy: "Mohammad Shakil Ahmed"
+  }
+};
+
+export const PERSONA_HEALTHCARE_MBBS = {
+  title: "Dr. Nusrat Jahan - Medical Officer CV",
+  personalInfo: {
+    fullName: "Dr. Nusrat Jahan",
+    jobTitle: "Resident Medical Officer (MBBS, BMDC Reg: A-78921)",
+    email: "dr.nusrat.jahan@example.com",
+    phone: "+880 1715-678901",
+    location: "Dhanmondi, Dhaka",
+    summary: "BMDC-registered physician with 3+ years of clinical experience across Internal Medicine, Emergency Triage, and Post-Operative ICU management. Dedicated to empathetic evidence-based patient care, clinical diagnosis, and infection control standards.",
+    photo: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&auto=format&fit=crop&q=80",
+    photoStyle: "circle"
+  },
+  personalDetails: {
+    fatherName: "Dr. MA Jalil",
+    motherName: "Hosne Ara Begum",
+    dateOfBirth: "1997-08-19",
+    dob: "1997-08-19",
+    gender: "Female",
+    maritalStatus: "Single",
+    nationality: "Bangladeshi",
+    nationalId: "19972695678901234",
+    nid: "19972695678901234",
+    religion: "Islam",
+    bloodGroup: "A+",
+    permanentAddress: "Jalil Villa, Station Road, Mymensingh Sadar, Mymensingh"
+  },
+  experience: [
+    {
+      id: "exp-med-1",
+      jobTitle: "Resident Medical Officer (Internal Medicine)",
+      company: "Square Hospitals Limited",
+      location: "Dhaka, Bangladesh",
+      startDate: "2023",
+      endDate: "Present",
+      current: true,
+      description: "Manage 25-bed acute medical ward overseeing patient admissions, clinical evaluations, and emergency interventions.",
+      highlights: [
+        "Performed arterial blood gas sampling, endotracheal intubation, central venous catheterizations, and lumbar punctures.",
+        "Conducted daily clinical rounds collaborating with multidisciplinary specialist teams for complex diagnostic dilemmas.",
+        "Maintained hospital infection control compliance rate above 98% across acute inpatient admissions."
+      ]
+    },
+    {
+      id: "exp-med-2",
+      jobTitle: "Honorary Medical Officer (Emergency & Triage)",
+      company: "Dhaka Medical College Hospital (DMCH)",
+      location: "Dhaka, Bangladesh",
+      startDate: "2022",
+      endDate: "2023",
+      current: false,
+      description: "Handled emergency triage and resuscitation protocols for critically ill acute admissions.",
+      highlights: [
+        "Managed emergency department triaging 150+ acute clinical admissions daily during peak emergency shifts."
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-med-1",
+      degree: "FCPS Part-I (Medicine)",
+      institution: "Bangladesh College of Physicians and Surgeons (BCPS)",
+      location: "Dhaka",
+      startDate: "2024",
+      endDate: "2024",
+      grade: "Passed"
+    },
+    {
+      id: "edu-med-2",
+      degree: "Bachelor of Medicine & Bachelor of Surgery (MBBS)",
+      institution: "Dhaka Medical College (DMC), University of Dhaka",
+      location: "Dhaka",
+      startDate: "2016",
+      endDate: "2021",
+      grade: "Passed with Honors in Pathology & Pharmacology"
+    }
+  ],
+  skills: [
+    { name: "Emergency Clinical Triage" },
+    { name: "Basic & Advanced Life Support (BLS/ACLS)" },
+    { name: "Internal Medicine Clinical Care" },
+    { name: "ICU & Ventilator Management" },
+    { name: "12-Lead ECG Interpretation" },
+    { name: "Patient Counseling & Empathy" }
+  ],
+  certifications: [
+    { name: "BMDC Permanent Registration (Reg: A-78921)", issuer: "Bangladesh Medical & Dental Council", date: "2022" },
+    { name: "Advanced Cardiovascular Life Support (ACLS)", issuer: "American Heart Association", date: "2023" }
+  ]
+};
+
+export const PERSONA_ACADEMIC_RESEARCH = {
+  title: "Dr. Md. Saiful Islam - Academic & Research CV",
+  personalInfo: {
+    fullName: "Dr. Md. Saiful Islam",
+    jobTitle: "Associate Professor & Computational Biology Researcher",
+    email: "saiful.cse@du.ac.bd",
+    phone: "+880 1819-234567",
+    location: "Dhaka, Bangladesh",
+    website: "https://saiful-cs.du.ac.bd",
+    linkedin: "linkedin.com/in/saiful-islam-phd",
+    summary: "Computational biology and machine learning researcher with 18 peer-reviewed publications in IEEE, Nature Scientific Reports, and ACM Transactions. 8+ years experience mentoring graduate researchers, authoring competitive research grants, and teaching undergraduate algorithms.",
+    photo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
+    photoStyle: "circle"
+  },
+  experience: [
+    {
+      id: "exp-acad-1",
+      jobTitle: "Associate Professor (Dept. of CSE)",
+      company: "University of Dhaka",
+      location: "Dhaka, Bangladesh",
+      startDate: "2021",
+      endDate: "Present",
+      current: true,
+      description: "Teach Advanced Algorithms and Machine Learning; direct the Bioinformatics Computing Lab.",
+      highlights: [
+        "Principal Investigator for $140k Ministry of ICT research grant on deep learning models for genomic variant classification.",
+        "Supervised 14 M.Sc. thesis projects and 28 undergraduate capstone design groups to completion.",
+        "Published 6 Q1 journal articles as corresponding author over the past 3 academic years."
+      ]
+    },
+    {
+      id: "exp-acad-2",
+      jobTitle: "Postdoctoral Research Fellow",
+      company: "Max Planck Institute for Informatics",
+      location: "Saarbrücken, Germany",
+      startDate: "2018",
+      endDate: "2021",
+      current: false,
+      description: "Conducted fundamental research in graph representation learning for molecular property prediction.",
+      highlights: [
+        "Developed graph neural network framework for molecular property prediction cited 450+ times."
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-acad-1",
+      degree: "Ph.D. in Computer Science",
+      institution: "National University of Singapore (NUS)",
+      location: "Singapore",
+      startDate: "2014",
+      endDate: "2018",
+      grade: "Doctoral Dissertation with Distinction"
+    },
+    {
+      id: "edu-acad-2",
+      degree: "B.Sc. in Computer Science & Engineering",
+      institution: "Bangladesh University of Engineering and Technology (BUET)",
+      location: "Dhaka",
+      startDate: "2009",
+      endDate: "2013",
+      grade: "CGPA 3.94 / 4.00 (First Class 2nd)"
+    }
+  ],
+  skills: [
+    { name: "Machine Learning & PyTorch" },
+    { name: "Genomic Sequence Analysis" },
+    { name: "Graph Neural Networks" },
+    { name: "Algorithmic Design" },
+    { name: "Peer Review & Grant Writing" },
+    { name: "Curriculum Accreditation (BAETE)" }
+  ]
+};
+
+export const PERSONA_EXECUTIVE_LEAD = {
+  title: "Marcus Sterling - Chief Operating Officer CV",
+  personalInfo: {
+    fullName: "Marcus Sterling",
+    jobTitle: "Chief Operating Officer & Enterprise Transformation Leader",
+    email: "marcus.sterling@example.com",
+    phone: "+1 (555) 789-0123",
+    location: "New York, NY",
+    linkedin: "linkedin.com/in/marcussterling-coo",
+    summary: "Transformational executive leader with 15+ years driving global operations, P&L management ($150M+), enterprise M&A integration, and digital supply chain modernizations across Fortune 500 tech and logistics enterprises. Expert at turning vision into scalable operating margin expansions.",
+    photo: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&auto=format&fit=crop&q=80",
+    photoStyle: "circle"
+  },
+  experience: [
+    {
+      id: "exp-exec-1",
+      jobTitle: "Chief Operating Officer",
+      company: "Apex Global Logistics & Cloud Solutions",
+      location: "New York, NY",
+      startDate: "2020",
+      endDate: "Present",
+      current: true,
+      description: "Direct enterprise strategy, customer fulfillment, technology operations, and P&L governance across 14 countries.",
+      highlights: [
+        "Oversee 1,400-person global operations across North America, EMEA, and APAC generating $180M ARR.",
+        "Accelerated EBITDA margins by 420 bps through automated fulfillment robotics and predictive AI routing.",
+        "Led post-merger integration of $45M SaaS acquisition ahead of schedule, capturing $6.2M in annual synergies."
+      ]
+    },
+    {
+      id: "exp-exec-2",
+      jobTitle: "Vice President of Operations & Strategy",
+      company: "Vanguard Industrial Partners",
+      location: "Chicago, IL",
+      startDate: "2015",
+      endDate: "2020",
+      current: false,
+      description: "Managed business unit operations with $90M annual spend.",
+      highlights: [
+        "Restructured supply chain procurement network, lowering vendor COGS by 18% over 3 fiscal years."
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-exec-1",
+      degree: "MBA in Strategic Management & Operations",
+      institution: "Wharton School, University of Pennsylvania",
+      location: "Philadelphia, PA",
+      startDate: "2013",
+      endDate: "2015",
+      grade: "Palmer Scholar (Top 5%)"
+    },
+    {
+      id: "edu-exec-2",
+      degree: "B.S. in Industrial & Systems Engineering",
+      institution: "Northwestern University",
+      location: "Evanston, IL",
+      startDate: "2007",
+      endDate: "2011",
+      grade: "Magna Cum Laude"
+    }
+  ],
+  skills: [
+    { name: "P&L Management ($150M+)" },
+    { name: "Enterprise M&A Integration" },
+    { name: "Global Supply Chain Operations" },
+    { name: "EBITDA Margin Optimization" },
+    { name: "Executive Stakeholder Governance" },
+    { name: "Organizational Leadership" }
+  ]
+};
+
+export const PERSONA_STUDENT_FRESHER = {
+  title: "Nafis Ahmed - Computer Science Graduate CV",
+  personalInfo: {
+    fullName: "Nafis Ahmed",
+    jobTitle: "Junior Software Engineer & CS Graduate",
+    email: "nafis.ahmed@example.com",
+    phone: "+880 1712-345678",
+    location: "Dhanmondi, Dhaka",
+    linkedin: "linkedin.com/in/nafisahmed",
+    github: "github.com/nafisahmed",
+    website: "https://nafisahmed.dev",
+    summary: "Computer Science graduate (CGPA 3.78/4.00) with hands-on internship experience building responsive React and Node.js web applications. Eager to contribute clean, maintainable code to a collaborative engineering team.",
+    photo: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop&q=80",
+    photoStyle: "circle"
+  },
+  personalDetails: {
+    nationality: "Bangladeshi",
+    presentAddress: "Dhanmondi 15, Dhaka 1209",
+    dateOfBirth: "2002-05-14"
+  },
+  experience: [
+    {
+      id: "exp-f1",
+      jobTitle: "Software Engineering Intern",
+      company: "Pathao Tech (Product Lab)",
+      location: "Dhaka, Bangladesh",
+      startDate: "Jan 2025",
+      endDate: "Jun 2025",
+      current: false,
+      description: "Contributed to merchant dashboard features in React, TypeScript, and REST APIs.",
+      highlights: [
+        "Reduced checkout form validation latency by 28% across key onboarding screens.",
+        "Wrote automated unit tests achieving 85% coverage for new billing utility modules."
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-f1",
+      degree: "B.Sc. in Computer Science & Engineering",
+      institution: "North South University, Dhaka",
+      location: "Dhaka",
+      startDate: "2021",
+      endDate: "2025",
+      grade: "CGPA 3.78 / 4.00",
+      highlights: ["Dean's Honor List recipient across 4 semesters."]
+    }
+  ],
+  skills: [
+    { name: "React & Next.js" },
+    { name: "TypeScript & JavaScript" },
+    { name: "Node.js & Express" },
+    { name: "PostgreSQL & Prisma" },
+    { name: "Tailwind CSS" },
+    { name: "Git & GitHub Actions" }
+  ],
+  projects: [
+    {
+      id: "proj-f1",
+      name: "MedTrack BD",
+      role: "Solo Developer",
+      description: "Real-time pharmacy prescription dispenser and inventory alert dashboard in Next.js.",
+      technologies: ["React", "Next.js", "Tailwind CSS", "Supabase"]
+    },
+    {
+      id: "proj-f2",
+      name: "SmartCampus",
+      role: "Team Lead",
+      description: "University campus room allocation & student event calendar app with QR verification.",
+      technologies: ["TypeScript", "Node.js", "PostgreSQL"]
+    }
+  ],
+  certifications: [
+    { name: "Meta Front-End Developer Professional Certificate", issuer: "Coursera", date: "2024" }
+  ],
+  languages: [
+    { name: "Bengali", proficiency: "Native" },
+    { name: "English", proficiency: "Fluent" }
+  ]
+};
+
+export const PERSONA_CREATIVE_UIUX = {
+  title: "Sophia Chen - Lead Product Designer CV",
+  personalInfo: {
+    fullName: "Sophia Chen",
+    jobTitle: "Lead Product & Interaction Designer",
+    email: "sophia.chen@example.com",
+    phone: "+1 (555) 456-7890",
+    location: "Seattle, WA",
+    website: "https://sophiachen.design",
+    linkedin: "linkedin.com/in/sophiachen-design",
+    summary: "Design systems and product interaction lead with 7+ years crafting scalable Figma component ecosystems, micro-interactions, and high-conversion SaaS web applications. Passionate about accessibility (WCAG AAA) and intuitive user onboarding.",
+    photo: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80",
+    photoStyle: "circle"
+  },
+  experience: [
+    {
+      id: "exp-ui-1",
+      jobTitle: "Staff Product Designer",
+      company: "Figma Ecosystem Studio",
+      location: "Seattle, WA",
+      startDate: "2022",
+      endDate: "Present",
+      current: true,
+      description: "Lead design tokens architecture and multi-platform component library supporting 40+ engineering pods.",
+      highlights: [
+        "Architected multi-brand design token system reducing UI development turnaround by 35%.",
+        "Redesigned core onboarding flow, elevating 30-day user activation rate from 42% to 68%."
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-ui-1",
+      degree: "B.Des. in Human-Computer Interaction",
+      institution: "University of Washington",
+      location: "Seattle, WA",
+      startDate: "2014",
+      endDate: "2018",
+      grade: "3.91 GPA"
+    }
+  ],
+  skills: [
+    { name: "Figma Component Systems" },
+    { name: "Design Tokens & Styling" },
+    { name: "User Research & Prototyping" },
+    { name: "Accessibility (WCAG AAA)" },
+    { name: "HTML5/CSS3/Tailwind" },
+    { name: "Design Sprint Facilitation" }
+  ]
+};
+
+export const PERSONA_FINANCE_ACCOUNTING = {
+  title: "Sadia Rahman, ACA - Financial Planning & Analysis CV",
+  personalInfo: {
+    fullName: "Sadia Rahman, ACA",
+    jobTitle: "Senior Financial Planning & Analysis (FP&A) Manager",
+    email: "sadia.rahman.aca@example.com",
+    phone: "+880 1718-234567",
+    location: "Banani, Dhaka",
+    linkedin: "linkedin.com/in/sadia-rahman-aca",
+    summary: "Chartered Accountant (ICAB) with 6+ years experience in corporate budgeting, statutory financial audits, treasury management, and IFRS/BFRS reporting. Expert at building automated financial forecast models and driving working capital optimization.",
+    photo: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&auto=format&fit=crop&q=80",
+    photoStyle: "portrait"
+  },
+  experience: [
+    {
+      id: "exp-fin-1",
+      jobTitle: "Senior FP&A Manager",
+      company: "Grameenphone Ltd. (Finance Division)",
+      location: "Dhaka, Bangladesh",
+      startDate: "2021",
+      endDate: "Present",
+      current: true,
+      description: "Direct annual OPEX and CAPEX budget planning ($120M) and board financial reviews.",
+      highlights: [
+        "Led quarterly financial forecasting models yielding under 2% variance from actual fiscal outcomes.",
+        "Identified working capital inefficiencies, unlocking BDT 14 Crore in cash flow liquidity."
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-fin-1",
+      degree: "Associate Chartered Accountant (ACA)",
+      institution: "Institute of Chartered Accountants of Bangladesh (ICAB)",
+      location: "Dhaka",
+      startDate: "2017",
+      endDate: "2021",
+      grade: "Passed in First Attempt"
+    },
+    {
+      id: "edu-fin-2",
+      degree: "BBA in Accounting & Information Systems",
+      institution: "University of Dhaka",
+      location: "Dhaka",
+      startDate: "2013",
+      endDate: "2017",
+      grade: "CGPA 3.85 / 4.00"
+    }
+  ],
+  skills: [
+    { name: "IFRS / BFRS Financial Reporting" },
+    { name: "Corporate Financial Modeling" },
+    { name: "Statutory & Tax Audit" },
+    { name: "Working Capital Optimization" },
+    { name: "ERP (SAP S/4HANA Finance)" },
+    { name: "Treasury & Cash Management" }
+  ]
+};
+
+export const PERSONA_TEXTILE_MERCHANDISER = {
+  title: "Farhan Kabir - Apparel Merchandiser CV",
+  personalInfo: {
+    fullName: "Farhan Kabir",
+    jobTitle: "Senior Apparel Merchandiser & Supply Chain Lead",
+    email: "farhan.textile@example.com",
+    phone: "+880 1719-876543",
+    location: "Gazipur, Dhaka",
+    linkedin: "linkedin.com/in/farhan-textile-merchandiser",
+    summary: "Textile engineering graduate with 8+ years managing woven and knit apparel merchandising for premier European buyers (H&M, Zara, Primark). Expert in consumption costing, lab dip approvals, yarn-to-garment production lead times, and factory compliance audits.",
+    photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80",
+    photoStyle: "portrait"
+  },
+  experience: [
+    {
+      id: "exp-tex-1",
+      jobTitle: "Senior Apparel Merchandiser",
+      company: "Beximco Apparels Ltd.",
+      location: "Gazipur, Bangladesh",
+      startDate: "2020",
+      endDate: "Present",
+      current: true,
+      description: "Manage buyer accounts with annual order volumes exceeding 4.5 million garment pieces.",
+      highlights: [
+        "Achieved 99.2% on-time garment shipment delivery across 12 consecutive export seasons.",
+        "Negotiated fabric sourcing contracts saving $240k across bulk woven production orders."
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-tex-1",
+      degree: "B.Sc. in Textile Engineering (Fabric & Apparel)",
+      institution: "Bangladesh University of Textiles (BUTEX)",
+      location: "Dhaka",
+      startDate: "2012",
+      endDate: "2016",
+      grade: "First Class"
+    }
+  ],
+  skills: [
+    { name: "Garment Consumption & Costing" },
+    { name: "Yarn & Fabric Sourcing" },
+    { name: "Lab Dip & Sample Approval" },
+    { name: "Production Planning (T&A)" },
+    { name: "Buyer Communication (H&M, Inditex)" },
+    { name: "Sedex & BSCI Social Compliance" }
+  ]
+};
+
+/**
+ * Resolver function to return the most accurate persona preview data for any template.
+ */
+export const resolvePersonaForTemplate = (template = {}) => {
+  const id = String(template.id || '').toLowerCase();
+  const cat = String(template.category || '').toLowerCase();
+  const cats = (template.categories || []).map((c) => String(c).toLowerCase());
+
+  if (id.includes('doctor') || id.includes('medical') || id.includes('mbbs') || id.includes('nurse') || id.includes('health') || cats.includes('healthcare')) {
+    return PERSONA_HEALTHCARE_MBBS;
+  }
+  if (id.includes('bcs') || id.includes('admin-cadre') || id.includes('govt') || id.includes('civil')) {
+    return PERSONA_BD_BCS_CADRE;
+  }
+  if (id.includes('accountant') || id.includes('audit') || id.includes('fpa') || id.includes('tax') || (id.includes('finance') && !id.includes('bank'))) {
+    return PERSONA_FINANCE_ACCOUNTING;
+  }
+  if (id.includes('bank') || id.includes('mto') || id.includes('finance') || id.includes('fin-') || cats.includes('finance and accounting')) {
+    return PERSONA_BD_BANKING_MTO;
+  }
+  if (id.includes('academic') || id.includes('research') || id.includes('professor') || id.includes('faculty') || cats.includes('academic and research')) {
+    return PERSONA_ACADEMIC_RESEARCH;
+  }
+  if (id.includes('textile') || id.includes('merchandis') || id.includes('apparel') || id.includes('garment')) {
+    return PERSONA_TEXTILE_MERCHANDISER;
+  }
+  if (id.includes('creative') || id.includes('design') || id.includes('uiux') || cats.includes('creative')) {
+    return PERSONA_CREATIVE_UIUX;
+  }
+  if (id.includes('executive') || id.includes('leadership') || id.includes('coo') || id.includes('director') || cats.includes('executive')) {
+    return PERSONA_EXECUTIVE_LEAD;
+  }
+  if (id.includes('fresher') || id.includes('graduate') || cats.includes('student and fresh graduate')) {
+    return PERSONA_STUDENT_FRESHER;
+  }
+  if (id.startsWith('bd-') || id.includes('bd') || cat.includes('bangladesh') || cats.includes('bangladesh cvs')) {
+    return PERSONA_BD_BANKING_MTO;
+  }
+  return PERSONA_TECH_LEAD;
+};
+

@@ -3,6 +3,7 @@ import { useDispatch } from 'react-redux';
 import '../shared/cvElements.css';
 import {
   updatePersonalInfo,
+  updatePersonalDetails,
   updateExperience,
   updateEducation,
   updateSkill,
@@ -11,9 +12,32 @@ import {
   updateLanguage,
   updateReference,
   updateDeclaration,
+  updateCustomSection,
 } from '../../store/cvSlice';
 import EditableElement from '../../features/cv-editor/components/EditableElement';
+import {
+  resolveDesignTokens,
+  getSectionVisibility,
+  getOrderedSectionKeys,
+  CVSectionTitle,
+  CVSection,
+  CVPersonalDetailsTable,
+  CVCustomSections,
+  CVDeclaration,
+} from '../shared/cvElements';
 import { Camera } from 'lucide-react';
+
+export {
+  EditableElement,
+  resolveDesignTokens,
+  getSectionVisibility,
+  getOrderedSectionKeys,
+  CVSectionTitle,
+  CVSection,
+  CVPersonalDetailsTable,
+  CVCustomSections,
+  CVDeclaration,
+};
 
 /**
  * Shared Redux dispatch helpers & reusable inline-editable subcomponents
@@ -24,6 +48,8 @@ export const useOnePageEditors = () => {
 
   return {
     savePersonal: (field) => (val) => dispatch(updatePersonalInfo({ [field]: val })),
+    savePersonalDetailField: (field) => (val) =>
+      dispatch(updatePersonalDetails({ [field]: val })),
     saveExperienceField: (index, field) => (val) =>
       dispatch(updateExperience({ index, data: { [field]: val } })),
     saveExperienceHighlight: (index, hIdx, highlights = []) => (val) => {
@@ -45,6 +71,10 @@ export const useOnePageEditors = () => {
       dispatch(updateReference({ index, data: { [field]: val } })),
     saveDeclarationField: (field) => (val) =>
       dispatch(updateDeclaration({ [field]: val })),
+    saveCustomSectionTitle: (index) => (val) =>
+      dispatch(updateCustomSection({ sectionId: `custom-${index}`, data: { title: val } })),
+    saveCustomSectionContent: (index) => (val) =>
+      dispatch(updateCustomSection({ sectionId: `custom-${index}`, data: { content: val } })),
   };
 };
 
@@ -141,47 +171,25 @@ export const CompactSectionTitle = ({
   title,
   color = '#2563eb',
   variant = 'underline',
+  fontFamily,
+  dividerThickness = '2px',
+  style = {},
+  className = '',
+  sectionKey,
+  onSave,
 }) => {
-  if (variant === 'pill') {
-    return (
-      <h2
-        className="cv-section-title cv-heading-avoid-break text-[10.5px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded inline-block mb-1.5"
-        style={{ color, backgroundColor: `${color}15` }}
-      >
-        {title}
-      </h2>
-    );
-  }
-
-  if (variant === 'plain') {
-    return (
-      <h2
-        className="cv-section-title cv-heading-avoid-break text-[11px] font-bold uppercase tracking-widest pb-0.5 mb-1.5 border-b"
-        style={{ color, borderColor: '#cbd5e1' }}
-      >
-        {title}
-      </h2>
-    );
-  }
-
-  if (variant === 'bar') {
-    return (
-      <div className="cv-section-title cv-heading-avoid-break flex items-center gap-2 mb-1.5">
-        <span className="w-1 h-3.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-        <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-900">
-          {title}
-        </h2>
-      </div>
-    );
-  }
-
   return (
-    <h2
-      className="cv-section-title cv-heading-avoid-break text-[11px] font-extrabold uppercase tracking-wider pb-0.5 mb-1.5 border-b-2"
-      style={{ color, borderColor: color }}
-    >
-      {title}
-    </h2>
+    <CVSectionTitle
+      title={title}
+      color={color}
+      fontFamily={fontFamily}
+      dividerThickness={dividerThickness}
+      variant={variant}
+      style={style}
+      className={className}
+      sectionKey={sectionKey}
+      onSave={onSave}
+    />
   );
 };
 
@@ -190,11 +198,15 @@ export const OnePageExperienceList = ({
   editors,
   accentColor = '#2563eb',
   compact = false,
+  designTokens = {},
 }) => {
   if (!experience?.length) return null;
 
+  const itemGap = designTokens?.itemSpacing || (compact ? '8px' : '10px');
+  const effAccent = designTokens?.accentColor || accentColor;
+
   return (
-    <div className={compact ? 'space-y-2' : 'space-y-2.5'}>
+    <div className="space-y-0" style={{ display: 'flex', flexDirection: 'column', gap: itemGap }}>
       {experience.map((exp, index) => (
         <div key={exp.id || index} className="leading-snug cv-experience-item cv-item-avoid-break">
           <div className="flex items-baseline justify-between gap-2">
@@ -207,6 +219,7 @@ export const OnePageExperienceList = ({
                 onSave={editors.saveExperienceField(index, 'jobTitle')}
                 placeholder="Role / Position"
                 className="text-[12px] font-bold text-slate-900 inline"
+                style={{ fontFamily: designTokens?.headingFont }}
               />
               {exp.company && (
                 <>
@@ -219,7 +232,7 @@ export const OnePageExperienceList = ({
                     onSave={editors.saveExperienceField(index, 'company')}
                     placeholder="Organization"
                     className="text-[11.5px] font-semibold inline"
-                    style={{ color: accentColor }}
+                    style={{ color: effAccent }}
                   />
                 </>
               )}
@@ -243,6 +256,7 @@ export const OnePageExperienceList = ({
               onSave={editors.saveExperienceField(index, 'description')}
               placeholder="Summary of responsibilities..."
               className="text-[11px] text-slate-700 mt-0.5 block leading-snug"
+              style={{ fontFamily: designTokens?.bodyFont }}
             />
           )}
 
@@ -260,6 +274,7 @@ export const OnePageExperienceList = ({
                         onSave={editors.saveExperienceHighlight(index, hIdx, exp.highlights)}
                         placeholder="Achievement bullet..."
                         className="inline"
+                        style={{ fontFamily: designTokens?.bodyFont }}
                       />
                     </li>
                   )
@@ -277,11 +292,15 @@ export const OnePageEducationList = ({
   editors,
   accentColor = '#2563eb',
   showGradesProminent = true,
+  designTokens = {},
 }) => {
   if (!education?.length) return null;
 
+  const itemGap = designTokens?.itemSpacing || '6px';
+  const effAccent = designTokens?.accentColor || accentColor;
+
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-0" style={{ display: 'flex', flexDirection: 'column', gap: itemGap }}>
       {education.map((edu, index) => (
         <div key={edu.id || index} className="leading-snug cv-education-item cv-item-avoid-break">
           <div className="flex items-baseline justify-between gap-2">
@@ -293,6 +312,7 @@ export const OnePageEducationList = ({
               onSave={editors.saveEducationField(index, 'degree')}
               placeholder="Degree / Certificate"
               className="text-[11.5px] font-bold text-slate-900 inline"
+              style={{ fontFamily: designTokens?.headingFont }}
             />
             <span className="text-[10.5px] font-semibold text-slate-500 whitespace-nowrap shrink-0">
               {edu.startDate || ''}
@@ -309,6 +329,7 @@ export const OnePageEducationList = ({
               onSave={editors.saveEducationField(index, 'institution')}
               placeholder="Institution / University"
               className="inline font-medium"
+              style={{ fontFamily: designTokens?.bodyFont }}
             />
             {showGradesProminent && edu.grade && (
               <EditableElement
@@ -319,12 +340,14 @@ export const OnePageEducationList = ({
                 onSave={editors.saveEducationField(index, 'grade')}
                 placeholder="GPA / CGPA"
                 className="font-bold whitespace-nowrap shrink-0 text-[10.5px]"
-                style={{ color: accentColor }}
+                style={{ color: effAccent }}
               />
             )}
           </div>
           {Array.isArray(edu.highlights) && edu.highlights[0] && (
-            <p className="text-[10.5px] text-slate-500 mt-0.5">{edu.highlights[0]}</p>
+            <p className="text-[10.5px] text-slate-500 mt-0.5" style={{ fontFamily: designTokens?.bodyFont }}>
+              {edu.highlights[0]}
+            </p>
           )}
         </div>
       ))}
@@ -337,11 +360,14 @@ export const OnePageProjectsGrid = ({
   editors,
   accentColor = '#2563eb',
   twoColumns = true,
+  designTokens = {},
 }) => {
   if (!projects?.length) return null;
 
+  const effAccent = designTokens?.accentColor || accentColor;
+
   return (
-    <div className={twoColumns && projects.length > 1 ? 'grid grid-cols-2 gap-2.5' : 'space-y-2'}>
+    <div className={twoColumns && projects.length > 1 ? 'grid grid-cols-2 gap-2' : 'space-y-2'}>
       {projects.map((proj, index) => (
         <div
           key={proj.id || index}
@@ -356,9 +382,10 @@ export const OnePageProjectsGrid = ({
               onSave={editors.saveProjectField(index, 'name')}
               placeholder="Project Name"
               className="text-[11.5px] font-bold text-slate-900 inline"
+              style={{ fontFamily: designTokens?.headingFont }}
             />
             {proj.role && (
-              <span className="text-[9.5px] font-semibold shrink-0" style={{ color: accentColor }}>
+              <span className="text-[9.5px] font-semibold shrink-0" style={{ color: effAccent }}>
                 {proj.role}
               </span>
             )}
@@ -372,6 +399,7 @@ export const OnePageProjectsGrid = ({
               onSave={editors.saveProjectField(index, 'description')}
               placeholder="Project outcome..."
               className="text-[10.5px] text-slate-600 mt-0.5 block leading-snug"
+              style={{ fontFamily: designTokens?.bodyFont }}
             />
           )}
           {(Array.isArray(proj.technologies) ? proj.technologies.length > 0 : proj.technologies) && (
@@ -399,3 +427,6 @@ export const OnePageProjectsGrid = ({
   );
 };
 
+export const OnePagePersonalDetailsTable = (props) => <CVPersonalDetailsTable {...props} />;
+export const OnePageCustomSections = (props) => <CVCustomSections {...props} />;
+export const OnePageDeclaration = (props) => <CVDeclaration {...props} />;

@@ -1,26 +1,12 @@
+import { resolvePersonaForTemplate } from './personaPresets.js';
+
 /**
  * Canonical Template Catalog, Dynamic Categories, One-Page Guidance, and Backward-Compatible Aliases.
  * Every template in TEMPLATES_REGISTRY represents a genuinely distinct layout architecture,
  * color palette, target industry, and export-tested configuration.
  */
 
-export const PREFERRED_CATEGORY_ORDER = [
-  "All CVs",
-  "One-Page CVs",
-  "Bangladesh CVs",
-  "Student / Fresh Graduate",
-  "Modern",
-  "Minimal",
-  "Standard",
-  "Professional",
-  "Executive",
-  "Technology",
-  "IT",
-  "Academic",
-  "Multiple-Page CVs"
-];
-
-export const TEMPLATES_REGISTRY = [
+const RAW_TEMPLATES_REGISTRY = [
   {
     "id": "onepage-fresher-clean",
     "name": "Fresh Graduate Clean",
@@ -5273,6 +5259,450 @@ export const TEMPLATE_ALIAS_COLORS = {
   }
 };
 
+export const TEMPLATE_CATEGORIES = [
+  "All Templates",
+  "Bangladesh CVs",
+  "International Standard",
+  "Modern",
+  "Minimal",
+  "Executive",
+  "Corporate",
+  "Technology",
+  "IT and Software Engineering",
+  "Creative",
+  "Academic and Research",
+  "Healthcare",
+  "Education and Teaching",
+  "Business and Management",
+  "Finance and Accounting",
+  "Engineering",
+  "Marketing and Sales",
+  "Student and Fresh Graduate",
+  "Experienced Professionals",
+  "Multiple-Page CVs",
+];
+
+export const PREFERRED_CATEGORY_ORDER = [...TEMPLATE_CATEGORIES];
+
+export const deriveLayoutType = (t) => {
+  const arch = String(t.layoutArchitecture || t.baseLayout || t.id || '').toLowerCase();
+  if (arch === 'onepage-academic-compact' || arch.includes('academic')) return 'academic';
+  if (arch === 'onepage-tech-grid' || arch.includes('grid')) return 'grid';
+  if (
+    arch === 'onepage-executive-brief' ||
+    arch === 'onepage-creative-editorial' ||
+    arch.includes('editorial')
+  ) {
+    return 'editorial';
+  }
+  if (arch === 'onepage-bd-compact' || arch === 'bd-corporate-standard') return 'two-column-right';
+  if (
+    arch === 'onepage-modern-split' ||
+    arch === 'onepage-it-sidebar' ||
+    arch === 'executive-slate' ||
+    arch === 'ocean-split' ||
+    arch.includes('split') ||
+    arch.includes('sidebar')
+  ) {
+    return 'two-column-left';
+  }
+  return 'single-column';
+};
+
+export const deriveProfessions = (t) => {
+  const id = String(t.id || '').toLowerCase();
+
+  if (id.includes('doctor') || id.includes('clinical') || id.includes('medical')) {
+    return ['Medical Officer', 'Clinical Doctor', 'Resident Physician'];
+  }
+  if (id.includes('nurse') || id.includes('nursing')) {
+    return ['Registered Nurse', 'Staff Nurse', 'Clinical Nurse'];
+  }
+  if (id.includes('pharma')) {
+    return ['Pharmacist', 'QA Officer', 'Medical Representative'];
+  }
+  if (id.includes('frontend') || id.includes('react')) {
+    return ['Frontend Developer', 'React Specialist', 'UI Engineer'];
+  }
+  if (id.includes('backend') || id.includes('node') || id.includes('microservices')) {
+    return ['Backend Engineer', 'Node.js Developer', 'API Architect'];
+  }
+  if (id.includes('fullstack') || id.includes('ts')) {
+    return ['Full-Stack Developer', 'TypeScript Engineer', 'Software Architect'];
+  }
+  if (id.includes('devops') || id.includes('cloud') || id.includes('sre')) {
+    return ['DevOps Engineer', 'Cloud Architect', 'Site Reliability Engineer'];
+  }
+  if (id.includes('mobile') || id.includes('flutter') || id.includes('ios') || id.includes('android')) {
+    return ['Mobile App Developer', 'Flutter Engineer', 'iOS/Android Specialist'];
+  }
+  if (id.includes('data-analyst') || id.includes('bi')) {
+    return ['Data Analyst', 'BI Specialist', 'Analytics Consultant'];
+  }
+  if (id.includes('ai') || id.includes('ml')) {
+    return ['Machine Learning Engineer', 'AI Researcher', 'Data Scientist'];
+  }
+  if (id.includes('cyber') || id.includes('security')) {
+    return ['Cybersecurity Analyst', 'InfoSec Officer', 'SOC Specialist'];
+  }
+  if (id.includes('qa') || id.includes('test')) {
+    return ['QA Automation Engineer', 'SDET', 'Software Quality Lead'];
+  }
+  if (id.includes('uiux') || id.includes('designer') || id.includes('product-design')) {
+    return ['Product Designer', 'UI/UX Specialist', 'Design System Lead'];
+  }
+  if (id.includes('product-manager')) {
+    return ['Product Manager', 'Technical PO', 'Product Lead'];
+  }
+  if (id.includes('brand')) {
+    return ['Brand Designer', 'Visual Identity Lead', 'Creative Director'];
+  }
+  if (id.includes('graphic')) {
+    return ['Graphic Designer', 'Visual Content Creator', 'Print Designer'];
+  }
+  if (id.includes('copy') || id.includes('content')) {
+    return ['Content Strategist', 'Technical Copywriter', 'Creative Writer'];
+  }
+  if (id.includes('video') || id.includes('motion')) {
+    return ['Motion Designer', 'Video Producer', 'Multimedia Creator'];
+  }
+  if (id.includes('finance') || id.includes('fpa') || id.includes('investment') || id.includes('accountant') || id.includes('tax')) {
+    return ['Financial Analyst', 'FP&A Manager', 'Corporate Accountant'];
+  }
+  if (id.includes('bank') || id.includes('mto') || id.includes('po')) {
+    return ['Bank Officer', 'Management Trainee (MTO)', 'Credit Analyst'];
+  }
+  if (id.includes('bcs') || id.includes('cadre') || id.includes('govt')) {
+    return ['Cadre Officer', 'Govt Administrator', 'Public Sector Executive'];
+  }
+  if (id.includes('textile') || id.includes('merchandis') || id.includes('garment')) {
+    return ['Senior Merchandiser', 'Apparel Production Lead', 'Garment Sourcing Manager'];
+  }
+  if (id.includes('civil')) {
+    return ['Civil Engineer', 'Structural Designer', 'Project Site Engineer'];
+  }
+  if (id.includes('electrical')) {
+    return ['Electrical Engineer', 'Power Systems Specialist', 'Control Systems Engineer'];
+  }
+  if (id.includes('mechanical')) {
+    return ['Mechanical Engineer', 'HVAC Specialist', 'Manufacturing Engineer'];
+  }
+  if (id.includes('architect')) {
+    return ['Architectural Designer', 'BIM Specialist', 'Spatial Planner'];
+  }
+  if (id.includes('marketing') || id.includes('sales') || id.includes('seo') || id.includes('social')) {
+    return ['Growth Marketer', 'SEO Specialist', 'Sales Executive'];
+  }
+  if (id.includes('hr') || id.includes('talent')) {
+    return ['HR Specialist', 'Talent Acquisition Partner', 'People Operations Lead'];
+  }
+  if (id.includes('teacher') || id.includes('educator') || id.includes('faculty') || id.includes('lecturer')) {
+    return ['Educator', 'University Lecturer', 'High School Teacher'];
+  }
+  if (id.includes('academic') || id.includes('research') || id.includes('scientist') || id.includes('fellow')) {
+    return ['Research Fellow', 'Computational Scientist', 'Postdoctoral Scholar'];
+  }
+  if (id.includes('fresher') || id.includes('intern') || id.includes('student') || id.includes('entry')) {
+    return ['Junior Software Engineer', 'Graduate Trainee', 'Intern'];
+  }
+  if (id.includes('executive') || id.includes('director') || id.includes('founder') || id.includes('slate')) {
+    return ['Chief Operating Officer (COO)', 'Managing Director', 'Executive VP'];
+  }
+  return ['Software Engineer', 'Technical Specialist', 'Professional'];
+};
+
+export const deriveCategories = (t) => {
+  const cats = new Set();
+  const id = String(t.id || '').toLowerCase();
+  const oldCats = (t.categories || []).map((c) => String(c).toLowerCase());
+  const arch = String(t.layoutArchitecture || '').toLowerCase();
+  const desc = String(t.description || '').toLowerCase();
+
+  // Bangladesh CVs
+  if (
+    id.startsWith('bd-') ||
+    id.includes('bangladesh') ||
+    oldCats.includes('bangladesh cvs') ||
+    id.includes('bd-compact') ||
+    desc.includes('bangladeshi')
+  ) {
+    cats.add('Bangladesh CVs');
+  }
+
+  // Technology / IT and Software Engineering
+  if (
+    id.includes('tech') ||
+    id.includes('dev') ||
+    id.includes('frontend') ||
+    id.includes('backend') ||
+    id.includes('fullstack') ||
+    id.includes('mobile') ||
+    id.includes('ai-') ||
+    id.includes('ml-') ||
+    id.includes('cyber') ||
+    id.includes('qa') ||
+    id.includes('cs-') ||
+    id.includes('it-') ||
+    id.includes('cloud') ||
+    oldCats.includes('technology') ||
+    oldCats.includes('it')
+  ) {
+    cats.add('Technology');
+    cats.add('IT and Software Engineering');
+  }
+
+  // Creative
+  if (
+    id.includes('creative') ||
+    id.includes('design') ||
+    id.includes('uiux') ||
+    id.includes('brand') ||
+    id.includes('graphic') ||
+    id.includes('video') ||
+    id.includes('editorial') ||
+    arch === 'onepage-creative-editorial'
+  ) {
+    cats.add('Creative');
+  }
+
+  // Academic and Research
+  if (
+    id.includes('academic') ||
+    id.includes('research') ||
+    id.includes('scientist') ||
+    id.includes('fellow') ||
+    id.includes('phd') ||
+    oldCats.includes('academic') ||
+    arch === 'onepage-academic-compact'
+  ) {
+    cats.add('Academic and Research');
+  }
+
+  // Education and Teaching
+  if (
+    id.includes('teacher') ||
+    id.includes('educator') ||
+    id.includes('lecturer') ||
+    id.includes('faculty') ||
+    id.includes('education') ||
+    desc.includes('teaching') ||
+    desc.includes('faculty')
+  ) {
+    cats.add('Education and Teaching');
+  }
+
+  // Healthcare
+  if (
+    id.includes('doctor') ||
+    id.includes('nurse') ||
+    id.includes('nursing') ||
+    id.includes('clinical') ||
+    id.includes('pharma') ||
+    id.includes('medical') ||
+    desc.includes('medical') ||
+    desc.includes('clinical')
+  ) {
+    cats.add('Healthcare');
+  }
+
+  // Business and Management
+  if (
+    id.includes('business') ||
+    id.includes('management') ||
+    id.includes('manager') ||
+    id.includes('pmp') ||
+    id.includes('scrum') ||
+    id.includes('operations') ||
+    id.includes('supply-chain') ||
+    id.includes('consultant')
+  ) {
+    cats.add('Business and Management');
+  }
+
+  // Finance and Accounting
+  if (
+    id.includes('finance') ||
+    id.includes('accountant') ||
+    id.includes('banking') ||
+    id.includes('investment') ||
+    id.includes('tax') ||
+    id.includes('bank') ||
+    desc.includes('banking') ||
+    desc.includes('accounting')
+  ) {
+    cats.add('Finance and Accounting');
+  }
+
+  // Engineering
+  if (
+    id.includes('engineer') ||
+    id.includes('civil') ||
+    id.includes('electrical') ||
+    id.includes('mechanical') ||
+    id.includes('architect') ||
+    id.includes('tech-grid')
+  ) {
+    cats.add('Engineering');
+  }
+
+  // Marketing and Sales
+  if (
+    id.includes('marketing') ||
+    id.includes('sales') ||
+    id.includes('seo') ||
+    id.includes('social') ||
+    id.includes('pr-') ||
+    id.includes('communications') ||
+    id.includes('account-executive') ||
+    id.includes('customer-success')
+  ) {
+    cats.add('Marketing and Sales');
+  }
+
+  // Executive
+  if (
+    id.includes('executive') ||
+    id.includes('director') ||
+    id.includes('founder') ||
+    id.includes('lead') ||
+    id.includes('slate') ||
+    oldCats.includes('executive')
+  ) {
+    cats.add('Executive');
+  }
+
+  // Corporate
+  if (
+    id.includes('corp') ||
+    id.includes('standard') ||
+    id.includes('management') ||
+    id.includes('hr') ||
+    oldCats.includes('professional') ||
+    cats.has('Business and Management') ||
+    cats.has('Finance and Accounting')
+  ) {
+    cats.add('Corporate');
+  }
+
+  // Student and Fresh Graduate
+  if (
+    id.includes('fresher') ||
+    id.includes('intern') ||
+    id.includes('student') ||
+    id.includes('graduate') ||
+    id.includes('scholarship') ||
+    id.includes('entry') ||
+    oldCats.includes('student / fresh graduate')
+  ) {
+    cats.add('Student and Fresh Graduate');
+  }
+
+  // Experienced Professionals
+  if (
+    !cats.has('Student and Fresh Graduate') ||
+    t.isOnePage === false ||
+    cats.has('Executive') ||
+    id.includes('senior') ||
+    id.includes('lead') ||
+    id.includes('manager')
+  ) {
+    cats.add('Experienced Professionals');
+  }
+
+  // Modern & Minimal
+  if (
+    oldCats.includes('modern') ||
+    id.includes('modern') ||
+    arch.includes('modern') ||
+    arch.includes('split')
+  ) {
+    cats.add('Modern');
+  }
+  if (
+    oldCats.includes('minimal') ||
+    id.includes('minimal') ||
+    arch.includes('swiss') ||
+    arch.includes('minimal')
+  ) {
+    cats.add('Minimal');
+  }
+
+  // International Standard
+  if (
+    oldCats.includes('standard') ||
+    id.includes('ats') ||
+    arch.includes('ats') ||
+    id.includes('standard') ||
+    arch.includes('linear')
+  ) {
+    cats.add('International Standard');
+  }
+
+  // Multiple-Page CVs
+  if (t.isOnePage === false || oldCats.includes('multiple-page cvs')) {
+    cats.add('Multiple-Page CVs');
+  }
+
+  return Array.from(cats);
+};
+
+export const deriveDefaultDesignTokens = (t, layoutType) => {
+  const id = String(t.id || '').toLowerCase();
+  const primary = t.thumbnailColor || '#2563eb';
+  const accent = t.accentColor || primary;
+  const isAcademic = layoutType === 'academic' || id.includes('academic');
+  const isTech = id.includes('tech') || id.includes('dev') || id.includes('cloud') || id.includes('it');
+  const isExecutive = layoutType === 'editorial' || id.includes('executive');
+
+  const headingFont = isAcademic ? 'Lora' : isExecutive ? 'Merriweather' : 'Plus Jakarta Sans';
+  const bodyFont = isTech ? 'JetBrains Mono' : 'Inter';
+
+  return {
+    primaryColor: primary,
+    accentColor: accent,
+    headingColor: '#0f172a',
+    bodyColor: '#334155',
+    backgroundColor: '#ffffff',
+    sidebarColor: layoutType === 'two-column-left' ? '#f8fafc' : '#ffffff',
+    fontFamily: headingFont,
+    headingFont,
+    bodyFont,
+    fontSize: 'normal',
+    lineSpacing: 'normal',
+    sectionSpacing: 14,
+    itemSpacing: 10,
+    pageMargin: 24,
+    dividerThickness: 1,
+    columnRatio:
+      layoutType === 'two-column-left'
+        ? '30/70'
+        : layoutType === 'two-column-right'
+        ? '70/30'
+        : '100',
+  };
+};
+
+export const enrichTemplate = (t) => {
+  const layoutType = deriveLayoutType(t);
+  const hasPhoto = Boolean(t.photoFormat && t.photoFormat !== 'none');
+  const professions = deriveProfessions(t);
+  const categories = deriveCategories(t);
+  const defaultDesignTokens = deriveDefaultDesignTokens(t, layoutType);
+  const personaPreviewData = resolvePersonaForTemplate(t);
+
+  return {
+    ...t,
+    categories,
+    professions,
+    layoutType,
+    hasPhoto,
+    defaultDesignTokens,
+    personaPreviewData,
+  };
+};
+
+export const TEMPLATES_REGISTRY = RAW_TEMPLATES_REGISTRY.map(enrichTemplate);
+
 export const resolveTemplateId = (templateId) => {
   if (!templateId) return 'onepage-fresher-clean';
   const normalized = String(templateId).trim();
@@ -5291,7 +5721,12 @@ export const resolveTemplateMeta = (templateId, templates = TEMPLATES_REGISTRY) 
 };
 
 export const templateMatchesCategory = (template, selectedCategory) => {
-  if (!selectedCategory || selectedCategory === 'All CVs' || selectedCategory === 'All') {
+  if (
+    !selectedCategory ||
+    selectedCategory === 'All Templates' ||
+    selectedCategory === 'All CVs' ||
+    selectedCategory === 'All'
+  ) {
     return true;
   }
   if (selectedCategory === 'One-Page CVs') {
@@ -5303,25 +5738,59 @@ export const templateMatchesCategory = (template, selectedCategory) => {
   if (Array.isArray(template.categories) && template.categories.includes(selectedCategory)) {
     return true;
   }
+  if (selectedCategory === 'Bangladesh CVs') {
+    return (
+      template.category === 'Bangladesh CVs' ||
+      template.categories?.includes('Bangladesh CVs') ||
+      template.id?.startsWith('bd-') ||
+      template.id === 'onepage-bd-compact'
+    );
+  }
+  if (selectedCategory === 'International Standard') {
+    return (
+      template.categories?.includes('Standard') ||
+      template.categories?.includes('Professional') ||
+      template.category === 'Standard' ||
+      template.id?.includes('ats')
+    );
+  }
+  if (selectedCategory === 'Technology') {
+    return (
+      template.categories?.includes('Technology') ||
+      template.categories?.includes('IT') ||
+      template.categories?.includes('IT and Software Engineering')
+    );
+  }
+  if (selectedCategory === 'IT and Software Engineering') {
+    return (
+      template.categories?.includes('IT and Software Engineering') ||
+      template.categories?.includes('IT') ||
+      template.categories?.includes('Technology')
+    );
+  }
+  if (selectedCategory === 'Academic and Research') {
+    return (
+      template.categories?.includes('Academic and Research') ||
+      template.categories?.includes('Academic') ||
+      template.category === 'Academic'
+    );
+  }
+  if (selectedCategory === 'Student and Fresh Graduate') {
+    return (
+      template.categories?.includes('Student and Fresh Graduate') ||
+      template.categories?.includes('Student / Fresh Graduate')
+    );
+  }
+  if (selectedCategory === 'Experienced Professionals') {
+    return (
+      template.categories?.includes('Experienced Professionals') ||
+      (!template.categories?.includes('Student and Fresh Graduate') &&
+        !template.categories?.includes('Student / Fresh Graduate'))
+    );
+  }
   return template.category === selectedCategory;
 };
 
 export const getDynamicCategories = (templates = TEMPLATES_REGISTRY) => {
-  const found = new Set(['All CVs']);
-  templates.forEach((t) => {
-    if (t.isOnePage) found.add('One-Page CVs');
-    if (t.isOnePage === false) found.add('Multiple-Page CVs');
-    if (t.category) found.add(t.category);
-    if (Array.isArray(t.categories)) {
-      t.categories.forEach((cat) => {
-        if (cat && cat !== 'All') found.add(cat);
-      });
-    }
-  });
-
-  const ordered = PREFERRED_CATEGORY_ORDER.filter((cat) => found.has(cat));
-  const extra = Array.from(found).filter((cat) => !PREFERRED_CATEGORY_ORDER.includes(cat));
-  return [...ordered, ...extra];
+  return [...TEMPLATE_CATEGORIES];
 };
-
-export const TEMPLATE_CATEGORIES = getDynamicCategories(TEMPLATES_REGISTRY);

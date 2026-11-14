@@ -40,7 +40,7 @@ export const TemplateGalleryPage = () => {
 
   const [templatesList, setTemplatesList] = useState(TEMPLATES_REGISTRY);
   const [categoriesList, setCategoriesList] = useState(TEMPLATE_CATEGORIES);
-  const [selectedCategory, setSelectedCategory] = useState('One-Page CVs');
+  const [selectedCategory, setSelectedCategory] = useState('All Templates');
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(24);
   const [previewTemplate, setPreviewTemplate] = useState(null);
@@ -99,6 +99,7 @@ export const TemplateGalleryPage = () => {
         tpl.name.toLowerCase().includes(q) ||
         tpl.description.toLowerCase().includes(q) ||
         tpl.features?.some((f) => f.toLowerCase().includes(q)) ||
+        tpl.professions?.some((p) => p.toLowerCase().includes(q)) ||
         tpl.categories?.some((c) => c.toLowerCase().includes(q));
 
       return matchesCategory && matchesSearch;
@@ -185,6 +186,14 @@ export const TemplateGalleryPage = () => {
       'Daniel Carter',
       'Tahmidur Rahman Dipto',
       'Tahmidur Rahman',
+      'Marcus Sterling',
+      'Dr. Nusrat Jahan',
+      'Dr. Md. Saiful Islam',
+      'Tanvir Hasan Chowdhury',
+      'Mohammad Shakil Ahmed',
+      'Sadia Rahman',
+      'Farhan Kabir',
+      'Sophia Chen',
     ]);
     const userHasCustomData =
       currentCV?.personalInfo?.fullName &&
@@ -192,18 +201,22 @@ export const TemplateGalleryPage = () => {
 
     const baseData = userHasCustomData
       ? currentCV
-      : isOnePage
-        ? FRESHER_ONE_PAGE_CV
-        : isBD
-          ? TAHMIDUR_RAHMAN_CV
-          : DANIEL_CARTER_CV;
+      : template.personaPreviewData
+        ? template.personaPreviewData
+        : isOnePage
+          ? FRESHER_ONE_PAGE_CV
+          : isBD
+            ? TAHMIDUR_RAHMAN_CV
+            : DANIEL_CARTER_CV;
 
     return stripTransientCvMeta({
       ...baseData,
       templateId: template.id,
+      designTokens: template.defaultDesignTokens || baseData.designTokens,
       design: {
         ...baseData.design,
         primaryColor: template.thumbnailColor || baseData.design?.primaryColor || '#2563eb',
+        accentColor: template.accentColor || baseData.design?.accentColor || '#3b82f6',
       },
     });
   };

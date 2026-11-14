@@ -275,4 +275,37 @@ h3 {
   }
 }
 
+/* ==========================================================================
+   Shared Component Primitives (Section Titles, BD Tables, Declarations)
+   ========================================================================== */
+.cv-section {
+  position: relative;
+  box-sizing: border-box;
+}
+
+.cv-section-title {
+  margin-top: 0;
+  line-height: 1.25;
+}
+
+.cv-bd-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.cv-bd-table td,
+.cv-bd-table th {
+  padding: 4px 8px;
+  vertical-align: middle;
+}
+
+.cv-custom-section {
+  position: relative;
+}
+
+.cv-declaration {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
 
