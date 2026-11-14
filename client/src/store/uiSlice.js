@@ -6,6 +6,8 @@ const initialState = {
   desktopTab: 'content', // 'content' | 'design' | 'templates' | 'ai'
   activeSection: 'personalInfo',
   activeField: null, // e.g. 'fullName', 'jobTitle', 'summary'
+  selectedElementPath: null, // e.g. 'personalInfo.fullName', 'experience.0.jobTitle'
+  selectedElementType: null, // e.g. 'heading', 'text', 'multiline', 'badge', 'date'
   previewScale: 0.95,
   isDarkMode: false,
   aiModal: {
@@ -48,6 +50,18 @@ export const uiSlice = createSlice({
     },
     setActiveField: (state, action) => {
       state.activeField = action.payload;
+      state.selectedElementPath = action.payload;
+    },
+    setSelectedElement: (state, action) => {
+      const { path, type } = action.payload || {};
+      state.selectedElementPath = path || null;
+      state.selectedElementType = type || 'text';
+      state.activeField = path || null;
+    },
+    clearSelectedElement: (state) => {
+      state.selectedElementPath = null;
+      state.selectedElementType = null;
+      state.activeField = null;
     },
     setPreviewScale: (state, action) => {
       state.previewScale = Math.max(0.25, Math.min(2.0, action.payload));
@@ -116,6 +130,8 @@ export const {
   setDesktopTab,
   setActiveSection,
   setActiveField,
+  setSelectedElement,
+  clearSelectedElement,
   setPreviewScale,
   toggleDarkMode,
   openAIModal,

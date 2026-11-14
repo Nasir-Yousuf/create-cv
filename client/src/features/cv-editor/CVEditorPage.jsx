@@ -20,6 +20,7 @@ import {
   showToast,
   openAIModal,
   toggleDarkMode,
+  setEditorMode,
 } from '../../store/uiSlice';
 import cvService from '../../services/cvService';
 import exportService from '../../services/exportService';
@@ -27,6 +28,7 @@ import templateService from '../../services/templateService';
 import { RenderCVTemplate } from '../../templates';
 import SortableSectionList from './components/SortableSectionList';
 import SectionFormEditor from './components/SectionFormEditor';
+import EditorInspector from './components/EditorInspector';
 import PhotoUploadCropModal from './components/PhotoUploadCropModal';
 import AIAssistantModal from '../../components/common/AIAssistantModal';
 import WhatsAppSupportButton from '../../components/common/WhatsAppSupportButton';
@@ -101,8 +103,18 @@ export const CVEditorPage = () => {
     saveStatus,
     lastSavedAt,
   } = useSelector((state) => state.cv);
-  const { previewScale, isDarkMode } = useSelector((state) => state.ui);
+  const { previewScale, isDarkMode, editorMode = 'form', selectedElementPath } = useSelector(
+    (state) => state.ui
+  );
   const { isAuthenticated, user } = useSelector((state) => state.auth);
+
+  // Auto-switch to Inspector tab and open drawer when user selects an element on the canvas
+  useEffect(() => {
+    if (selectedElementPath) {
+      setActiveSidebarTab('inspector');
+      setIsSidebarOpen(true);
+    }
+  }, [selectedElementPath]);
 
   // Warn on tab/window close if there are unsaved changes
   useEffect(() => {
@@ -660,18 +672,43 @@ export const CVEditorPage = () => {
               <span>Templates</span>
             </button>
 
-            {/* Editor Pill (Active in Reference Photo with Blue Border & Blue Text) */}
-            <button
-              type="button"
-              onClick={() => {
-                setIsSidebarOpen(true);
-                setActiveSidebarTab('sections');
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-50/70 dark:bg-blue-950/60 border border-blue-500/40 text-blue-600 dark:text-blue-400 shadow-sm transition-all"
-            >
-              <Edit3 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              <span>Editor</span>
-            </button>
+            {/* Mode A / Mode B Switcher */}
+            <div className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => {
+                  dispatch(setEditorMode('form'));
+                  setActiveSidebarTab('sections');
+                  setIsSidebarOpen(true);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  editorMode === 'form' && activeSidebarTab === 'sections' && isSidebarOpen
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Mode A: Simple Form Builder"
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>Form Builder</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  dispatch(setEditorMode('visual'));
+                  setActiveSidebarTab('inspector');
+                  setIsSidebarOpen(true);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  editorMode === 'visual' || (activeSidebarTab === 'inspector' && isSidebarOpen)
+                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs ring-1 ring-indigo-500/20'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Mode B: Advanced Visual Canvas Editor"
+              >
+                <MousePointer className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Visual Canvas</span>
+              </button>
+            </div>
 
             {/* AI Assistant Pill */}
             <button
@@ -801,6 +838,24 @@ export const CVEditorPage = () => {
                 <span className="text-[10px]">Sections</span>
               </button>
 
+              {/* Inspector (Mode B) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveSidebarTab('inspector');
+                  setIsSidebarOpen(true);
+                }}
+                className={`flex flex-col items-center gap-1 w-full py-2 rounded-xl transition-all ${
+                  activeSidebarTab === 'inspector' && isSidebarOpen
+                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+                title="Canvas Element Inspector"
+              >
+                <Sliders className="w-5 h-5" />
+                <span className="text-[10px]">Inspector</span>
+              </button>
+
               {/* Settings */}
               <button
                 type="button"
@@ -845,6 +900,8 @@ export const CVEditorPage = () => {
                 <span className="font-bold text-sm text-slate-800 dark:text-white capitalize">
                   {activeSidebarTab === 'sections'
                     ? 'Edit CV Content'
+                    : activeSidebarTab === 'inspector'
+                    ? 'Element Inspector'
                     : activeSidebarTab === 'templates'
                     ? 'Choose Template'
                     : activeSidebarTab === 'design'
@@ -1245,6 +1302,13 @@ export const CVEditorPage = () => {
                   </div>
                 </div>
               )}
+
+              {/* --- 5. INSPECTOR VIEW (Mode B Visual Element Formatting) --- */}
+              {activeSidebarTab === 'inspector' && (
+                <div className="flex flex-col h-full overflow-hidden">
+                  <EditorInspector onOpenPhotoModal={() => setPhotoModalOpen(true)} />
+                </div>
+              )}
             </aside>
           )}
 
@@ -1565,12 +1629,13 @@ export const CVEditorPage = () => {
                         : devicePreview === 'tablet'
                         ? 'border-[12px] border-slate-700 rounded-[28px] p-2 bg-slate-700 shadow-2xl'
                         : 'shadow-2xl rounded-sm'
-                    } bg-white`}
+                    } bg-white overflow-hidden max-w-full`}
                     style={{
                       width: `${devicePreview === 'mobile' ? 400 : devicePreview === 'tablet' ? 680 : 794}px`,
                       minHeight: '1123px',
                       transform: `scale(${previewScale})`,
                       transformOrigin: 'top left',
+                      boxSizing: 'border-box',
                     }}
                   >
                     <RenderCVTemplate

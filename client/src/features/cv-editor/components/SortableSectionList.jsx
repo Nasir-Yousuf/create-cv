@@ -311,6 +311,12 @@ export const SortableSectionList = () => {
                     isLast={index === sectionOrder.length - 1}
                     onMoveUp={() => handleMoveUp(index)}
                     onMoveDown={() => handleMoveDown(index)}
+                    onHide={() => dispatch(hideSection(sectionId))}
+                    onDuplicate={
+                      isCustom && customSec
+                        ? () => dispatch(addCustomSection({ title: `${customSec.title} (Copy)` }))
+                        : null
+                    }
                   >
                     <div
                       onClick={() => dispatch(setActiveSection(sectionId))}

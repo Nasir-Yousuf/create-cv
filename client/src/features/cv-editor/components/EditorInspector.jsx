@@ -5,7 +5,9 @@ import {
   updatePersonalInfo,
   setTemplateId,
   setElementOverride,
+  removeElementOverride,
 } from '../../../store/cvSlice';
+import { clearSelectedElement, openAIModal } from '../../../store/uiSlice';
 import {
   Bold,
   Italic,
@@ -26,62 +28,209 @@ import {
   Square,
   Layers,
   Layout,
+  Plus,
+  Minus,
+  RotateCcw,
+  X,
 } from 'lucide-react';
 import { FONT_OPTIONS, COLOR_PALETTES, TEMPLATES_REGISTRY } from '@shared/constants/cvDefaults.js';
 
 export const EditorInspector = ({ onOpenPhotoModal }) => {
   const dispatch = useDispatch();
-  const currentCV = useSelector((state) => state.cv.currentCV);
-  const { design = {}, personalInfo = {}, templateId } = currentCV || {};
-  const { activeSection, activeField } = useSelector((state) => state.ui);
+  const currentCV = useSelector((state) => state.cv.currentCV || {});
+  const { design = {}, personalInfo = {}, templateId } = currentCV;
+  const { activeSection, activeField, selectedElementPath, selectedElementType } = useSelector(
+    (state) => state.ui
+  );
   const elementOverrides = currentCV?.elementOverrides || {};
-  const activeOverride = activeField ? elementOverrides[activeField] || {} : {};
 
+  const targetPath = selectedElementPath || activeField;
+  const activeOverride = targetPath ? elementOverrides[targetPath] || {} : {};
   const primaryColor = design?.primaryColor || '#4f46e5';
+
+  const formatElementLabel = (path) => {
+    if (!path) return 'Text Element';
+    const parts = path.split('.');
+    if (parts.length === 1) return parts[0].replace(/([A-Z])/g, ' $1');
+    if (parts.length === 2) return `${parts[0]} • ${parts[1].replace(/([A-Z])/g, ' $1')}`;
+    return `${parts[0]} #${parseInt(parts[1], 10) + 1} • ${parts[2]?.replace(/([A-Z])/g, ' $1') || parts[1]}`;
+  };
+
+  const currentFontSize =
+    typeof activeOverride.fontSize === 'number'
+      ? activeOverride.fontSize
+      : parseInt(activeOverride.fontSize || (design?.fontSize === 'large' ? 14 : design?.fontSize === 'small' ? 11 : 12), 10);
 
   return (
     <div className="w-80 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col h-full overflow-y-auto text-xs">
       {/* Top Header */}
-      <div className="p-4 border-b border-slate-100 dark:border-slate-800">
-        <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-          {activeField ? 'Inspector & Text Formatting' : 'Design & Document Settings'}
-        </h3>
-        <p className="text-[11px] text-slate-500 mt-0.5">
-          {activeField
-            ? `Editing element: ${activeField}`
-            : 'Select any element on your CV to format text'}
-        </p>
+      <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div>
+          <h3 className="font-bold text-slate-900 dark:text-white text-sm">
+            {targetPath ? 'Element Inspector' : 'Visual Design Settings'}
+          </h3>
+          <p className="text-[11px] text-slate-500 mt-0.5 truncate max-w-[210px]">
+            {targetPath
+              ? formatElementLabel(targetPath)
+              : 'Click any element on your CV to format text'}
+          </p>
+        </div>
+        {targetPath && (
+          <button
+            type="button"
+            onClick={() => dispatch(clearSelectedElement())}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            title="Deselect element"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       <div className="p-4 space-y-6 flex-1">
-        {/* Template Switcher */}
-        <div className="space-y-2 pb-4 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center justify-between">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <Layout className="w-3.5 h-3.5 text-emerald-600" />
-              Active Template
-            </label>
-            <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded">
-              {TEMPLATES_REGISTRY.length} Distinct Designs
-            </span>
-          </div>
-          <select
-            value={templateId || 'onepage-fresher-clean'}
-            onChange={(e) => dispatch(setTemplateId(e.target.value))}
-            className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          >
-            {TEMPLATES_REGISTRY.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.isOnePage ? '1-Page' : 'Multi-Page'})
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Selected Element Specific Formatting Controls */}
+        {targetPath ? (
+          <div className="space-y-4 p-3.5 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-900/60">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                Active Selection
+              </span>
+              <span className="text-[9.5px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
+                {selectedElementType || 'Text'}
+              </span>
+            </div>
 
-        {/* 1. Quick Formatting Toolbar (Matches screenshot 1 & 2) */}
+            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+              {formatElementLabel(targetPath)}
+            </p>
+
+            {/* Granular Font Size Stepper */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex justify-between items-center text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                <span>Font Size</span>
+                <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                  {currentFontSize}px
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    dispatch(
+                      setElementOverride({
+                        path: targetPath,
+                        overrides: { fontSize: Math.max(8, currentFontSize - 1) },
+                      })
+                    )
+                  }
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200"
+                  title="Decrease size"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <input
+                  type="range"
+                  min="8"
+                  max="48"
+                  value={currentFontSize}
+                  onChange={(e) =>
+                    dispatch(
+                      setElementOverride({
+                        path: targetPath,
+                        overrides: { fontSize: parseInt(e.target.value, 10) },
+                      })
+                    )
+                  }
+                  className="flex-1 accent-indigo-600 cursor-pointer"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    dispatch(
+                      setElementOverride({
+                        path: targetPath,
+                        overrides: { fontSize: Math.min(48, currentFontSize + 1) },
+                      })
+                    )
+                  }
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200"
+                  title="Increase size"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Element Specific Color Override */}
+            <div className="space-y-1.5 pt-1">
+              <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block">
+                Element Text Color
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={activeOverride.color || '#0f172a'}
+                  onChange={(e) =>
+                    dispatch(
+                      setElementOverride({
+                        path: targetPath,
+                        overrides: { color: e.target.value },
+                      })
+                    )
+                  }
+                  className="w-7 h-7 rounded-lg cursor-pointer border-0 bg-transparent shrink-0"
+                />
+                <input
+                  type="text"
+                  placeholder="#0f172a"
+                  value={activeOverride.color || ''}
+                  onChange={(e) =>
+                    dispatch(
+                      setElementOverride({
+                        path: targetPath,
+                        overrides: { color: e.target.value },
+                      })
+                    )
+                  }
+                  className="flex-1 px-2.5 py-1 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+
+            {/* Clear Element Override Button */}
+            <div className="pt-2 flex items-center justify-between border-t border-indigo-200/50 dark:border-indigo-900/40">
+              <button
+                type="button"
+                onClick={() => dispatch(removeElementOverride(targetPath))}
+                className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1"
+                title="Reset this element to template defaults"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset Element</span>
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  dispatch(
+                    openAIModal({
+                      mode: 'summary',
+                      contextData: { targetPath },
+                    })
+                  )
+                }
+                className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+              >
+                <Sparkles className="w-3 h-3 text-indigo-500" />
+                <span>AI Polish</span>
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {/* 1. Quick Formatting Toolbar (Bold, Italic, Alignment) */}
         <div className="space-y-3">
           <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Typography & Style
+            {targetPath ? 'Element Style & Alignment' : 'Document Typography & Alignment'}
           </label>
 
           {/* Bold, Italic, Alignment Bar */}
@@ -89,12 +238,12 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
             <button
               type="button"
               onClick={() => {
-                if (activeField) {
+                if (targetPath) {
                   const isBold =
                     activeOverride.fontWeight === 'bold' || activeOverride.fontWeight === 700;
                   dispatch(
                     setElementOverride({
-                      path: activeField,
+                      path: targetPath,
                       overrides: { fontWeight: isBold ? 'normal' : 'bold' },
                     })
                   );
@@ -112,10 +261,10 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
             <button
               type="button"
               onClick={() => {
-                if (activeField) {
+                if (targetPath) {
                   dispatch(
                     setElementOverride({
-                      path: activeField,
+                      path: targetPath,
                       overrides: { italic: !activeOverride.italic },
                     })
                   );
@@ -133,10 +282,10 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
             <button
               type="button"
               onClick={() => {
-                if (activeField) {
+                if (targetPath) {
                   dispatch(
                     setElementOverride({
-                      path: activeField,
+                      path: targetPath,
                       overrides: { underline: !activeOverride.underline },
                     })
                   );
@@ -155,14 +304,14 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
             <button
               type="button"
               onClick={() => {
-                if (activeField) {
-                  dispatch(setElementOverride({ path: activeField, overrides: { align: 'left' } }));
+                if (targetPath) {
+                  dispatch(setElementOverride({ path: targetPath, overrides: { align: 'left' } }));
                 } else {
                   dispatch(updateDesign({ textAlignment: 'left' }));
                 }
               }}
               className={`p-1.5 rounded-lg transition-colors ${
-                (activeField
+                (targetPath
                   ? activeOverride.align === 'left'
                   : design?.textAlignment === 'left')
                   ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
@@ -175,16 +324,16 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
             <button
               type="button"
               onClick={() => {
-                if (activeField) {
+                if (targetPath) {
                   dispatch(
-                    setElementOverride({ path: activeField, overrides: { align: 'center' } })
+                    setElementOverride({ path: targetPath, overrides: { align: 'center' } })
                   );
                 } else {
                   dispatch(updateDesign({ textAlignment: 'center' }));
                 }
               }}
               className={`p-1.5 rounded-lg transition-colors ${
-                (activeField
+                (targetPath
                   ? activeOverride.align === 'center'
                   : design?.textAlignment === 'center')
                   ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
@@ -197,16 +346,16 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
             <button
               type="button"
               onClick={() => {
-                if (activeField) {
+                if (targetPath) {
                   dispatch(
-                    setElementOverride({ path: activeField, overrides: { align: 'right' } })
+                    setElementOverride({ path: targetPath, overrides: { align: 'right' } })
                   );
                 } else {
                   dispatch(updateDesign({ textAlignment: 'right' }));
                 }
               }}
               className={`p-1.5 rounded-lg transition-colors ${
-                (activeField
+                (targetPath
                   ? activeOverride.align === 'right'
                   : design?.textAlignment === 'right')
                   ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
@@ -219,16 +368,16 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
             <button
               type="button"
               onClick={() => {
-                if (activeField) {
+                if (targetPath) {
                   dispatch(
-                    setElementOverride({ path: activeField, overrides: { align: 'justify' } })
+                    setElementOverride({ path: targetPath, overrides: { align: 'justify' } })
                   );
                 } else {
                   dispatch(updateDesign({ textAlignment: 'justify' }));
                 }
               }}
               className={`p-1.5 rounded-lg transition-colors ${
-                (activeField
+                (targetPath
                   ? activeOverride.align === 'justify'
                   : design?.textAlignment === 'justify')
                   ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
@@ -242,7 +391,7 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
 
           {/* Font Family Selector */}
           <div className="space-y-1">
-            <span className="text-[10px] font-semibold text-slate-500">Font Family</span>
+            <span className="text-[10px] font-semibold text-slate-500">Document Font Family</span>
             <select
               value={design?.fontFamily || 'Inter'}
               onChange={(e) => dispatch(updateDesign({ fontFamily: e.target.value }))}
@@ -256,10 +405,10 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
             </select>
           </div>
 
-          {/* Font Size Scale */}
+          {/* Base Font Scale */}
           <div className="space-y-1">
             <div className="flex justify-between text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-              <span>Text Scale</span>
+              <span>Document Text Scale</span>
               <span className="capitalize text-indigo-600 dark:text-indigo-400 font-bold">
                 {design?.fontSize || 'medium'}
               </span>
@@ -283,10 +432,34 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
           </div>
         </div>
 
-        {/* 2. Color Scheme & Swatches (Matches screenshot 1 & 2) */}
-        <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+        {/* 2. Document Template Switcher */}
+        <div className="space-y-2 pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-between">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <Layout className="w-3.5 h-3.5 text-emerald-600" />
+              Active Template
+            </label>
+            <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded">
+              {TEMPLATES_REGISTRY.length} Designs
+            </span>
+          </div>
+          <select
+            value={templateId || 'onepage-fresher-clean'}
+            onChange={(e) => dispatch(setTemplateId(e.target.value))}
+            className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            {TEMPLATES_REGISTRY.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} ({t.isOnePage ? '1-Page' : 'Multi-Page'})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* 3. Global Accent Color Scheme & Swatches */}
+        <div className="space-y-3 pt-2">
           <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Accent Color
+            Global Palette & Accent Color
           </label>
           <div className="flex items-center gap-2">
             <div
@@ -323,11 +496,11 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
           </div>
         </div>
 
-        {/* 3. Photo & Headshot Controls */}
+        {/* 4. Photo & Headshot Controls */}
         <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
           <div className="flex items-center justify-between">
             <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Profile Photo
+              Profile Photo Frame
             </label>
             <button
               type="button"
@@ -398,7 +571,7 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
           )}
         </div>
 
-        {/* 4. Page Spacing & Margins */}
+        {/* 5. Page Spacing & Margins */}
         <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
           <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Page Layout
@@ -435,4 +608,3 @@ export const EditorInspector = ({ onOpenPhotoModal }) => {
 };
 
 export default EditorInspector;
-

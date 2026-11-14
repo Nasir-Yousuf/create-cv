@@ -187,3 +187,65 @@ h3 {
   flex-shrink: 0;
 }
 
+/* ==========================================================================
+   Mode B: Advanced Visual Editor Canvas Interaction & Canva-Style Pips
+   ========================================================================== */
+.cv-editable-element {
+  position: relative;
+  max-width: 100%;
+  box-sizing: border-box;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  transition: outline 0.15s ease, background-color 0.15s ease;
+}
+
+.cv-editable-element:hover:not(.cv-selected) {
+  outline: 1.5px dashed rgba(99, 102, 241, 0.7);
+  outline-offset: 2px;
+  background-color: rgba(99, 102, 241, 0.05);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.cv-editable-element.cv-selected {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+  background-color: rgba(99, 102, 241, 0.07);
+  border-radius: 2px;
+  z-index: 20;
+}
+
+.cv-editor-pip {
+  display: block;
+  pointer-events: none;
+}
+
+.cv-drop-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #4f46e5;
+  border-radius: 9999px;
+  box-shadow: 0 0 8px rgba(79, 70, 229, 0.6);
+  z-index: 40;
+  pointer-events: none;
+}
+
+/* Ensure all interactive editing overlays, pips, and toolbars are 100% hidden in print/exports */
+@media print {
+  .cv-editor-pip,
+  .cv-editor-badge,
+  .cv-editor-toolbar,
+  .cv-drop-indicator,
+  .cv-placeholder {
+    display: none !important;
+  }
+
+  .cv-editable-element {
+    outline: none !important;
+    background-color: transparent !important;
+  }
+}
+
+
