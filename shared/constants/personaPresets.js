@@ -1017,6 +1017,155 @@ export const PERSONA_TEXTILE_MERCHANDISER = {
   ]
 };
 
+export const PERSONA_ENGINEERING_SPEC = {
+  title: "Engr. Tariqul Islam, P.Eng. - Structural & Civil Engineering CV",
+  personalInfo: {
+    fullName: "Engr. Tariqul Islam, P.Eng.",
+    jobTitle: "Senior Structural & Civil Projects Engineer (IEB #34281)",
+    email: "tariqul.islam.pe@example.com",
+    phone: "+880 1713-456789",
+    location: "Uttara, Dhaka",
+    linkedin: "linkedin.com/in/tariqul-islam-civil",
+    summary: "Professional Engineer (IEB Registered #34281) with 8+ years experience in structural modeling, high-rise seismic analysis, and EPC project supervision. Expert in BNBC/ACI codes, ETABS, SAP2000, and AutoCAD Civil 3D.",
+    photo: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80",
+    photoStyle: "rounded"
+  },
+  experience: [
+    {
+      id: "exp-eng-1",
+      jobTitle: "Senior Project Structural Engineer",
+      company: "Concord Engineers & Construction Ltd.",
+      location: "Dhaka, Bangladesh",
+      startDate: "2020",
+      endDate: "Present",
+      current: true,
+      description: "Direct structural design validation and on-site quality assurance for 24-storied commercial towers.",
+      highlights: [
+        "Modeled seismic response spectrum in ETABS complying strictly with BNBC 2020 building code.",
+        "Reduced reinforced concrete slab dead load by 8% through post-tensioned beam optimization."
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-eng-1",
+      degree: "B.Sc. in Civil & Structural Engineering",
+      institution: "Bangladesh University of Engineering and Technology (BUET)",
+      location: "Dhaka",
+      startDate: "2012",
+      endDate: "2016",
+      grade: "CGPA 3.82 / 4.00"
+    }
+  ],
+  skills: [
+    { name: "Structural Design (ETABS, SAP2000)" },
+    { name: "AutoCAD & Revit BIM Modeling" },
+    { name: "BNBC 2020 & ACI 318 Building Codes" },
+    { name: "Soil Foundation & Deep Piling QA" },
+    { name: "BOQ & Construction Cost Estimation" },
+    { name: "Site Safety & OSHA Compliance" }
+  ]
+};
+
+export const PERSONA_MARKETING_GROWTH = {
+  title: "Arifa Sultana - Growth Marketing & Strategy CV",
+  personalInfo: {
+    fullName: "Arifa Sultana",
+    jobTitle: "Head of Growth & Performance Marketing",
+    email: "arifa.growth@example.com",
+    phone: "+880 1819-345678",
+    location: "Gulshan-2, Dhaka",
+    linkedin: "linkedin.com/in/arifa-sultana-growth",
+    summary: "Data-driven Growth Marketing Strategist with 7+ years scaling digital products and direct-to-consumer brands across South Asia. Managed $2.4M+ paid media budgets delivering a 3.8x blended ROAS, with deep expertise in full-funnel CRO, retention, and attribution.",
+    photo: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80",
+    photoStyle: "circle"
+  },
+  experience: [
+    {
+      id: "exp-mkt-1",
+      jobTitle: "Head of Growth",
+      company: "Pathao Ltd. (Digital Services)",
+      location: "Dhaka, Bangladesh",
+      startDate: "2021",
+      endDate: "Present",
+      current: true,
+      description: "Lead multi-channel customer acquisition and lifecycle retention teams across rides and food delivery.",
+      highlights: [
+        "Scaled monthly active transacting users from 420k to 1.1M while decreasing blended CAC by 28%.",
+        "Orchestrated A/B landing page testing program boosting app installation conversion rate from 14% to 22%."
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-mkt-1",
+      degree: "BBA in Marketing & Analytics",
+      institution: "Institute of Business Administration (IBA), University of Dhaka",
+      location: "Dhaka",
+      startDate: "2014",
+      endDate: "2018",
+      grade: "CGPA 3.88 / 4.00"
+    }
+  ],
+  skills: [
+    { name: "Performance Paid Ads (Meta, Google, TikTok)" },
+    { name: "Full-Funnel CAC & LTV Optimization" },
+    { name: "Marketing Attribution (Mixpanel, GA4)" },
+    { name: "Lifecycle CRM (Braze, Clevertap)" },
+    { name: "Conversion Rate Optimization (CRO)" },
+    { name: "Go-to-Market (GTM) Product Launch" }
+  ]
+};
+
+export const PERSONA_SKILLED_TRADE_PRO = {
+  title: "Md. Kamal Hossain - Industrial Technical Lead CV",
+  personalInfo: {
+    fullName: "Md. Kamal Hossain",
+    jobTitle: "Senior Industrial HVAC & Electrical Maintenance Lead",
+    email: "kamal.trade.lead@example.com",
+    phone: "+880 1912-345678",
+    location: "Tongi, Gazipur",
+    summary: "Certified Industrial Plant Technician (OSHA 30, B-Grade Electrical Licensure) with 10+ years experience maintaining commercial HVAC chillers, diesel backup generators, and 3-phase automated machinery. Dedicated to zero downtime and stringent factory safety.",
+    photo: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80",
+    photoStyle: "portrait"
+  },
+  experience: [
+    {
+      id: "exp-trade-1",
+      jobTitle: "Maintenance Engineering Lead",
+      company: "Apex Footwear Ltd. (Central Plant)",
+      location: "Gazipur, Bangladesh",
+      startDate: "2018",
+      endDate: "Present",
+      current: true,
+      description: "Supervise 14 on-duty electro-mechanical technicians managing factory utility plant infrastructure.",
+      highlights: [
+        "Maintained 99.8% plant uptime across 3 factory shifts via computerized preventative maintenance.",
+        "Successfully overhauled three 500-Ton Daikin chillers with zero reported incidents."
+      ]
+    }
+  ],
+  education: [
+    {
+      id: "edu-trade-1",
+      degree: "Diploma in Mechanical & Refrigeration Technology",
+      institution: "Dhaka Polytechnic Institute",
+      location: "Dhaka",
+      startDate: "2010",
+      endDate: "2014",
+      grade: "First Division"
+    }
+  ],
+  skills: [
+    { name: "Industrial HVAC Chiller Overhaul" },
+    { name: "3-Phase Electrical Switchgear & VFDs" },
+    { name: "PLC Diagnostics & Automated Controls" },
+    { name: "Preventative Maintenance (CMMS)" },
+    { name: "OSHA 30 Certified Industrial Safety" },
+    { name: "Welding & Brazing Piping Systems" }
+  ]
+};
+
 /**
  * Resolver function to return the most accurate persona preview data for any template.
  */
@@ -1025,13 +1174,22 @@ export const resolvePersonaForTemplate = (template = {}) => {
   const cat = String(template.category || '').toLowerCase();
   const cats = (template.categories || []).map((c) => String(c).toLowerCase());
 
-  if (id.includes('doctor') || id.includes('medical') || id.includes('mbbs') || id.includes('nurse') || id.includes('health') || cats.includes('healthcare')) {
+  if (id.includes('doctor') || id.includes('medical') || id.includes('mbbs') || id.includes('nurse') || id.includes('clinical') || cats.includes('healthcare')) {
     return PERSONA_HEALTHCARE_MBBS;
   }
-  if (id.includes('bcs') || id.includes('admin-cadre') || id.includes('govt') || id.includes('civil')) {
+  if (id.includes('trade') || id.includes('skilled') || id.includes('technician')) {
+    return PERSONA_SKILLED_TRADE_PRO;
+  }
+  if (id.includes('marketing') || id.includes('growth') || id.includes('sales') || cats.includes('marketing and sales')) {
+    return PERSONA_MARKETING_GROWTH;
+  }
+  if (id.includes('engineering-spec') || id.includes('civil-eng') || id.includes('mechanical-eng') || id.includes('electrical-eng') || (id.includes('engineer') && !id.includes('software') && !id.includes('frontend') && !id.includes('backend'))) {
+    return PERSONA_ENGINEERING_SPEC;
+  }
+  if (id.includes('bcs') || id.includes('admin-cadre') || id.includes('govt')) {
     return PERSONA_BD_BCS_CADRE;
   }
-  if (id.includes('accountant') || id.includes('audit') || id.includes('fpa') || id.includes('tax') || (id.includes('finance') && !id.includes('bank'))) {
+  if (id.includes('accountant') || id.includes('audit') || id.includes('fpa') || id.includes('tax') || id.includes('ledger') || (id.includes('finance') && !id.includes('bank'))) {
     return PERSONA_FINANCE_ACCOUNTING;
   }
   if (id.includes('bank') || id.includes('mto') || id.includes('finance') || id.includes('fin-') || cats.includes('finance and accounting')) {
