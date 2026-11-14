@@ -7,6 +7,7 @@ import Toast from './components/common/Toast';
 import AuthModal from './components/auth/AuthModal';
 import AIAssistantModal from './components/common/AIAssistantModal';
 import WhatsAppSupportButton from './components/common/WhatsAppSupportButton';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import authService from './services/authService';
 import {
@@ -177,30 +178,32 @@ export const App = () => {
       {!isEditorPage && !isAdminPage && <Navbar onOpenAuth={handleOpenAuth} />}
 
       <main className="flex-1">
-        <Suspense fallback={<PageRouteSkeleton />}>
-          <Routes>
-            <Route path="/" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
-            <Route path="/templates" element={<TemplateGalleryPage />} />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedUserRoute>
-                  <DashboardPage onOpenAuth={handleOpenAuth} />
-                </ProtectedUserRoute>
-              }
-            />
-            <Route path="/builder" element={<CVEditorPage />} />
-            <Route
-              path="/admin"
-              element={
-                <ProtectedAdminRoute>
-                  <AdminPaymentsPage />
-                </ProtectedAdminRoute>
-              }
-            />
-            <Route path="/pricing" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
-          </Routes>
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={<PageRouteSkeleton />}>
+            <Routes>
+              <Route path="/" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
+              <Route path="/templates" element={<TemplateGalleryPage />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedUserRoute>
+                    <DashboardPage onOpenAuth={handleOpenAuth} />
+                  </ProtectedUserRoute>
+                }
+              />
+              <Route path="/builder" element={<CVEditorPage />} />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedAdminRoute>
+                    <AdminPaymentsPage />
+                  </ProtectedAdminRoute>
+                }
+              />
+              <Route path="/pricing" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </main>
 
       {!isEditorPage && !isAdminPage && <Footer />}

@@ -276,6 +276,9 @@ export const QuickCVWizard = () => {
     cvTitle: "",
     retryExport: null,
   });
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1200,
+  );
   const [showSampleInInputs, setShowSampleInInputs] = useState(false);
   const activePersonaId = cvData.profileType || "student";
   const currentPersona = getPersonaById(activePersonaId);
