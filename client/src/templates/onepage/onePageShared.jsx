@@ -24,6 +24,7 @@ import {
   CVPersonalDetailsTable,
   CVCustomSections,
   CVDeclaration,
+  CVPhoto,
 } from '../shared/cvElements';
 import { Camera } from 'lucide-react';
 
@@ -37,6 +38,7 @@ export {
   CVPersonalDetailsTable,
   CVCustomSections,
   CVDeclaration,
+  CVPhoto,
 };
 
 /**

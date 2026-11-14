@@ -5,24 +5,44 @@ import {
   OnePageAvatar,
   OnePageExperienceList,
   OnePageEducationList,
+  resolveDesignTokens,
+  getSectionVisibility,
+  CVCustomSections,
+  CVDeclaration,
+  CVPersonalDetailsTable,
 } from './onePageShared';
 
 export const OnePageMinimalSwiss = ({ cvData, onOpenPhotoModal }) => {
   const editors = useOnePageEditors();
   const {
     personalInfo = {},
+    personalDetails = {},
     experience = [],
     education = [],
     skills = [],
     projects = [],
     certifications = [],
     languages = [],
+    references = [],
+    declaration = {},
+    customSections = [],
     design = {},
   } = cvData || {};
 
-  const primary = design?.primaryColor || '#1e293b';
-  const textColor = design?.textColor || '#0f172a';
-  const fontFamily = design?.fontFamily || 'Inter, sans-serif';
+  const tokens = resolveDesignTokens(cvData, {
+    primaryColor: '#0f172a', // Swiss Minimal Slate
+    accentColor: '#475569',
+    headingColor: '#000000',
+    bodyColor: '#1e293b',
+    backgroundColor: '#ffffff',
+    headingFont: 'Plus Jakarta Sans',
+    bodyFont: 'Inter',
+    sectionSpacing: 12,
+    itemSpacing: 6,
+    dividerThickness: 1,
+  });
+
+  const isVisible = (key) => getSectionVisibility(key, cvData);
 
   const contactBits = [
     personalInfo.email,
@@ -34,8 +54,12 @@ export const OnePageMinimalSwiss = ({ cvData, onOpenPhotoModal }) => {
 
   return (
     <div
-      className="px-7 py-6 bg-white text-slate-900 leading-snug"
-      style={{ fontFamily, color: textColor }}
+      className="px-7 py-6 bg-white leading-snug min-h-[1060px]"
+      style={{
+        fontFamily: `${tokens.bodyFont}, sans-serif`,
+        color: tokens.bodyColor,
+        backgroundColor: tokens.backgroundColor,
+      }}
     >
       {/* Swiss Clean Asymmetric Header */}
       <header className="flex items-center justify-between gap-4 pb-4 mb-3.5 border-b border-slate-300">
@@ -47,7 +71,8 @@ export const OnePageMinimalSwiss = ({ cvData, onOpenPhotoModal }) => {
             value={personalInfo.fullName || ''}
             onSave={editors.savePersonal('fullName')}
             placeholder="Your Full Name"
-            className="text-[24px] font-semibold tracking-tight text-slate-950 block leading-tight"
+            className="text-[24px] font-semibold tracking-tight block leading-tight"
+            style={{ color: tokens.headingColor, fontFamily: `${tokens.headingFont}, sans-serif` }}
           />
           <EditableElement
             section="personalInfo"
@@ -58,7 +83,7 @@ export const OnePageMinimalSwiss = ({ cvData, onOpenPhotoModal }) => {
             placeholder="Designation"
             className="text-[12.5px] font-medium text-slate-500 mt-0.5 block"
           />
-          <p className="text-[10.5px] text-slate-500 mt-2">{contactBits.join('  /  ')}</p>
+          <p className="text-[10px] text-slate-500 mt-2">{contactBits.join('  /  ')}</p>
         </div>
 
         <OnePageAvatar
@@ -67,17 +92,18 @@ export const OnePageMinimalSwiss = ({ cvData, onOpenPhotoModal }) => {
           showPhoto={design?.showPhoto}
           photoStyle={personalInfo.photoStyle || 'rounded'}
           photoSize={design?.photoSize}
+          photoConfig={personalInfo.photoConfig}
           borderColor="#cbd5e1"
           onOpenPhotoModal={onOpenPhotoModal}
         />
       </header>
 
-      {/* Architectural 22% Label / 78% Content Rows */}
+      {/* Architectural 25% Label / 75% Content Rows */}
       <div className="divide-y divide-slate-200/80">
-        {personalInfo.summary && (
+        {isVisible('summary') && personalInfo.summary && (
           <div className="grid grid-cols-12 gap-4 py-2.5">
             <div className="col-span-3">
-              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: primary }}>
+              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: tokens.primaryColor }}>
                 Profile
               </span>
             </div>
@@ -94,10 +120,10 @@ export const OnePageMinimalSwiss = ({ cvData, onOpenPhotoModal }) => {
           </div>
         )}
 
-        {experience.length > 0 && (
+        {isVisible('experience') && experience.length > 0 && (
           <div className="grid grid-cols-12 gap-4 py-2.5">
             <div className="col-span-3">
-              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: primary }}>
+              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: tokens.primaryColor }}>
                 Experience
               </span>
             </div>
@@ -105,17 +131,17 @@ export const OnePageMinimalSwiss = ({ cvData, onOpenPhotoModal }) => {
               <OnePageExperienceList
                 experience={experience}
                 editors={editors}
-                accentColor={primary}
+                accentColor={tokens.primaryColor}
                 compact={true}
               />
             </div>
           </div>
         )}
 
-        {education.length > 0 && (
+        {isVisible('education') && education.length > 0 && (
           <div className="grid grid-cols-12 gap-4 py-2.5">
             <div className="col-span-3">
-              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: primary }}>
+              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: tokens.primaryColor }}>
                 Education
               </span>
             </div>
@@ -123,16 +149,16 @@ export const OnePageMinimalSwiss = ({ cvData, onOpenPhotoModal }) => {
               <OnePageEducationList
                 education={education}
                 editors={editors}
-                accentColor={primary}
+                accentColor={tokens.primaryColor}
               />
             </div>
           </div>
         )}
 
-        {projects.length > 0 && (
+        {isVisible('projects') && projects.length > 0 && (
           <div className="grid grid-cols-12 gap-4 py-2.5">
             <div className="col-span-3">
-              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: primary }}>
+              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: tokens.primaryColor }}>
                 Projects
               </span>
             </div>
@@ -148,33 +174,53 @@ export const OnePageMinimalSwiss = ({ cvData, onOpenPhotoModal }) => {
           </div>
         )}
 
-        {(skills.length > 0 || certifications.length > 0 || languages.length > 0) && (
+        {((isVisible('skills') && skills.length > 0) ||
+          (isVisible('certifications') && certifications.length > 0) ||
+          (isVisible('languages') && languages.length > 0)) && (
           <div className="grid grid-cols-12 gap-4 py-2.5">
             <div className="col-span-3">
-              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: primary }}>
+              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: tokens.primaryColor }}>
                 Capabilities
               </span>
             </div>
             <div className="col-span-9 space-y-1.5 text-[10.5px]">
-              {skills.length > 0 && (
+              {isVisible('skills') && skills.length > 0 && (
                 <p className="text-slate-800">
                   <span className="font-semibold">Skills: </span>
                   {skills.map((s) => s.name).join(' · ')}
                 </p>
               )}
-              {certifications.length > 0 && (
+              {isVisible('certifications') && certifications.length > 0 && (
                 <p className="text-slate-700">
                   <span className="font-semibold">Credentials: </span>
                   {certifications.map((c) => c.name).join(' · ')}
                 </p>
               )}
-              {languages.length > 0 && (
+              {isVisible('languages') && languages.length > 0 && (
                 <p className="text-slate-600">
                   <span className="font-semibold text-slate-800">Languages: </span>
                   {languages.map((l) => `${l.name} (${l.proficiency})`).join(', ')}
                 </p>
               )}
             </div>
+          </div>
+        )}
+
+        {isVisible('personalDetails') && (
+          <div className="py-2.5">
+            <CVPersonalDetailsTable personalDetails={personalDetails} compact={true} />
+          </div>
+        )}
+
+        {isVisible('customSections') && customSections.length > 0 && (
+          <div className="py-2.5">
+            <CVCustomSections customSections={customSections} primaryColor={tokens.primaryColor} />
+          </div>
+        )}
+
+        {isVisible('declaration') && declaration?.text && (
+          <div className="py-2.5 text-[9px]">
+            <CVDeclaration declaration={declaration} />
           </div>
         )}
       </div>

@@ -19,6 +19,7 @@ import {
   CVPersonalDetailsTable,
   CVCustomSections,
   CVDeclaration,
+  CVPhoto,
 } from './shared/cvElements';
 import EditableElement from '../features/cv-editor/components/EditableElement';
 import {
@@ -34,6 +35,7 @@ import { ExecutiveSlate } from './ExecutiveSlate';
 import { OceanSplit } from './OceanSplit';
 import { LinearDark } from './LinearDark';
 import { ATSClassic } from './ATSClassic';
+import { AcademicMultiPageCV } from './AcademicMultiPageCV';
 
 // Legacy Base Templates (kept internally for backward-compatibility fallback if ever needed)
 import { ModernBlue } from './ModernBlue';
@@ -53,8 +55,15 @@ import { OnePageExecutiveBrief } from './onepage/OnePageExecutiveBrief';
 import { OnePageAcademicCompact } from './onepage/OnePageAcademicCompact';
 import { OnePageCreativeEditorial } from './onepage/OnePageCreativeEditorial';
 
+// Domain-Specific Specialized Templates
+import { OnePageClinicalHealth } from './onepage/OnePageClinicalHealth';
+import { OnePageFinanceLedger } from './onepage/OnePageFinanceLedger';
+import { OnePageEngineeringSpec } from './onepage/OnePageEngineeringSpec';
+import { OnePageMarketingGrowth } from './onepage/OnePageMarketingGrowth';
+import { OnePageSkilledTradePro } from './onepage/OnePageSkilledTradePro';
+
 export const TEMPLATE_COMPONENTS = {
-  // Dedicated One-Page Collection (10 Distinct Designs)
+  // Dedicated One-Page Collection (10 Distinct Core Designs)
   'onepage-fresher-clean': OnePageFresherClean,
   'onepage-bd-compact': OnePageBDCompact,
   'onepage-modern-split': OnePageModernSplit,
@@ -66,12 +75,20 @@ export const TEMPLATE_COMPONENTS = {
   'onepage-academic-compact': OnePageAcademicCompact,
   'onepage-creative-editorial': OnePageCreativeEditorial,
 
-  // Multiple-Page Collection (5 Distinct Detailed Designs)
+  // Domain-Specific Specialized One-Page Templates (5 New Designs)
+  'onepage-clinical-health': OnePageClinicalHealth,
+  'onepage-finance-ledger': OnePageFinanceLedger,
+  'onepage-engineering-spec': OnePageEngineeringSpec,
+  'onepage-marketing-growth': OnePageMarketingGrowth,
+  'onepage-skilled-trade-pro': OnePageSkilledTradePro,
+
+  // Multiple-Page Collection (6 Distinct Detailed Designs)
   'bd-corporate-standard': BangladeshStandard,
   'executive-slate': ExecutiveSlate,
   'ocean-split': OceanSplit,
   'linear-dark': LinearDark,
   'ats-classic': ATSClassic,
+  'academic-multipage-cv': AcademicMultiPageCV,
 
   // Internal legacy references (if referenced explicitly)
   'legacy-modern-blue': ModernBlue,
@@ -240,6 +257,7 @@ export {
   CVPersonalDetailsTable,
   CVCustomSections,
   CVDeclaration,
+  CVPhoto,
   EditableElement,
   CompactSectionTitle,
   OnePageExperienceList,

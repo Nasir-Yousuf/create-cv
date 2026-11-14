@@ -1,5 +1,5 @@
 import React from 'react';
-import { resolvePhotoBoxClasses } from './shared/cvElements';
+import './shared/cvElements.css';
 import { useDispatch } from 'react-redux';
 import {
   updatePersonalInfo,
@@ -7,13 +7,30 @@ import {
   updateEducation,
   updateSkill,
   updateProject,
+  updateCertification,
+  updateLanguage,
   updateReference,
+  updateDeclaration,
+  updatePersonalDetails,
+  updateCustomSection,
 } from '../store/cvSlice';
 import EditableElement from '../features/cv-editor/components/EditableElement';
-import { Mail, Phone, MapPin, Globe, Linkedin, Github, Camera } from 'lucide-react';
+import {
+  resolveDesignTokens,
+  getSectionVisibility,
+  getOrderedSectionKeys,
+  CVSection,
+  CVSectionTitle,
+  CVPersonalDetailsTable,
+  CVCustomSections,
+  CVDeclaration,
+  CVPhoto,
+} from './shared/cvElements';
+import { Mail, Phone, MapPin, Globe, Linkedin, Github } from 'lucide-react';
 
 export const OceanSplit = ({ cvData, onOpenPhotoModal }) => {
   const dispatch = useDispatch();
+
   const {
     personalInfo = {},
     personalDetails = {},
@@ -25,217 +42,241 @@ export const OceanSplit = ({ cvData, onOpenPhotoModal }) => {
     languages = [],
     references = [],
     declaration = {},
+    customSections = [],
     design = {},
   } = cvData || {};
 
-  const primary = design?.primaryColor || '#0284c7'; // Sky/Ocean blue
-  const accent = design?.accentColor || '#38bdf8';
-  const fontFamily = design?.fontFamily || 'Inter';
-
-  const photoSizeClass = resolvePhotoBoxClasses({
-    photoSize: design?.photoSize,
-    photoStyle: personalInfo?.photoStyle === 'circle' ? 'circle' : personalInfo?.photoStyle === 'square' ? 'square' : 'portrait',
-    circleSizes: {
-      sm: 'w-24 h-24',
-      md: 'w-28 h-28',
-      lg: 'w-36 h-36',
-      xl: 'w-40 h-40',
-    },
-    portraitSizes: {
-      sm: 'w-20 h-28',
-      md: 'w-24 h-32',
-      lg: 'w-32 h-44',
-      xl: 'w-36 h-48',
-    },
-    squareSizes: {
-      sm: 'w-24 h-24',
-      md: 'w-28 h-28',
-      lg: 'w-36 h-36',
-      xl: 'w-40 h-40',
-    },
+  const tokens = resolveDesignTokens(cvData, {
+    primaryColor: '#0284c7', // Sky / Ocean Blue
+    accentColor: '#38bdf8',
+    headingColor: '#0f172a',
+    bodyColor: '#334155',
+    backgroundColor: '#ffffff',
+    sidebarColor: '#f0f9ff',
+    headingFont: 'Plus Jakarta Sans',
+    bodyFont: 'Inter',
+    sectionSpacing: 16,
+    itemSpacing: 8,
+    dividerThickness: 1,
   });
 
+  const isVisible = (key) => getSectionVisibility(key, cvData);
+
   return (
-    <div className="flex flex-col sm:flex-row min-h-full bg-white text-slate-800 text-xs font-sans" style={{ fontFamily }}>
-      {/* Left Sidebar */}
-      <div className="w-full sm:w-1/3 bg-slate-900 text-white p-6 sm:p-8 space-y-6 shrink-0">
+    <div
+      className="flex flex-col sm:flex-row min-h-full bg-white text-slate-800 text-xs leading-normal"
+      style={{
+        fontFamily: tokens.bodyFont,
+        color: tokens.bodyColor,
+        backgroundColor: tokens.backgroundColor,
+      }}
+    >
+      {/* 1. Left Sidebar (35%) */}
+      <div
+        className="w-full sm:w-[36%] p-6 sm:p-7 border-b sm:border-b-0 sm:border-r border-sky-100 space-y-5"
+        style={{ backgroundColor: tokens.sidebarColor }}
+      >
         {/* Photo */}
-        {design?.showPhoto !== false && (
-          <div
-            onClick={() => onOpenPhotoModal && onOpenPhotoModal()}
-            className="flex justify-center cursor-pointer group relative"
-            title="Click to edit photo"
-          >
-            {personalInfo.photo ? (
-              <div
-                className={`${photoSizeClass} border-4 border-sky-400 shadow-lg ${
-                  personalInfo.photoStyle === 'circle'
-                    ? 'rounded-full'
-                    : personalInfo.photoStyle === 'square'
-                    ? 'rounded-none'
-                    : 'rounded-lg'
-                }`}
-              >
-                <img
-                  src={personalInfo.photo}
-                  alt={personalInfo.fullName || 'User Photo'}
-                  className="cv-photo-img"
-                />
-              </div>
-            ) : (
-              <div className={`${photoSizeClass} border-2 border-dashed border-sky-400/60 rounded-lg flex flex-col items-center justify-center text-sky-300 p-2 text-center print:hidden cv-photo-placeholder`}>
-                <Camera className="w-5 h-5 mb-1" />
-                <span className="text-[9px]">Passport Photo</span>
-              </div>
-            )}
-          </div>
-        )}
+        <div className="flex justify-center pb-2">
+          <CVPhoto
+            photo={personalInfo.photo || personalInfo.photoUrl}
+            fullName={personalInfo.fullName}
+            showPhoto={design?.showPhoto}
+            photoStyle={personalInfo.photoStyle || 'circle'}
+            photoSize={design?.photoSize}
+            photoConfig={personalInfo.photoConfig}
+            borderColor={tokens.primaryColor}
+            onOpenPhotoModal={onOpenPhotoModal}
+          />
+        </div>
 
         {/* Contact Info */}
-        <div className="space-y-3 text-xs">
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-sky-400 border-b border-slate-700 pb-1">
+        <div className="space-y-2 text-[11px] text-slate-700">
+          <div className="font-bold text-xs uppercase tracking-wider pb-1 border-b" style={{ color: tokens.primaryColor, borderColor: `${tokens.primaryColor}30` }}>
             Contact
-          </h3>
-          <div className="space-y-2 text-slate-300">
-            {personalInfo.email && (
-              <div className="cv-icon-row gap-2 min-w-0">
-                <Mail className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <EditableElement
-                  section="personalInfo"
-                  field="email"
-                  value={personalInfo.email}
-                  onSave={(val) => dispatch(updatePersonalInfo({ email: val }))}
-                  placeholder="email@example.com"
-                  className="break-all inline min-w-0"
-                />
-              </div>
-            )}
-            {personalInfo.phone && (
-              <div className="cv-icon-row gap-2 min-w-0">
-                <Phone className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <EditableElement
-                  section="personalInfo"
-                  field="phone"
-                  value={personalInfo.phone}
-                  onSave={(val) => dispatch(updatePersonalInfo({ phone: val }))}
-                  placeholder="+1 555-0100"
-                  className="inline min-w-0"
-                />
-              </div>
-            )}
-            {personalInfo.location && (
-              <div className="cv-icon-row gap-2 min-w-0">
-                <MapPin className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <EditableElement
-                  section="personalInfo"
-                  field="location"
-                  value={personalInfo.location}
-                  onSave={(val) => dispatch(updatePersonalInfo({ location: val }))}
-                  placeholder="City, Country"
-                  className="inline min-w-0"
-                />
-              </div>
-            )}
-            {personalInfo.website && (
-              <div className="cv-icon-row gap-2 min-w-0">
-                <Globe className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <EditableElement
-                  section="personalInfo"
-                  field="website"
-                  value={personalInfo.website}
-                  onSave={(val) => dispatch(updatePersonalInfo({ website: val }))}
-                  placeholder="website.com"
-                  className="break-all inline min-w-0"
-                />
-              </div>
-            )}
-            {personalInfo.github && (
-              <div className="cv-icon-row gap-2 min-w-0">
-                <Github className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <EditableElement
-                  section="personalInfo"
-                  field="github"
-                  value={personalInfo.github}
-                  onSave={(val) => dispatch(updatePersonalInfo({ github: val }))}
-                  placeholder="github.com/username"
-                  className="break-all inline min-w-0"
-                />
-              </div>
-            )}
-            {personalInfo.linkedin && (
-              <div className="cv-icon-row gap-2 min-w-0">
-                <Linkedin className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <EditableElement
-                  section="personalInfo"
-                  field="linkedin"
-                  value={personalInfo.linkedin}
-                  onSave={(val) => dispatch(updatePersonalInfo({ linkedin: val }))}
-                  placeholder="linkedin.com/in/username"
-                  className="break-all inline min-w-0"
-                />
-              </div>
-            )}
           </div>
+          {personalInfo.email && (
+            <div className="cv-icon-row gap-2">
+              <Mail className="w-3.5 h-3.5 shrink-0" style={{ color: tokens.primaryColor }} />
+              <EditableElement
+                section="personalInfo"
+                field="email"
+                value={personalInfo.email}
+                onSave={(val) => dispatch(updatePersonalInfo({ email: val }))}
+                placeholder="email@example.com"
+                className="inline min-w-0 break-words"
+              />
+            </div>
+          )}
+          {personalInfo.phone && (
+            <div className="cv-icon-row gap-2">
+              <Phone className="w-3.5 h-3.5 shrink-0" style={{ color: tokens.primaryColor }} />
+              <EditableElement
+                section="personalInfo"
+                field="phone"
+                value={personalInfo.phone}
+                onSave={(val) => dispatch(updatePersonalInfo({ phone: val }))}
+                placeholder="+1 555-0199"
+                className="inline min-w-0 break-words"
+              />
+            </div>
+          )}
+          {personalInfo.location && (
+            <div className="cv-icon-row gap-2">
+              <MapPin className="w-3.5 h-3.5 shrink-0" style={{ color: tokens.primaryColor }} />
+              <EditableElement
+                section="personalInfo"
+                field="location"
+                value={personalInfo.location}
+                onSave={(val) => dispatch(updatePersonalInfo({ location: val }))}
+                placeholder="City, Country"
+                className="inline min-w-0 break-words"
+              />
+            </div>
+          )}
+          {personalInfo.linkedin && (
+            <div className="cv-icon-row gap-2">
+              <Linkedin className="w-3.5 h-3.5 shrink-0" style={{ color: tokens.primaryColor }} />
+              <EditableElement
+                section="personalInfo"
+                field="linkedin"
+                value={personalInfo.linkedin}
+                onSave={(val) => dispatch(updatePersonalInfo({ linkedin: val }))}
+                placeholder="linkedin.com/in/username"
+                className="inline min-w-0 break-words"
+              />
+            </div>
+          )}
+          {personalInfo.github && (
+            <div className="cv-icon-row gap-2">
+              <Github className="w-3.5 h-3.5 shrink-0" style={{ color: tokens.primaryColor }} />
+              <EditableElement
+                section="personalInfo"
+                field="github"
+                value={personalInfo.github}
+                onSave={(val) => dispatch(updatePersonalInfo({ github: val }))}
+                placeholder="github.com/username"
+                className="inline min-w-0 break-words"
+              />
+            </div>
+          )}
+          {personalInfo.website && (
+            <div className="cv-icon-row gap-2">
+              <Globe className="w-3.5 h-3.5 shrink-0" style={{ color: tokens.primaryColor }} />
+              <EditableElement
+                section="personalInfo"
+                field="website"
+                value={personalInfo.website}
+                onSave={(val) => dispatch(updatePersonalInfo({ website: val }))}
+                placeholder="portfolio.com"
+                className="inline min-w-0 break-words"
+              />
+            </div>
+          )}
         </div>
 
         {/* Skills in Sidebar */}
-        {skills && skills.length > 0 && (
-          <div className="space-y-3">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-sky-400 border-b border-slate-700 pb-1">
-              Skills & Expertise
-            </h3>
-            <div className="space-y-2 text-xs">
-              {skills.map((skill, index) => (
-                <div key={skill.id || index} className="space-y-1">
-                  <div className="flex justify-between text-slate-200">
+        {isVisible('skills') && skills && skills.length > 0 && (
+          <div className="space-y-2">
+            <div className="font-bold text-xs uppercase tracking-wider pb-1 border-b" style={{ color: tokens.primaryColor, borderColor: `${tokens.primaryColor}30` }}>
+              Core Skills
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {skills.map((s, idx) => (
+                <span
+                  key={s.id || idx}
+                  className="px-2 py-0.5 rounded bg-white text-slate-800 text-[10.5px] border border-sky-200 font-medium"
+                >
+                  <EditableElement
+                    section="skills"
+                    field="name"
+                    index={idx}
+                    value={s.name}
+                    onSave={(val) => dispatch(updateSkill({ index: idx, data: { name: val } }))}
+                    placeholder="Skill"
+                    className="inline"
+                  />
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Certifications in Sidebar */}
+        {isVisible('certifications') && certifications && certifications.length > 0 && (
+          <div className="space-y-2">
+            <div className="font-bold text-xs uppercase tracking-wider pb-1 border-b" style={{ color: tokens.primaryColor, borderColor: `${tokens.primaryColor}30` }}>
+              Certifications
+            </div>
+            <div className="space-y-1.5 text-[11px] text-slate-700">
+              {certifications.map((c, idx) => (
+                <div key={c.id || idx} className="cv-item-avoid-break">
+                  <div className="font-semibold text-slate-900 leading-snug">
                     <EditableElement
-                      section="skills"
+                      section="certifications"
                       field="name"
-                      index={index}
-                      value={skill.name}
-                      onSave={(val) => dispatch(updateSkill({ index, data: { name: val } }))}
-                      placeholder="Skill"
-                      className="inline font-medium"
-                    />
-                    <span className="text-[10px] text-slate-400">{skill.level || 'Advanced'}</span>
-                  </div>
-                  <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                    <div
-                      className="bg-sky-400 h-full rounded-full"
-                      style={{
-                        width:
-                          skill.level === 'Expert'
-                            ? '95%'
-                            : skill.level === 'Advanced'
-                            ? '80%'
-                            : skill.level === 'Intermediate'
-                            ? '60%'
-                            : '40%',
-                      }}
+                      index={idx}
+                      value={c.name}
+                      onSave={(val) => dispatch(updateCertification({ index: idx, data: { name: val } }))}
+                      placeholder="Certification"
+                      className="inline"
                     />
                   </div>
+                  {c.issuer && <div className="text-[10px] text-slate-500">{c.issuer}</div>}
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Personal Details in Sidebar (if available) */}
-        {personalDetails?.fatherName && (
-          <div className="space-y-2 text-[11px] text-slate-300 pt-2 border-t border-slate-800">
-            <h3 className="text-[10px] font-bold uppercase tracking-wider text-sky-400">Personal Info</h3>
-            <p><strong>DOB:</strong> {personalDetails.dob}</p>
-            <p><strong>NID:</strong> {personalDetails.nid}</p>
-            <p><strong>Blood:</strong> {personalDetails.bloodGroup}</p>
-            <p><strong>Nationality:</strong> {personalDetails.nationality || 'Bangladeshi'}</p>
+        {/* Languages in Sidebar */}
+        {isVisible('languages') && languages && languages.length > 0 && (
+          <div className="space-y-2">
+            <div className="font-bold text-xs uppercase tracking-wider pb-1 border-b" style={{ color: tokens.primaryColor, borderColor: `${tokens.primaryColor}30` }}>
+              Languages
+            </div>
+            <div className="space-y-1 text-[11px]">
+              {languages.map((l, idx) => (
+                <div key={l.id || idx} className="flex justify-between">
+                  <span className="font-medium text-slate-800">
+                    <EditableElement
+                      section="languages"
+                      field="name"
+                      index={idx}
+                      value={l.name || l.language}
+                      onSave={(val) => dispatch(updateLanguage({ index: idx, data: { name: val, language: val } }))}
+                      placeholder="Language"
+                      className="inline font-medium"
+                    />
+                  </span>
+                  {l.proficiency && <span className="text-slate-500 text-[10px]">{l.proficiency}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Personal Details Table in Sidebar */}
+        {isVisible('personalDetails') && personalDetails?.fatherName && (
+          <div className="space-y-2 pt-2 border-t border-sky-200">
+            <div className="font-bold text-[11px] uppercase tracking-wider" style={{ color: tokens.primaryColor }}>
+              Personal Info
+            </div>
+            <div className="space-y-1 text-[10.5px] text-slate-600">
+              <p><strong className="text-slate-800">Father:</strong> {personalDetails.fatherName}</p>
+              <p><strong className="text-slate-800">Mother:</strong> {personalDetails.motherName}</p>
+              <p><strong className="text-slate-800">DOB:</strong> {personalDetails.dob}</p>
+              <p><strong className="text-slate-800">Nationality:</strong> {personalDetails.nationality || 'Bangladeshi'}</p>
+              {personalDetails.nid && <p><strong className="text-slate-800">NID:</strong> {personalDetails.nid}</p>}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Right Content Area */}
-      <div className="w-full sm:w-2/3 p-6 sm:p-10 space-y-6">
-        {/* Header */}
-        <div className="border-b pb-4">
+      {/* 2. Right Main Column (64%) */}
+      <div className="w-full sm:w-[64%] p-6 sm:p-8 space-y-5">
+        {/* Header Block */}
+        <div className="pb-3 border-b-2" style={{ borderColor: tokens.primaryColor }}>
           <EditableElement
             section="personalInfo"
             field="fullName"
@@ -243,223 +284,251 @@ export const OceanSplit = ({ cvData, onOpenPhotoModal }) => {
             value={personalInfo.fullName}
             onSave={(val) => dispatch(updatePersonalInfo({ fullName: val }))}
             placeholder="Your Full Name"
-            className="text-3xl font-extrabold tracking-tight text-slate-900 block"
-            style={{ color: primary }}
+            className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 block"
+            style={{ fontFamily: tokens.headingFont }}
           />
+
           <EditableElement
             section="personalInfo"
             field="jobTitle"
             tag="p"
             value={personalInfo.jobTitle}
             onSave={(val) => dispatch(updatePersonalInfo({ jobTitle: val }))}
-            placeholder="Your Title"
-            className="text-base font-semibold text-slate-600 mt-1 block"
+            placeholder="Target Professional Designation"
+            className="text-sm font-semibold tracking-wide block mt-0.5"
+            style={{ color: tokens.primaryColor, fontFamily: tokens.headingFont }}
           />
         </div>
 
         {/* Summary */}
-        {personalInfo.summary && (
-          <section>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b pb-1 mb-2">
-              Professional Profile
-            </h3>
+        {isVisible('summary') && personalInfo.summary && (
+          <div className="space-y-1.5">
+            <CVSectionTitle
+              title="Profile Summary"
+              color={tokens.primaryColor}
+              fontFamily={tokens.headingFont}
+              dividerThickness={tokens.dividerThickness}
+              variant="underline"
+            />
             <EditableElement
               section="personalInfo"
               field="summary"
               value={personalInfo.summary}
               multiline={true}
               onSave={(val) => dispatch(updatePersonalInfo({ summary: val }))}
-              placeholder="Write your professional profile..."
-              className="text-slate-700 leading-relaxed block text-xs"
+              placeholder="Write your professional summary..."
+              className="text-slate-700 leading-relaxed text-xs block text-justify"
+              style={{ fontFamily: tokens.bodyFont }}
             />
-          </section>
+          </div>
         )}
 
         {/* Experience */}
-        {experience && experience.length > 0 && (
-          <section className="space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b pb-1">
-              Work Experience
-            </h3>
-            <div className="space-y-4">
-              {experience.map((exp, index) => (
-                <div key={exp.id || index} className="space-y-1 text-xs">
-                  <div className="flex justify-between font-bold text-slate-900">
-                    <EditableElement
-                      section="experience"
-                      field="jobTitle"
-                      index={index}
-                      value={exp.jobTitle}
-                      onSave={(val) => dispatch(updateExperience({ index, data: { jobTitle: val } }))}
-                      placeholder="Job Title"
-                      className="inline font-bold"
-                    />
-                    <span className="text-slate-500 font-normal">
+        {isVisible('experience') && experience && experience.length > 0 && (
+          <div className="space-y-2">
+            <CVSectionTitle
+              title="Work Experience"
+              color={tokens.primaryColor}
+              fontFamily={tokens.headingFont}
+              dividerThickness={tokens.dividerThickness}
+              variant="underline"
+            />
+            <div className="space-y-3.5">
+              {experience.map((exp, idx) => (
+                <div key={exp.id || idx} className="cv-item-avoid-break space-y-0.5">
+                  <div className="flex justify-between items-baseline gap-2">
+                    <span className="font-bold text-slate-900 text-xs">
+                      <EditableElement
+                        section="experience"
+                        field="jobTitle"
+                        index={idx}
+                        value={exp.jobTitle}
+                        onSave={(val) => dispatch(updateExperience({ index: idx, data: { jobTitle: val } }))}
+                        placeholder="Job Title"
+                        className="inline"
+                        style={{ fontFamily: tokens.headingFont }}
+                      />
+                      {' — '}
+                      <span style={{ color: tokens.primaryColor }}>
+                        <EditableElement
+                          section="experience"
+                          field="company"
+                          index={idx}
+                          value={exp.company}
+                          onSave={(val) => dispatch(updateExperience({ index: idx, data: { company: val } }))}
+                          placeholder="Company"
+                          className="inline font-semibold"
+                        />
+                      </span>
+                    </span>
+                    <span className="text-[11px] text-slate-500 shrink-0">
                       <EditableElement
                         section="experience"
                         field="startDate"
-                        index={index}
+                        index={idx}
                         value={exp.startDate}
-                        onSave={(val) => dispatch(updateExperience({ index, data: { startDate: val } }))}
+                        onSave={(val) => dispatch(updateExperience({ index: idx, data: { startDate: val } }))}
                         placeholder="Start"
                         className="inline"
                       />
-                      {' - '}
-                      {exp.current ? (
-                        'Present'
-                      ) : (
-                        <EditableElement
-                          section="experience"
-                          field="endDate"
-                          index={index}
-                          value={exp.endDate}
-                          onSave={(val) => dispatch(updateExperience({ index, data: { endDate: val } }))}
-                          placeholder="End"
-                          className="inline"
-                        />
-                      )}
+                      {' – '}
+                      {exp.current ? 'Present' : exp.endDate}
                     </span>
-                  </div>
-                  <div className="text-slate-600 font-medium">
-                    <EditableElement
-                      section="experience"
-                      field="company"
-                      index={index}
-                      value={exp.company}
-                      onSave={(val) => dispatch(updateExperience({ index, data: { company: val } }))}
-                      placeholder="Company"
-                      className="inline"
-                    />
-                    {exp.location && ` • ${exp.location}`}
                   </div>
                   {exp.description && (
                     <EditableElement
                       section="experience"
                       field="description"
-                      index={index}
+                      index={idx}
                       value={exp.description}
                       multiline={true}
-                      onSave={(val) => dispatch(updateExperience({ index, data: { description: val } }))}
-                      placeholder="Job duties..."
-                      className="text-slate-700 text-xs block"
+                      onSave={(val) => dispatch(updateExperience({ index: idx, data: { description: val } }))}
+                      placeholder="Responsibilities..."
+                      className="text-slate-700 text-xs leading-relaxed block"
                     />
                   )}
                   {exp.highlights && exp.highlights.length > 0 && (
-                    <ul className="list-disc pl-4 space-y-0.5 text-slate-700 mt-1">
+                    <ul className="list-disc pl-4 space-y-0.5 text-slate-700 text-xs mt-1">
                       {exp.highlights.map((h, i) => h && <li key={i}>{h}</li>)}
                     </ul>
                   )}
                 </div>
               ))}
             </div>
-          </section>
+          </div>
         )}
 
         {/* Education */}
-        {education && education.length > 0 && (
-          <section className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b pb-1">
-              Education
-            </h3>
-            <div className="space-y-2 text-xs">
-              {education.map((edu, index) => (
-                <div key={edu.id || index}>
-                  <div className="flex justify-between font-bold text-slate-900">
-                    <span>
-                      <EditableElement
-                        section="education"
-                        field="degree"
-                        index={index}
-                        value={edu.degree}
-                        onSave={(val) => dispatch(updateEducation({ index, data: { degree: val } }))}
-                        placeholder="Degree"
-                        className="inline font-bold"
-                      />
-                      {edu.fieldOfStudy && ` in ${edu.fieldOfStudy}`}
-                    </span>
-                    <span className="text-slate-500 font-normal">{edu.startDate} - {edu.endDate}</span>
-                  </div>
-                  <p className="text-slate-600">
+        {isVisible('education') && education && education.length > 0 && (
+          <div className="space-y-2">
+            <CVSectionTitle
+              title="Education"
+              color={tokens.primaryColor}
+              fontFamily={tokens.headingFont}
+              dividerThickness={tokens.dividerThickness}
+              variant="underline"
+            />
+            <div className="space-y-2">
+              {education.map((edu, idx) => (
+                <div key={edu.id || idx} className="cv-item-avoid-break flex justify-between items-start gap-4">
+                  <div>
                     <EditableElement
                       section="education"
-                      field="institution"
-                      index={index}
-                      value={edu.institution}
-                      onSave={(val) => dispatch(updateEducation({ index, data: { institution: val } }))}
-                      placeholder="Institution"
-                      className="inline"
+                      field="degree"
+                      index={idx}
+                      value={edu.degree}
+                      onSave={(val) => dispatch(updateEducation({ index: idx, data: { degree: val } }))}
+                      placeholder="Degree"
+                      className="font-bold text-slate-900 text-xs inline"
+                      style={{ fontFamily: tokens.headingFont }}
                     />
-                    {edu.grade && ` (${edu.grade})`}
-                  </p>
+                    <div className="text-[11px] text-slate-600">
+                      <EditableElement
+                        section="education"
+                        field="institution"
+                        index={idx}
+                        value={edu.institution}
+                        onSave={(val) => dispatch(updateEducation({ index: idx, data: { institution: val } }))}
+                        placeholder="Institution"
+                        className="inline"
+                      />
+                      {edu.grade && <span className="text-slate-500 italic"> — {edu.grade}</span>}
+                    </div>
+                  </div>
+                  <span className="text-[11px] text-slate-500 shrink-0 font-medium">
+                    {edu.endDate || edu.startDate}
+                  </span>
                 </div>
               ))}
             </div>
-          </section>
+          </div>
         )}
 
         {/* Projects */}
-        {projects && projects.length > 0 && (
-          <section className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b pb-1">
-              Projects
-            </h3>
-            <div className="space-y-2 text-xs">
-              {projects.map((proj, index) => (
-                <div key={proj.id || index}>
-                  <EditableElement
-                    section="projects"
-                    field="title"
-                    index={index}
-                    value={proj.title}
-                    onSave={(val) => dispatch(updateProject({ index, data: { title: val } }))}
-                    placeholder="Project Name"
-                    className="font-bold text-slate-900 block"
-                  />
+        {isVisible('projects') && projects && projects.length > 0 && (
+          <div className="space-y-2">
+            <CVSectionTitle
+              title="Key Projects"
+              color={tokens.primaryColor}
+              fontFamily={tokens.headingFont}
+              dividerThickness={tokens.dividerThickness}
+              variant="underline"
+            />
+            <div className="space-y-2">
+              {projects.map((proj, idx) => (
+                <div key={proj.id || idx} className="cv-item-avoid-break space-y-0.5">
+                  <div className="flex justify-between items-baseline">
+                    <span className="font-bold text-slate-900 text-xs">
+                      <EditableElement
+                        section="projects"
+                        field="title"
+                        index={idx}
+                        value={proj.title || proj.name}
+                        onSave={(val) => dispatch(updateProject({ index: idx, data: { title: val, name: val } }))}
+                        placeholder="Project Title"
+                        className="inline font-bold"
+                      />
+                    </span>
+                    {proj.url && <span className="text-[10px] text-slate-500 font-mono">{proj.url}</span>}
+                  </div>
                   {proj.description && (
                     <EditableElement
                       section="projects"
                       field="description"
-                      index={index}
+                      index={idx}
                       value={proj.description}
                       multiline={true}
-                      onSave={(val) => dispatch(updateProject({ index, data: { description: val } }))}
-                      placeholder="Project details..."
-                      className="text-slate-700 block text-xs"
+                      onSave={(val) => dispatch(updateProject({ index: idx, data: { description: val } }))}
+                      placeholder="Details..."
+                      className="text-slate-700 text-xs leading-relaxed block"
                     />
-                  )}
-                  {proj.technologies && proj.technologies.length > 0 && (
-                    <p className="text-slate-500 text-[10px] mt-0.5">Stack: {proj.technologies.join(', ')}</p>
                   )}
                 </div>
               ))}
             </div>
-          </section>
+          </div>
+        )}
+
+        {/* Custom Sections */}
+        {isVisible('customSections') && (
+          <CVCustomSections
+            customSections={customSections}
+            designTokens={tokens}
+            onSaveTitle={(idx) => (val) => dispatch(updateCustomSection({ index: idx, data: { title: val } }))}
+            onSaveContent={(idx) => (val) => dispatch(updateCustomSection({ index: idx, data: { content: val } }))}
+          />
         )}
 
         {/* References */}
-        {references && references.length > 0 && (
-          <section className="space-y-2 pt-2 border-t">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 pb-1">
-              References
-            </h3>
+        {isVisible('references') && references && references.length > 0 && (
+          <div className="space-y-2">
+            <CVSectionTitle
+              title="References"
+              color={tokens.primaryColor}
+              fontFamily={tokens.headingFont}
+              dividerThickness={tokens.dividerThickness}
+              variant="underline"
+            />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               {references.map((r, i) => (
-                <div key={r.id || i} className="p-2 bg-slate-50 rounded border border-slate-200">
-                  <EditableElement
-                    section="references"
-                    field="name"
-                    index={i}
-                    value={r.name}
-                    onSave={(val) => dispatch(updateReference({ index: i, data: { name: val } }))}
-                    placeholder="Referee Name"
-                    className="font-bold text-slate-900 block"
-                  />
-                  <p className="text-slate-600">{r.designation}, {r.company}</p>
-                  {r.phone && <p className="text-slate-500">Phone: {r.phone}</p>}
+                <div key={r.id || i} className="cv-item-avoid-break p-2.5 bg-sky-50/50 border border-sky-100 rounded space-y-0.5">
+                  <div className="font-bold text-slate-900">{r.name}</div>
+                  <p className="text-slate-700">{r.designation}, {r.company}</p>
+                  {r.phone && <p className="text-slate-600 text-[11px]">Tel: {r.phone}</p>}
                 </div>
               ))}
             </div>
-          </section>
+          </div>
+        )}
+
+        {/* Declaration */}
+        {isVisible('declaration') && (declaration?.signedBy || declaration?.text) && (
+          <CVDeclaration
+            declaration={declaration}
+            fullName={personalInfo.fullName}
+            designTokens={tokens}
+            onSaveText={(val) => dispatch(updateDeclaration({ text: val }))}
+          />
         )}
       </div>
     </div>

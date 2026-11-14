@@ -338,6 +338,175 @@ const RAW_TEMPLATES_REGISTRY = [
     }
   },
   {
+    "id": "onepage-clinical-health",
+    "name": "Clinical Healthcare & Medical Practitioner",
+    "category": "Healthcare",
+    "categories": [
+      "One-Page CVs",
+      "Healthcare",
+      "Experienced Professionals",
+      "International Standard",
+      "Modern"
+    ],
+    "isOnePage": true,
+    "isFeatured": true,
+    "description": "Specialized clinical and healthcare single-page layout featuring Licensure & Registration ribbon, clinical rotations, diagnostics/procedures competencies, and ethical medical declaration.",
+    "badge": "Healthcare 1-Page",
+    "isPremium": false,
+    "thumbnailColor": "#0f766e",
+    "accentColor": "#14b8a6",
+    "photoFormat": "portrait",
+    "layoutArchitecture": "onepage-clinical-health",
+    "features": [
+      "Medical Licensure Banner",
+      "Clinical Rotation Cards",
+      "Procedures & Diagnostics Matrix",
+      "Ethical Clinical Declaration"
+    ],
+    "pageGuidance": {
+      "recommendedMaxWords": 450,
+      "maxExperienceItems": 3,
+      "maxEducationItems": 2,
+      "maxBulletsPerRole": 3,
+      "tip": "Highlight hospital appointments, medical licensure/BMDC numbers, and procedural competencies."
+    }
+  },
+  {
+    "id": "onepage-finance-ledger",
+    "name": "Finance & Accounting Ledger",
+    "category": "Finance and Accounting",
+    "categories": [
+      "One-Page CVs",
+      "Finance and Accounting",
+      "Corporate",
+      "Experienced Professionals",
+      "International Standard"
+    ],
+    "isOnePage": true,
+    "isFeatured": true,
+    "description": "Rigorous single-page layout tailored for financial analysts, chartered accountants, and controllers. Features professional credential ribbon (CFA/CA/ACCA), financial modeling matrix, and quantitative KPI highlights.",
+    "badge": "Finance 1-Page",
+    "isPremium": false,
+    "thumbnailColor": "#047857",
+    "accentColor": "#10b981",
+    "photoFormat": "portrait",
+    "layoutArchitecture": "onepage-finance-ledger",
+    "features": [
+      "CFA/CA/ACCA Credential Ribbon",
+      "Financial Tooling & IFRS Matrix",
+      "Quantitative Metric Rows",
+      "Tabular Experience Flow"
+    ],
+    "pageGuidance": {
+      "recommendedMaxWords": 460,
+      "maxExperienceItems": 3,
+      "maxEducationItems": 2,
+      "maxBulletsPerRole": 3,
+      "tip": "Emphasize quantifiable achievements (e.g., $M budgets managed, % cost reduction, audit accuracy)."
+    }
+  },
+  {
+    "id": "onepage-engineering-spec",
+    "name": "Engineering Specification & Blueprint",
+    "category": "Engineering",
+    "categories": [
+      "One-Page CVs",
+      "Engineering",
+      "Technology",
+      "Experienced Professionals",
+      "Modern"
+    ],
+    "isOnePage": true,
+    "isFeatured": true,
+    "description": "Technical blueprint layout designed for Civil, Mechanical, Electrical, and Structural engineers. Highlights professional engineering certifications (PE/IEB), CAD/BIM tools, and detailed project specification cards.",
+    "badge": "Engineering 1-Page",
+    "isPremium": false,
+    "thumbnailColor": "#1d4ed8",
+    "accentColor": "#3b82f6",
+    "photoFormat": "rounded",
+    "layoutArchitecture": "onepage-engineering-spec",
+    "features": [
+      "PE / IEB Accreditation Bar",
+      "CAD/BIM & Codes Toolset",
+      "Project Scope & Budget Cards",
+      "Technical Precision Structure"
+    ],
+    "pageGuidance": {
+      "recommendedMaxWords": 450,
+      "maxExperienceItems": 3,
+      "maxEducationItems": 2,
+      "maxBulletsPerRole": 3,
+      "tip": "Specify structural codes, design software, and budget/scope metrics for key projects."
+    }
+  },
+  {
+    "id": "onepage-marketing-growth",
+    "name": "Growth Marketing & Brand Strategy",
+    "category": "Marketing and Sales",
+    "categories": [
+      "One-Page CVs",
+      "Marketing and Sales",
+      "Creative",
+      "Modern",
+      "Experienced Professionals"
+    ],
+    "isOnePage": true,
+    "isFeatured": true,
+    "description": "High-impact editorial layout for growth marketers, campaign directors, and sales strategists. Features key performance indicator ribbons (CAC/LTV, ROAS), campaign case study cards, and MarTech stack.",
+    "badge": "Marketing 1-Page",
+    "isPremium": false,
+    "thumbnailColor": "#ea580c",
+    "accentColor": "#f97316",
+    "photoFormat": "circle",
+    "layoutArchitecture": "onepage-marketing-growth",
+    "features": [
+      "CAC / ROAS KPI Ribbon",
+      "Campaign Case Study Cards",
+      "MarTech & Ad Stack Grid",
+      "Editorial Split Architecture"
+    ],
+    "pageGuidance": {
+      "recommendedMaxWords": 440,
+      "maxExperienceItems": 3,
+      "maxEducationItems": 2,
+      "maxBulletsPerRole": 3,
+      "tip": "Lead with conversion figures, revenue impact, and growth multipliers."
+    }
+  },
+  {
+    "id": "onepage-skilled-trade-pro",
+    "name": "Skilled Trade & Practical Pro",
+    "category": "Experienced Professionals",
+    "categories": [
+      "One-Page CVs",
+      "Experienced Professionals",
+      "Standard",
+      "International Standard"
+    ],
+    "isOnePage": true,
+    "isFeatured": true,
+    "description": "Pragmatic, high-visibility layout built for technicians, hospitality managers, retail supervisors, and skilled service workers. Highlights trade certifications, shift availability, practical skills, and direct reference contact.",
+    "badge": "Trade Pro 1-Page",
+    "isPremium": false,
+    "thumbnailColor": "#b45309",
+    "accentColor": "#f59e0b",
+    "photoFormat": "portrait",
+    "layoutArchitecture": "onepage-skilled-trade-pro",
+    "features": [
+      "Shift Availability & Work Permit Badge",
+      "Trade Licensure Ribbon",
+      "Hands-On Competencies First",
+      "Direct Contact & Verified References"
+    ],
+    "pageGuidance": {
+      "recommendedMaxWords": 420,
+      "maxExperienceItems": 3,
+      "maxEducationItems": 2,
+      "maxBulletsPerRole": 3,
+      "tip": "Clearly state your certifications (OSHA, HVAC, Electrical), shift availability, and driver license status."
+    }
+  },
+  {
     "id": "onepage-frontend-dev",
     "name": "Frontend React Engineer 1-Page",
     "category": "One-Page CVs",
@@ -2047,6 +2216,40 @@ const RAW_TEMPLATES_REGISTRY = [
       "maxEducationItems": 5,
       "maxBulletsPerRole": 5,
       "tip": "Ideal for academic curricula vitae, medical residencies, and extensive international applications."
+    }
+  },
+  {
+    "id": "academic-multipage-cv",
+    "name": "Academic & Scholarly Multi-Page CV",
+    "category": "Academic and Research",
+    "categories": [
+      "Multiple-Page CVs",
+      "Academic and Research",
+      "Education and Teaching",
+      "Experienced Professionals",
+      "Standard"
+    ],
+    "isOnePage": false,
+    "isFeatured": true,
+    "description": "Comprehensive multi-page academic curriculum vitae for university professors, postdoctoral researchers, doctoral candidates, and scientific fellows. Structured for peer-reviewed journal articles, DOI links, funded grants, academic honors, teaching dossiers, and scholarly referees.",
+    "badge": "Academic Multi-Page",
+    "isPremium": false,
+    "thumbnailColor": "#1e3a8a",
+    "accentColor": "#3b82f6",
+    "photoFormat": "portrait",
+    "layoutArchitecture": "academic-multipage-cv",
+    "features": [
+      "Peer-Reviewed Publication Citations & DOIs",
+      "Funded Research Grants & Fellowships",
+      "Formal Teaching & Advising Dossier",
+      "Multi-Page Continuous Scholarly Layout"
+    ],
+    "pageGuidance": {
+      "recommendedMaxWords": 1500,
+      "maxExperienceItems": 8,
+      "maxEducationItems": 4,
+      "maxBulletsPerRole": 5,
+      "tip": "List research interests first, followed by education, peer-reviewed publications with full DOI citations, funded grants, and academic references."
     }
   },
   {
@@ -5286,11 +5489,12 @@ export const PREFERRED_CATEGORY_ORDER = [...TEMPLATE_CATEGORIES];
 
 export const deriveLayoutType = (t) => {
   const arch = String(t.layoutArchitecture || t.baseLayout || t.id || '').toLowerCase();
-  if (arch === 'onepage-academic-compact' || arch.includes('academic')) return 'academic';
+  if (arch === 'onepage-academic-compact' || arch === 'academic-multipage-cv' || arch.includes('academic')) return 'academic';
   if (arch === 'onepage-tech-grid' || arch.includes('grid')) return 'grid';
   if (
     arch === 'onepage-executive-brief' ||
     arch === 'onepage-creative-editorial' ||
+    arch === 'onepage-marketing-growth' ||
     arch.includes('editorial')
   ) {
     return 'editorial';
@@ -5299,6 +5503,8 @@ export const deriveLayoutType = (t) => {
   if (
     arch === 'onepage-modern-split' ||
     arch === 'onepage-it-sidebar' ||
+    arch === 'onepage-clinical-health' ||
+    arch === 'onepage-skilled-trade-pro' ||
     arch === 'executive-slate' ||
     arch === 'ocean-split' ||
     arch.includes('split') ||
@@ -5312,6 +5518,9 @@ export const deriveLayoutType = (t) => {
 export const deriveProfessions = (t) => {
   const id = String(t.id || '').toLowerCase();
 
+  if (id.includes('trade') || id.includes('skilled')) {
+    return ['Senior Technician', 'Field Service Specialist', 'Maintenance Lead'];
+  }
   if (id.includes('doctor') || id.includes('clinical') || id.includes('medical')) {
     return ['Medical Officer', 'Clinical Doctor', 'Resident Physician'];
   }

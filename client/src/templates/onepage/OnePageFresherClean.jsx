@@ -7,6 +7,11 @@ import {
   OnePageExperienceList,
   OnePageEducationList,
   OnePageProjectsGrid,
+  resolveDesignTokens,
+  getSectionVisibility,
+  CVCustomSections,
+  CVDeclaration,
+  CVPersonalDetailsTable,
 } from './onePageShared';
 import { Mail, Phone, MapPin, Linkedin, Github, Globe } from 'lucide-react';
 
@@ -14,28 +19,47 @@ export const OnePageFresherClean = ({ cvData, onOpenPhotoModal }) => {
   const editors = useOnePageEditors();
   const {
     personalInfo = {},
+    personalDetails = {},
     experience = [],
     education = [],
     skills = [],
     projects = [],
     certifications = [],
     languages = [],
+    references = [],
+    declaration = {},
+    customSections = [],
     design = {},
   } = cvData || {};
 
-  const primary = design?.primaryColor || '#2563eb';
-  const textColor = design?.textColor || '#0f172a';
-  const fontFamily = design?.fontFamily || 'Inter, sans-serif';
+  const tokens = resolveDesignTokens(cvData, {
+    primaryColor: '#2563eb', // Clean Royal Blue
+    accentColor: '#3b82f6',
+    headingColor: '#1e3a8a',
+    bodyColor: '#1e293b',
+    backgroundColor: '#ffffff',
+    headingFont: 'Plus Jakarta Sans',
+    bodyFont: 'Inter',
+    sectionSpacing: 12,
+    itemSpacing: 6,
+    dividerThickness: 1.5,
+  });
+
+  const isVisible = (key) => getSectionVisibility(key, cvData);
 
   return (
     <div
-      className="px-7 py-6 bg-white text-slate-800 leading-snug"
-      style={{ fontFamily, color: textColor }}
+      className="px-7 py-6 bg-white leading-snug min-h-[1060px]"
+      style={{
+        fontFamily: `${tokens.bodyFont}, sans-serif`,
+        color: tokens.bodyColor,
+        backgroundColor: tokens.backgroundColor,
+      }}
     >
       {/* Top Header */}
       <div
         className="flex items-center gap-4 pb-3.5 mb-3.5 border-b-2"
-        style={{ borderColor: primary }}
+        style={{ borderColor: tokens.primaryColor }}
       >
         <OnePageAvatar
           photo={personalInfo.photo}
@@ -43,7 +67,8 @@ export const OnePageFresherClean = ({ cvData, onOpenPhotoModal }) => {
           showPhoto={design?.showPhoto}
           photoStyle={personalInfo.photoStyle || 'circle'}
           photoSize={design?.photoSize}
-          borderColor={`${primary}40`}
+          photoConfig={personalInfo.photoConfig}
+          borderColor={`${tokens.primaryColor}40`}
           onOpenPhotoModal={onOpenPhotoModal}
         />
 
@@ -55,7 +80,8 @@ export const OnePageFresherClean = ({ cvData, onOpenPhotoModal }) => {
             value={personalInfo.fullName || ''}
             onSave={editors.savePersonal('fullName')}
             placeholder="Your Full Name"
-            className="text-[22px] font-extrabold tracking-tight text-slate-950 block leading-tight"
+            className="text-[22px] font-extrabold tracking-tight block leading-tight"
+            style={{ color: tokens.headingColor, fontFamily: `${tokens.headingFont}, sans-serif` }}
           />
           <EditableElement
             section="personalInfo"
@@ -65,42 +91,42 @@ export const OnePageFresherClean = ({ cvData, onOpenPhotoModal }) => {
             onSave={editors.savePersonal('jobTitle')}
             placeholder="Graduate / Target Position"
             className="text-[12.5px] font-semibold mt-0.5 block"
-            style={{ color: primary }}
+            style={{ color: tokens.primaryColor }}
           />
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10.5px] text-slate-600">
             {personalInfo.email && (
               <span className="inline-flex items-center gap-1">
-                <Mail className="w-3 h-3 shrink-0" style={{ color: primary }} />
+                <Mail className="w-3 h-3 shrink-0" style={{ color: tokens.primaryColor }} />
                 <span>{personalInfo.email}</span>
               </span>
             )}
             {personalInfo.phone && (
               <span className="inline-flex items-center gap-1">
-                <Phone className="w-3 h-3 shrink-0" style={{ color: primary }} />
+                <Phone className="w-3 h-3 shrink-0" style={{ color: tokens.primaryColor }} />
                 <span>{personalInfo.phone}</span>
               </span>
             )}
             {personalInfo.location && (
               <span className="inline-flex items-center gap-1">
-                <MapPin className="w-3 h-3 shrink-0" style={{ color: primary }} />
+                <MapPin className="w-3 h-3 shrink-0" style={{ color: tokens.primaryColor }} />
                 <span>{personalInfo.location}</span>
               </span>
             )}
             {personalInfo.linkedin && (
               <span className="inline-flex items-center gap-1">
-                <Linkedin className="w-3 h-3 shrink-0" style={{ color: primary }} />
+                <Linkedin className="w-3 h-3 shrink-0" style={{ color: tokens.primaryColor }} />
                 <span>{personalInfo.linkedin}</span>
               </span>
             )}
             {personalInfo.github && (
               <span className="inline-flex items-center gap-1">
-                <Github className="w-3 h-3 shrink-0" style={{ color: primary }} />
+                <Github className="w-3 h-3 shrink-0" style={{ color: tokens.primaryColor }} />
                 <span>{personalInfo.github}</span>
               </span>
             )}
             {personalInfo.website && !personalInfo.github && (
               <span className="inline-flex items-center gap-1">
-                <Globe className="w-3 h-3 shrink-0" style={{ color: primary }} />
+                <Globe className="w-3 h-3 shrink-0" style={{ color: tokens.primaryColor }} />
                 <span>{personalInfo.website}</span>
               </span>
             )}
@@ -110,9 +136,9 @@ export const OnePageFresherClean = ({ cvData, onOpenPhotoModal }) => {
 
       <div className="space-y-3">
         {/* Career Profile */}
-        {personalInfo.summary && (
+        {isVisible('summary') && personalInfo.summary && (
           <section>
-            <CompactSectionTitle title="Career Objective" color={primary} />
+            <CompactSectionTitle title="Career Objective" color={tokens.primaryColor} />
             <EditableElement
               section="personalInfo"
               field="summary"
@@ -126,38 +152,38 @@ export const OnePageFresherClean = ({ cvData, onOpenPhotoModal }) => {
         )}
 
         {/* Education prioritized for Students / Fresh Graduates */}
-        {education.length > 0 && (
+        {isVisible('education') && education.length > 0 && (
           <section>
-            <CompactSectionTitle title="Education" color={primary} />
+            <CompactSectionTitle title="Education" color={tokens.primaryColor} />
             <OnePageEducationList
               education={education}
               editors={editors}
-              accentColor={primary}
+              accentColor={tokens.primaryColor}
             />
           </section>
         )}
 
         {/* Experience / Internships */}
-        {experience.length > 0 && (
+        {isVisible('experience') && experience.length > 0 && (
           <section>
-            <CompactSectionTitle title="Experience & Internships" color={primary} />
+            <CompactSectionTitle title="Experience & Internships" color={tokens.primaryColor} />
             <OnePageExperienceList
               experience={experience}
               editors={editors}
-              accentColor={primary}
+              accentColor={tokens.primaryColor}
               compact={true}
             />
           </section>
         )}
 
         {/* Key Projects in 2 columns */}
-        {projects.length > 0 && (
+        {isVisible('projects') && projects.length > 0 && (
           <section>
-            <CompactSectionTitle title="Key Projects" color={primary} />
+            <CompactSectionTitle title="Key Projects" color={tokens.primaryColor} />
             <OnePageProjectsGrid
               projects={projects}
               editors={editors}
-              accentColor={primary}
+              accentColor={tokens.primaryColor}
               twoColumns={true}
             />
           </section>
@@ -165,9 +191,9 @@ export const OnePageFresherClean = ({ cvData, onOpenPhotoModal }) => {
 
         {/* Bottom 2-column Skills + Certifications / Languages */}
         <div className="grid grid-cols-12 gap-4 pt-0.5">
-          {skills.length > 0 && (
+          {isVisible('skills') && skills.length > 0 && (
             <section className={certifications.length > 0 || languages.length > 0 ? 'col-span-7' : 'col-span-12'}>
-              <CompactSectionTitle title="Core Skills" color={primary} />
+              <CompactSectionTitle title="Core Skills" color={tokens.primaryColor} />
               <div className="flex flex-wrap gap-1.5">
                 {skills.map((s, idx) => (
                   <span
@@ -188,20 +214,20 @@ export const OnePageFresherClean = ({ cvData, onOpenPhotoModal }) => {
             </section>
           )}
 
-          {(certifications.length > 0 || languages.length > 0) && (
+          {((isVisible('certifications') && certifications.length > 0) || (isVisible('languages') && languages.length > 0)) && (
             <section className={skills.length > 0 ? 'col-span-5' : 'col-span-12'}>
               <CompactSectionTitle
                 title={certifications.length > 0 ? 'Certifications & Languages' : 'Languages'}
-                color={primary}
+                color={tokens.primaryColor}
               />
               <div className="space-y-1 text-[10.5px] text-slate-700">
-                {certifications.slice(0, 3).map((cert, idx) => (
+                {isVisible('certifications') && certifications.slice(0, 3).map((cert, idx) => (
                   <div key={cert.id || idx} className="leading-snug">
                     <span className="font-semibold text-slate-900">{cert.name}</span>
                     {cert.issuer && <span className="text-slate-500"> — {cert.issuer}</span>}
                   </div>
                 ))}
-                {languages.length > 0 && (
+                {isVisible('languages') && languages.length > 0 && (
                   <p className="text-slate-600 pt-0.5">
                     <span className="font-semibold text-slate-800">Languages: </span>
                     {languages.map((l) => `${l.name}${l.proficiency ? ` (${l.proficiency})` : ''}`).join(' • ')}
@@ -211,6 +237,20 @@ export const OnePageFresherClean = ({ cvData, onOpenPhotoModal }) => {
             </section>
           )}
         </div>
+
+        {isVisible('personalDetails') && (
+          <CVPersonalDetailsTable personalDetails={personalDetails} compact={true} />
+        )}
+
+        {isVisible('customSections') && customSections.length > 0 && (
+          <CVCustomSections customSections={customSections} primaryColor={tokens.primaryColor} />
+        )}
+
+        {isVisible('declaration') && declaration?.text && (
+          <div className="pt-2 text-[9px] border-t border-slate-200">
+            <CVDeclaration declaration={declaration} />
+          </div>
+        )}
       </div>
     </div>
   );

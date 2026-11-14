@@ -1,7 +1,9 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Provider } from 'react-redux';
-import { RenderCVTemplate } from './index.jsx';
+import { RenderCVTemplate, TEMPLATE_COMPONENTS } from './index.jsx';
+
+export const TEMPLATE_MAP = TEMPLATE_COMPONENTS;
 
 const staticStore = {
   getState: () => ({
@@ -28,6 +30,8 @@ export const renderCVToStaticHtml = (cvData) => {
   );
 };
 
+export { TEMPLATE_COMPONENTS };
 export { getGoogleFontsUrl, formatFontStack, containsBanglaText } from '@shared/utils/cvNormalize.js';
 
 export default renderCVToStaticHtml;
+

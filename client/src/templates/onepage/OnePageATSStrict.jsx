@@ -5,23 +5,44 @@ import {
   CompactSectionTitle,
   OnePageExperienceList,
   OnePageEducationList,
+  resolveDesignTokens,
+  getSectionVisibility,
+  CVCustomSections,
+  CVDeclaration,
+  CVPersonalDetailsTable,
 } from './onePageShared';
 
 export const OnePageATSStrict = ({ cvData }) => {
   const editors = useOnePageEditors();
   const {
     personalInfo = {},
+    personalDetails = {},
     experience = [],
     education = [],
     skills = [],
     projects = [],
     certifications = [],
     languages = [],
+    references = [],
+    declaration = {},
+    customSections = [],
     design = {},
   } = cvData || {};
 
-  const primary = design?.primaryColor || '#0f172a';
-  const fontFamily = design?.fontFamily || 'Inter, sans-serif';
+  const tokens = resolveDesignTokens(cvData, {
+    primaryColor: '#0f172a',
+    accentColor: '#334155',
+    headingColor: '#000000',
+    bodyColor: '#000000',
+    backgroundColor: '#ffffff',
+    headingFont: 'Inter',
+    bodyFont: 'Inter',
+    sectionSpacing: 12,
+    itemSpacing: 6,
+    dividerThickness: 1.5,
+  });
+
+  const isVisible = (key) => getSectionVisibility(key, cvData);
 
   const contactItems = [
     personalInfo.location,
@@ -32,9 +53,16 @@ export const OnePageATSStrict = ({ cvData }) => {
   ].filter(Boolean);
 
   return (
-    <div className="px-8 py-6 bg-white text-black leading-snug" style={{ fontFamily }}>
+    <div
+      className="px-8 py-6 bg-white leading-snug min-h-[1060px]"
+      style={{
+        fontFamily: `${tokens.bodyFont}, sans-serif`,
+        color: tokens.bodyColor,
+        backgroundColor: tokens.backgroundColor,
+      }}
+    >
       {/* Centered Pure Text ATS Letterhead */}
-      <header className="text-center pb-3 mb-3 border-b-2 border-slate-900">
+      <header className="text-center pb-3 mb-3 border-b-2" style={{ borderColor: tokens.headingColor }}>
         <EditableElement
           section="personalInfo"
           field="fullName"
@@ -42,7 +70,8 @@ export const OnePageATSStrict = ({ cvData }) => {
           value={personalInfo.fullName || ''}
           onSave={editors.savePersonal('fullName')}
           placeholder="YOUR FULL NAME"
-          className="text-[22px] font-bold uppercase tracking-wider text-black block leading-tight"
+          className="text-[22px] font-bold uppercase tracking-wider block leading-tight"
+          style={{ color: tokens.headingColor, fontFamily: `${tokens.headingFont}, sans-serif` }}
         />
         <EditableElement
           section="personalInfo"
@@ -53,15 +82,15 @@ export const OnePageATSStrict = ({ cvData }) => {
           placeholder="Target Designation"
           className="text-[12px] font-semibold text-slate-700 mt-0.5 block"
         />
-        <p className="text-[10.5px] text-slate-700 mt-1.5">
+        <p className="text-[10px] text-slate-700 mt-1.5">
           {contactItems.join('  |  ')}
         </p>
       </header>
 
       <div className="space-y-3">
-        {personalInfo.summary && (
+        {isVisible('summary') && personalInfo.summary && (
           <section>
-            <CompactSectionTitle title="Professional Summary" color={primary} variant="plain" />
+            <CompactSectionTitle title="Professional Summary" color={tokens.primaryColor} variant="plain" />
             <EditableElement
               section="personalInfo"
               field="summary"
@@ -73,32 +102,32 @@ export const OnePageATSStrict = ({ cvData }) => {
           </section>
         )}
 
-        {experience.length > 0 && (
+        {isVisible('experience') && experience.length > 0 && (
           <section>
-            <CompactSectionTitle title="Experience" color={primary} variant="plain" />
+            <CompactSectionTitle title="Experience" color={tokens.primaryColor} variant="plain" />
             <OnePageExperienceList
               experience={experience}
               editors={editors}
-              accentColor={primary}
+              accentColor={tokens.primaryColor}
               compact={true}
             />
           </section>
         )}
 
-        {education.length > 0 && (
+        {isVisible('education') && education.length > 0 && (
           <section>
-            <CompactSectionTitle title="Education" color={primary} variant="plain" />
+            <CompactSectionTitle title="Education" color={tokens.primaryColor} variant="plain" />
             <OnePageEducationList
               education={education}
               editors={editors}
-              accentColor={primary}
+              accentColor={tokens.primaryColor}
             />
           </section>
         )}
 
-        {projects.length > 0 && (
+        {isVisible('projects') && projects.length > 0 && (
           <section>
-            <CompactSectionTitle title="Projects" color={primary} variant="plain" />
+            <CompactSectionTitle title="Projects" color={tokens.primaryColor} variant="plain" />
             <div className="space-y-1.5">
               {projects.map((p, idx) => (
                 <div key={p.id || idx} className="text-[11px]">
@@ -116,26 +145,26 @@ export const OnePageATSStrict = ({ cvData }) => {
           </section>
         )}
 
-        {skills.length > 0 && (
+        {isVisible('skills') && skills.length > 0 && (
           <section>
-            <CompactSectionTitle title="Technical & Core Skills" color={primary} variant="plain" />
+            <CompactSectionTitle title="Technical & Core Skills" color={tokens.primaryColor} variant="plain" />
             <p className="text-[11px] text-slate-900 leading-relaxed">
               {skills.map((s) => s.name).join(' • ')}
             </p>
           </section>
         )}
 
-        {(certifications.length > 0 || languages.length > 0) && (
+        {((isVisible('certifications') && certifications.length > 0) || (isVisible('languages') && languages.length > 0)) && (
           <section>
-            <CompactSectionTitle title="Additional Credentials" color={primary} variant="plain" />
+            <CompactSectionTitle title="Additional Credentials" color={tokens.primaryColor} variant="plain" />
             <div className="space-y-0.5 text-[10.5px] text-slate-800">
-              {certifications.length > 0 && (
+              {isVisible('certifications') && certifications.length > 0 && (
                 <p>
                   <span className="font-bold">Certifications: </span>
                   {certifications.map((c) => `${c.name}${c.issuer ? ` (${c.issuer})` : ''}`).join('; ')}
                 </p>
               )}
-              {languages.length > 0 && (
+              {isVisible('languages') && languages.length > 0 && (
                 <p>
                   <span className="font-bold">Languages: </span>
                   {languages.map((l) => `${l.name}${l.proficiency ? ` - ${l.proficiency}` : ''}`).join(', ')}
@@ -143,6 +172,20 @@ export const OnePageATSStrict = ({ cvData }) => {
               )}
             </div>
           </section>
+        )}
+
+        {isVisible('personalDetails') && (
+          <CVPersonalDetailsTable personalDetails={personalDetails} compact={true} />
+        )}
+
+        {isVisible('customSections') && customSections.length > 0 && (
+          <CVCustomSections customSections={customSections} primaryColor={tokens.primaryColor} />
+        )}
+
+        {isVisible('declaration') && declaration?.text && (
+          <div className="pt-2 text-[9px] border-t border-slate-300">
+            <CVDeclaration declaration={declaration} />
+          </div>
         )}
       </div>
     </div>

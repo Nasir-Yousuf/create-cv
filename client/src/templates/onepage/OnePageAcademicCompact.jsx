@@ -5,12 +5,19 @@ import {
   CompactSectionTitle,
   OnePageExperienceList,
   OnePageEducationList,
+  resolveDesignTokens,
+  getSectionVisibility,
+  CVPhoto,
+  CVCustomSections,
+  CVDeclaration,
+  CVPersonalDetailsTable,
 } from './onePageShared';
 
-export const OnePageAcademicCompact = ({ cvData }) => {
+export const OnePageAcademicCompact = ({ cvData, onOpenPhotoModal }) => {
   const editors = useOnePageEditors();
   const {
     personalInfo = {},
+    personalDetails = {},
     experience = [],
     education = [],
     skills = [],
@@ -18,11 +25,25 @@ export const OnePageAcademicCompact = ({ cvData }) => {
     certifications = [],
     languages = [],
     references = [],
+    declaration = {},
+    customSections = [],
     design = {},
   } = cvData || {};
 
-  const primary = design?.primaryColor || '#7c2d12';
-  const fontFamily = design?.fontFamily || 'Merriweather, Georgia, serif';
+  const tokens = resolveDesignTokens(cvData, {
+    primaryColor: '#7c2d12', // Scholarly Crimson / Maroon
+    accentColor: '#9a3412',
+    headingColor: '#451a03',
+    bodyColor: '#1e293b',
+    backgroundColor: '#ffffff',
+    headingFont: 'Merriweather',
+    bodyFont: 'Inter',
+    sectionSpacing: 12,
+    itemSpacing: 6,
+    dividerThickness: 1.5,
+  });
+
+  const isVisible = (key) => getSectionVisibility(key, cvData);
 
   const contactBits = [
     personalInfo.email,
@@ -32,11 +53,21 @@ export const OnePageAcademicCompact = ({ cvData }) => {
   ].filter(Boolean);
 
   return (
-    <div className="px-8 py-6 bg-white text-slate-900 leading-snug" style={{ fontFamily }}>
+    <div
+      className="px-8 py-6 bg-white leading-snug min-h-[1060px]"
+      style={{
+        fontFamily: `${tokens.bodyFont}, sans-serif`,
+        color: tokens.bodyColor,
+        backgroundColor: tokens.backgroundColor,
+      }}
+    >
       {/* Scholarly Header with Top Crimson/Maroon Accent Line */}
-      <header className="pt-2 pb-3 mb-3 border-t-4 border-b border-slate-300" style={{ borderTopColor: primary }}>
-        <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2">
-          <div>
+      <header
+        className="pt-2 pb-3 mb-3 border-t-4 border-b border-slate-300"
+        style={{ borderTopColor: tokens.primaryColor }}
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1">
             <EditableElement
               section="personalInfo"
               field="fullName"
@@ -44,7 +75,11 @@ export const OnePageAcademicCompact = ({ cvData }) => {
               value={personalInfo.fullName || ''}
               onSave={editors.savePersonal('fullName')}
               placeholder="Applicant Full Name"
-              className="text-[21px] font-bold tracking-tight text-slate-950 block"
+              className="text-[21px] font-bold tracking-tight block"
+              style={{
+                color: tokens.headingColor,
+                fontFamily: `${tokens.headingFont}, Georgia, serif`,
+              }}
             />
             <EditableElement
               section="personalInfo"
@@ -54,20 +89,31 @@ export const OnePageAcademicCompact = ({ cvData }) => {
               onSave={editors.savePersonal('jobTitle')}
               placeholder="Academic Focus / Research Candidate"
               className="text-[12px] italic font-medium mt-0.5 block"
-              style={{ color: primary }}
+              style={{ color: tokens.primaryColor }}
             />
+            <p className="text-[10px] text-slate-600 mt-1">
+              {contactBits.join(' • ')}
+            </p>
           </div>
-          <p className="text-[10px] font-sans text-slate-600 sm:text-right max-w-[260px]">
-            {contactBits.join(' • ')}
-          </p>
+          {design?.showPhoto && (
+            <CVPhoto
+              photo={personalInfo.photo}
+              fullName={personalInfo.fullName}
+              showPhoto={design?.showPhoto}
+              photoStyle={personalInfo.photoStyle || 'rounded'}
+              photoSize={design?.photoSize || 'sm'}
+              photoConfig={personalInfo.photoConfig}
+              onOpenPhotoModal={onOpenPhotoModal}
+            />
+          )}
         </div>
       </header>
 
-      <div className="space-y-3 font-sans">
+      <div className="space-y-3">
         {/* Research Statement */}
-        {personalInfo.summary && (
+        {isVisible('summary') && personalInfo.summary && (
           <section>
-            <CompactSectionTitle title="Research Interests & Statement" color={primary} />
+            <CompactSectionTitle title="Research Interests & Statement" color={tokens.primaryColor} />
             <EditableElement
               section="personalInfo"
               field="summary"
@@ -80,21 +126,21 @@ export const OnePageAcademicCompact = ({ cvData }) => {
         )}
 
         {/* Education & Honors First */}
-        {education.length > 0 && (
+        {isVisible('education') && education.length > 0 && (
           <section>
-            <CompactSectionTitle title="Education & Academic Standing" color={primary} />
+            <CompactSectionTitle title="Education & Academic Standing" color={tokens.primaryColor} />
             <OnePageEducationList
               education={education}
               editors={editors}
-              accentColor={primary}
+              accentColor={tokens.primaryColor}
             />
           </section>
         )}
 
         {/* Thesis / Research Projects */}
-        {projects.length > 0 && (
+        {isVisible('projects') && projects.length > 0 && (
           <section>
-            <CompactSectionTitle title="Thesis, Research & Publications" color={primary} />
+            <CompactSectionTitle title="Thesis, Research & Publications" color={tokens.primaryColor} />
             <div className="space-y-1.5 text-[11px]">
               {projects.map((p, idx) => (
                 <div key={p.id || idx}>
@@ -108,36 +154,38 @@ export const OnePageAcademicCompact = ({ cvData }) => {
         )}
 
         {/* Teaching / Lab / Work Appointments */}
-        {experience.length > 0 && (
+        {isVisible('experience') && experience.length > 0 && (
           <section>
-            <CompactSectionTitle title="Teaching, Lab & Professional Appointments" color={primary} />
+            <CompactSectionTitle title="Teaching, Lab & Professional Appointments" color={tokens.primaryColor} />
             <OnePageExperienceList
               experience={experience}
               editors={editors}
-              accentColor={primary}
+              accentColor={tokens.primaryColor}
               compact={true}
             />
           </section>
         )}
 
         {/* Awards, Methods & Languages */}
-        {(certifications.length > 0 || skills.length > 0 || languages.length > 0) && (
+        {((isVisible('certifications') && certifications.length > 0) ||
+          (isVisible('skills') && skills.length > 0) ||
+          (isVisible('languages') && languages.length > 0)) && (
           <section>
-            <CompactSectionTitle title="Honors, Methodologies & Skills" color={primary} />
+            <CompactSectionTitle title="Honors, Methodologies & Skills" color={tokens.primaryColor} />
             <div className="space-y-1 text-[10.5px] text-slate-700">
-              {certifications.length > 0 && (
+              {isVisible('certifications') && certifications.length > 0 && (
                 <p>
                   <span className="font-bold text-slate-900">Honors & Fellowships: </span>
                   {certifications.map((c) => `${c.name}${c.date ? ` (${c.date})` : ''}`).join(' • ')}
                 </p>
               )}
-              {skills.length > 0 && (
+              {isVisible('skills') && skills.length > 0 && (
                 <p>
                   <span className="font-bold text-slate-900">Tools & Research Methods: </span>
                   {skills.map((s) => s.name).join(', ')}
                 </p>
               )}
-              {languages.length > 0 && (
+              {isVisible('languages') && languages.length > 0 && (
                 <p>
                   <span className="font-bold text-slate-900">Languages: </span>
                   {languages.map((l) => `${l.name} (${l.proficiency})`).join(', ')}
@@ -148,9 +196,9 @@ export const OnePageAcademicCompact = ({ cvData }) => {
         )}
 
         {/* 2-Column Academic Referees */}
-        {references.length > 0 && (
+        {isVisible('references') && references.length > 0 && (
           <section>
-            <CompactSectionTitle title="Academic Referees" color={primary} />
+            <CompactSectionTitle title="Academic Referees" color={tokens.primaryColor} />
             <div className="grid grid-cols-2 gap-3 text-[10.5px]">
               {references.slice(0, 2).map((ref, idx) => (
                 <div key={ref.id || idx} className="p-2 rounded border border-slate-200 bg-slate-50/70">
@@ -163,6 +211,20 @@ export const OnePageAcademicCompact = ({ cvData }) => {
               ))}
             </div>
           </section>
+        )}
+
+        {isVisible('personalDetails') && (
+          <CVPersonalDetailsTable personalDetails={personalDetails} compact={true} />
+        )}
+
+        {isVisible('customSections') && customSections.length > 0 && (
+          <CVCustomSections customSections={customSections} primaryColor={tokens.primaryColor} />
+        )}
+
+        {isVisible('declaration') && declaration?.text && (
+          <div className="pt-2 text-[9px] border-t border-slate-200">
+            <CVDeclaration declaration={declaration} />
+          </div>
         )}
       </div>
     </div>

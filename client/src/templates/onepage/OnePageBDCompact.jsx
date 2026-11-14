@@ -5,8 +5,13 @@ import {
   OnePageAvatar,
   CompactSectionTitle,
   OnePageExperienceList,
+  resolveDesignTokens,
+  getSectionVisibility,
+  CVCustomSections,
+  CVDeclaration,
+  CVPersonalDetailsTable,
 } from './onePageShared';
-import { Mail, Phone, MapPin, Linkedin } from 'lucide-react';
+import { Mail, Phone, MapPin, Linkedin, Globe } from 'lucide-react';
 
 export const OnePageBDCompact = ({ cvData, onOpenPhotoModal }) => {
   const editors = useOnePageEditors();
@@ -17,36 +22,58 @@ export const OnePageBDCompact = ({ cvData, onOpenPhotoModal }) => {
     education = [],
     skills = [],
     projects = [],
+    certifications = [],
     languages = [],
     references = [],
     declaration = {},
+    customSections = [],
     design = {},
   } = cvData || {};
 
-  const primary = design?.primaryColor || '#059669';
-  const textColor = design?.textColor || '#1e293b';
-  const fontFamily = design?.fontFamily || 'Inter, sans-serif';
+  const tokens = resolveDesignTokens(cvData, {
+    primaryColor: '#059669', // Emerald BD Green
+    accentColor: '#10b981',
+    headingColor: '#064e3b',
+    bodyColor: '#1e293b',
+    backgroundColor: '#ffffff',
+    headingFont: 'Plus Jakarta Sans',
+    bodyFont: 'Inter',
+    sectionSpacing: 12,
+    itemSpacing: 6,
+    dividerThickness: 1.5,
+  });
+
+  const isVisible = (key) => getSectionVisibility(key, cvData);
 
   const quickBdFacts = [
-    personalDetails.nationality ? `Nationality: ${personalDetails.nationality}` : null,
-    personalDetails.presentAddress ? `Address: ${personalDetails.presentAddress}` : null,
+    personalDetails.fatherName ? `Father: ${personalDetails.fatherName}` : null,
+    personalDetails.motherName ? `Mother: ${personalDetails.motherName}` : null,
     personalDetails.dateOfBirth ? `DOB: ${personalDetails.dateOfBirth}` : null,
+    personalDetails.nationality ? `Nationality: ${personalDetails.nationality}` : null,
+    personalDetails.nid ? `NID: ${personalDetails.nid}` : null,
+    personalDetails.religion ? `Religion: ${personalDetails.religion}` : null,
+    personalDetails.maritalStatus ? `Marital Status: ${personalDetails.maritalStatus}` : null,
+    personalDetails.bloodGroup ? `Blood: ${personalDetails.bloodGroup}` : null,
   ].filter(Boolean);
 
   return (
     <div
-      className="px-7 py-6 bg-white text-slate-800 leading-snug"
-      style={{ fontFamily, color: textColor }}
+      className="px-7 py-6 bg-white leading-snug min-h-[1060px]"
+      style={{
+        fontFamily: `${tokens.bodyFont}, sans-serif`,
+        color: tokens.bodyColor,
+        backgroundColor: tokens.backgroundColor,
+      }}
     >
       {/* Top Banner with Top-Right Bangladeshi Portrait Photo */}
       <div
         className="flex justify-between items-start gap-4 pb-3 mb-3 border-b-2"
-        style={{ borderColor: primary }}
+        style={{ borderColor: tokens.primaryColor }}
       >
         <div className="flex-1 min-w-0 space-y-1">
           <span
             className="text-[9.5px] font-bold uppercase tracking-widest block"
-            style={{ color: primary }}
+            style={{ color: tokens.primaryColor }}
           >
             Curriculum Vitae
           </span>
@@ -57,7 +84,8 @@ export const OnePageBDCompact = ({ cvData, onOpenPhotoModal }) => {
             value={personalInfo.fullName || ''}
             onSave={editors.savePersonal('fullName')}
             placeholder="YOUR FULL NAME"
-            className="text-[22px] font-extrabold uppercase tracking-tight text-slate-950 block leading-tight"
+            className="text-[22px] font-extrabold uppercase tracking-tight block leading-tight"
+            style={{ color: tokens.headingColor, fontFamily: `${tokens.headingFont}, sans-serif` }}
           />
           <EditableElement
             section="personalInfo"
@@ -71,26 +99,32 @@ export const OnePageBDCompact = ({ cvData, onOpenPhotoModal }) => {
           <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 pt-1 text-[10.5px] text-slate-600">
             {personalInfo.phone && (
               <span className="inline-flex items-center gap-1 font-semibold">
-                <Phone className="w-3 h-3 shrink-0" style={{ color: primary }} />
+                <Phone className="w-3 h-3 shrink-0" style={{ color: tokens.primaryColor }} />
                 <span>{personalInfo.phone}</span>
               </span>
             )}
             {personalInfo.email && (
               <span className="inline-flex items-center gap-1">
-                <Mail className="w-3 h-3 shrink-0" style={{ color: primary }} />
+                <Mail className="w-3 h-3 shrink-0" style={{ color: tokens.primaryColor }} />
                 <span>{personalInfo.email}</span>
               </span>
             )}
             {personalInfo.location && (
               <span className="inline-flex items-center gap-1">
-                <MapPin className="w-3 h-3 shrink-0" style={{ color: primary }} />
+                <MapPin className="w-3 h-3 shrink-0" style={{ color: tokens.primaryColor }} />
                 <span>{personalInfo.location}</span>
               </span>
             )}
             {personalInfo.linkedin && (
               <span className="inline-flex items-center gap-1">
-                <Linkedin className="w-3 h-3 shrink-0" style={{ color: primary }} />
+                <Linkedin className="w-3 h-3 shrink-0" style={{ color: tokens.primaryColor }} />
                 <span>{personalInfo.linkedin}</span>
+              </span>
+            )}
+            {personalInfo.website && (
+              <span className="inline-flex items-center gap-1">
+                <Globe className="w-3 h-3 shrink-0" style={{ color: tokens.primaryColor }} />
+                <span>{personalInfo.website}</span>
               </span>
             )}
           </div>
@@ -103,16 +137,17 @@ export const OnePageBDCompact = ({ cvData, onOpenPhotoModal }) => {
           photoStyle={personalInfo.photoStyle || 'portrait'}
           shapeOverride={personalInfo.photoStyle === 'circle' ? 'circle' : 'portrait'}
           photoSize={design?.photoSize}
-          borderColor={primary}
+          photoConfig={personalInfo.photoConfig}
+          borderColor={tokens.primaryColor}
           onOpenPhotoModal={onOpenPhotoModal}
         />
       </div>
 
       <div className="space-y-3">
         {/* Career Objective */}
-        {personalInfo.summary && (
+        {isVisible('summary') && personalInfo.summary && (
           <section>
-            <CompactSectionTitle title="Career Objective" color={primary} variant="bar" />
+            <CompactSectionTitle title="Career Objective" color={tokens.primaryColor} variant="bar" />
             <EditableElement
               section="personalInfo"
               field="summary"
@@ -126,9 +161,9 @@ export const OnePageBDCompact = ({ cvData, onOpenPhotoModal }) => {
         )}
 
         {/* Academic Qualifications Table (BD Recruiter Favorite — Compact 1-page) */}
-        {education.length > 0 && (
+        {isVisible('education') && education.length > 0 && (
           <section>
-            <CompactSectionTitle title="Academic Qualifications" color={primary} variant="bar" />
+            <CompactSectionTitle title="Academic Qualifications" color={tokens.primaryColor} variant="bar" />
             <div className="overflow-hidden rounded border border-slate-200">
               <table className="w-full text-left border-collapse text-[10.5px]">
                 <thead>
@@ -147,7 +182,7 @@ export const OnePageBDCompact = ({ cvData, onOpenPhotoModal }) => {
                       <td className="py-1 px-2 text-center text-slate-600 whitespace-nowrap">
                         {edu.endDate || edu.startDate || '-'}
                       </td>
-                      <td className="py-1 px-2 text-right font-bold whitespace-nowrap" style={{ color: primary }}>
+                      <td className="py-1 px-2 text-right font-bold whitespace-nowrap" style={{ color: tokens.primaryColor }}>
                         {edu.grade || '-'}
                       </td>
                     </tr>
@@ -159,25 +194,25 @@ export const OnePageBDCompact = ({ cvData, onOpenPhotoModal }) => {
         )}
 
         {/* Work Experience */}
-        {experience.length > 0 && (
+        {isVisible('experience') && experience.length > 0 && (
           <section>
-            <CompactSectionTitle title="Work Experience" color={primary} variant="bar" />
+            <CompactSectionTitle title="Work Experience" color={tokens.primaryColor} variant="bar" />
             <OnePageExperienceList
               experience={experience}
               editors={editors}
-              accentColor={primary}
+              accentColor={tokens.primaryColor}
               compact={true}
             />
           </section>
         )}
 
         {/* Key Projects (compact inline list) */}
-        {projects.length > 0 && (
+        {isVisible('projects') && projects.length > 0 && (
           <section>
-            <CompactSectionTitle title="Notable Projects" color={primary} variant="bar" />
+            <CompactSectionTitle title="Notable Projects" color={tokens.primaryColor} variant="bar" />
             <div className="grid grid-cols-2 gap-2 text-[10.5px]">
               {projects.slice(0, 2).map((proj, idx) => (
-                <div key={proj.id || idx} className="border-l-2 pl-2" style={{ borderColor: primary }}>
+                <div key={proj.id || idx} className="border-l-2 pl-2" style={{ borderColor: tokens.primaryColor }}>
                   <p className="font-bold text-slate-900">{proj.name}</p>
                   {proj.description && <p className="text-slate-600 leading-snug">{proj.description}</p>}
                 </div>
@@ -188,9 +223,9 @@ export const OnePageBDCompact = ({ cvData, onOpenPhotoModal }) => {
 
         {/* Core Skills & Personal Snapshot */}
         <div className="grid grid-cols-12 gap-4">
-          {skills.length > 0 && (
+          {isVisible('skills') && skills.length > 0 && (
             <section className={languages.length > 0 ? 'col-span-8' : 'col-span-12'}>
-              <CompactSectionTitle title="Skills & Competencies" color={primary} variant="bar" />
+              <CompactSectionTitle title="Skills & Competencies" color={tokens.primaryColor} variant="bar" />
               <div className="flex flex-wrap gap-1.5">
                 {skills.map((s, idx) => (
                   <span
@@ -203,9 +238,9 @@ export const OnePageBDCompact = ({ cvData, onOpenPhotoModal }) => {
               </div>
             </section>
           )}
-          {languages.length > 0 && (
+          {isVisible('languages') && languages.length > 0 && (
             <section className={skills.length > 0 ? 'col-span-4' : 'col-span-12'}>
-              <CompactSectionTitle title="Languages" color={primary} variant="bar" />
+              <CompactSectionTitle title="Languages" color={tokens.primaryColor} variant="bar" />
               <div className="space-y-0.5 text-[10.5px] text-slate-700">
                 {languages.map((l, idx) => (
                   <div key={l.id || idx}>
@@ -218,32 +253,33 @@ export const OnePageBDCompact = ({ cvData, onOpenPhotoModal }) => {
           )}
         </div>
 
-        {/* Concise Personal Snapshot + Reference + Declaration Footer */}
-        {(quickBdFacts.length > 0 || references.length > 0 || declaration?.text) && (
-          <div className="pt-2 border-t border-slate-200 space-y-1.5 text-[10px] text-slate-600">
-            {quickBdFacts.length > 0 && (
-              <p>
-                <span className="font-bold text-slate-800">Personal Info: </span>
-                {quickBdFacts.join('  •  ')}
-              </p>
-            )}
-            {references.length > 0 && (
-              <p>
-                <span className="font-bold text-slate-800">Reference: </span>
-                {references[0].name}
-                {references[0].designation ? `, ${references[0].designation}` : ''}
-                {references[0].company ? `, ${references[0].company}` : ''}
-                {references[0].phone ? ` (${references[0].phone})` : ''}
-              </p>
-            )}
-            {declaration?.text && (
-              <div className="flex items-end justify-between gap-4 pt-1">
-                <p className="italic text-slate-500 flex-1">{declaration.text}</p>
-                <span className="font-bold text-slate-800 border-t border-slate-400 pt-0.5 px-2 whitespace-nowrap">
-                  {declaration.signedBy || personalInfo.fullName}
-                </span>
-              </div>
-            )}
+        {/* Personal Details Snapshot (BD Standard) */}
+        {isVisible('personalDetails') && quickBdFacts.length > 0 && (
+          <div className="pt-2 border-t border-slate-200">
+            <CVPersonalDetailsTable personalDetails={personalDetails} compact={true} />
+          </div>
+        )}
+
+        {/* Custom Sections */}
+        {isVisible('customSections') && customSections.length > 0 && (
+          <CVCustomSections customSections={customSections} primaryColor={tokens.primaryColor} />
+        )}
+
+        {/* Reference */}
+        {isVisible('references') && references.length > 0 && (
+          <div className="pt-1 text-[10px] text-slate-700">
+            <span className="font-bold text-slate-900">Reference: </span>
+            {references[0].name}
+            {references[0].designation ? `, ${references[0].designation}` : ''}
+            {references[0].company ? `, ${references[0].company}` : ''}
+            {references[0].phone ? ` (${references[0].phone})` : ''}
+          </div>
+        )}
+
+        {/* Declaration Footer */}
+        {isVisible('declaration') && declaration?.text && (
+          <div className="pt-2 border-t border-slate-200">
+            <CVDeclaration declaration={declaration} />
           </div>
         )}
       </div>

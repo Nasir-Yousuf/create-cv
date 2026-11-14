@@ -72,6 +72,97 @@ export const resolvePhotoBoxClasses = ({
 };
 
 /**
+ * Universal Photo / Avatar component with full support for photoConfig,
+ * aspect ratios, border styles, shapes, and interactive modals.
+ */
+export const CVPhoto = ({
+  photo,
+  fullName,
+  showPhoto = true,
+  photoStyle = 'portrait',
+  photoSize = 'md',
+  photoConfig = {},
+  borderColor: propBorderColor,
+  borderWidth: propBorderWidth,
+  onOpenPhotoModal,
+  className = '',
+}) => {
+  if (showPhoto === false) return null;
+
+  const styleType = photoConfig?.shape || photoStyle || 'portrait';
+  const effectiveBorderWidth =
+    typeof propBorderWidth === 'number'
+      ? propBorderWidth
+      : typeof photoConfig?.borderWidth === 'number'
+      ? photoConfig.borderWidth
+      : 2;
+  const effectiveBorderColor =
+    propBorderColor || photoConfig?.borderColor || '#cbd5e1';
+  const effectiveBgColor = photoConfig?.bgColor || '#ffffff';
+
+  const isPortraitAspect =
+    photoConfig?.aspect === 0.75 || photoConfig?.aspect === 0.8 || styleType === 'portrait';
+
+  const sizeClass =
+    isPortraitAspect
+      ? photoSize === 'sm'
+        ? 'w-20 h-28'
+        : photoSize === 'lg'
+        ? 'w-32 h-44'
+        : photoSize === 'xl'
+        ? 'w-36 h-48'
+        : 'w-24 h-32'
+      : photoSize === 'sm'
+      ? 'w-20 h-20'
+      : photoSize === 'lg'
+      ? 'w-32 h-32'
+      : photoSize === 'xl'
+      ? 'w-36 h-36'
+      : 'w-24 h-24';
+
+  const radiusClass =
+    styleType === 'circle' && !isPortraitAspect
+      ? 'rounded-full'
+      : styleType === 'square'
+      ? 'rounded-none'
+      : 'rounded-xl';
+
+  if (photo) {
+    return (
+      <div
+        onClick={() => onOpenPhotoModal && onOpenPhotoModal()}
+        className={`relative group cursor-pointer shrink-0 overflow-hidden ${sizeClass} ${radiusClass} shadow-md cv-photo-frame ${className}`}
+        style={{
+          border: `${effectiveBorderWidth}px solid ${effectiveBorderColor}`,
+          backgroundColor: effectiveBgColor,
+        }}
+        title="Click to change photo"
+      >
+        <img
+          src={photo}
+          alt={fullName || 'Profile Photo'}
+          className="w-full h-full object-cover object-center block cv-photo-img"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={() => onOpenPhotoModal && onOpenPhotoModal()}
+      className={`cursor-pointer shrink-0 ${sizeClass} ${radiusClass} border-2 border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-blue-400 hover:text-blue-500 flex flex-col items-center justify-center text-center p-2 transition-colors print:hidden cv-photo-placeholder ${className}`}
+      title="Click to upload photo"
+    >
+      <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+      <span className="text-[9px] font-sans font-medium">PHOTO</span>
+    </div>
+  );
+};
+
+/**
  * Resolves the complete design tokens hierarchy for any template.
  * Hierarchy: user cvData.designTokens > user cvData.design > templateDefaultTokens > system defaults.
  */
